@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  frontend:
+    build: ./frontend     # Builds image from Dockerfile
+    container_name: react-frontend
+    ports:
+      - "3000:3000"   # Maps container port 3000 to localhost:3000
+    volumes:    # Syncs local code with container for hot reload
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    environment:
+      - CHOKIDAR_USEPOLLING=true    # Makes hot reload work reliably
+    stdin_open: true    # Keeps the container running
+    tty: true
+
+
