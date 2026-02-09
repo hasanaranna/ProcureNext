@@ -8,6 +8,7 @@
     "react-dom": "^19.2.4"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.18",
     "@types/jest": "^30.0.0",
     "@types/node": "^20.19.33",
     "@types/react": "^18.3.28",
