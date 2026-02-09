@@ -3,17 +3,18 @@ version: '3.8'
 services:
   frontend:
     build: ./frontend     # Builds image from Dockerfile
-    container_name: react-frontend
+    container_name: nextjs-frontend
     ports:
       - "3000:3000"   # Maps container port 3000 to localhost:3000
     volumes:    # Syncs local code with container for hot reload
-      - ./frontend/src:/app/src
+      - ./frontend/app:/app/app
       - ./frontend/public:/app/public
       - ./frontend/tsconfig.json:/app/tsconfig.json
-      - ./frontend/tsconfig.node.json:/app/tsconfig.node.json
+      - ./frontend/next.config.ts:/app/next.config.ts
     environment:
-      - CHOKIDAR_USEPOLLING=true    # Makes hot reload work reliably
+      - WATCHPACK_POLLING=true    # Makes hot reload work reliably
     stdin_open: true    # Keeps the container running
     tty: true
+    command: npm run dev
 
 

@@ -1,5 +1,5 @@
 # Use official Node.js image
-FROM node:18-alpine
+FROM node:20-alpine
 
 # Set working directory inside container
 WORKDIR /app
@@ -16,5 +16,5 @@ COPY . .
 # Expose port 3000
 EXPOSE 3000
 
-# Start the development server
-CMD ["npm", "start"]
+# Start the development server by default (can be overridden)
+CMD ["npm", "run", "dev"]
