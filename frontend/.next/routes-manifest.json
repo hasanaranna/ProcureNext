@@ -39,6 +39,36 @@
       "regex": "^/_not\\-found(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/_not\\-found(?:/)?$"
+    },
+    {
+      "page": "/home-buyer",
+      "regex": "^/home\\-buyer(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/home\\-buyer(?:/)?$"
+    },
+    {
+      "page": "/home-seller",
+      "regex": "^/home\\-seller(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/home\\-seller(?:/)?$"
+    },
+    {
+      "page": "/login",
+      "regex": "^/login(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/login(?:/)?$"
+    },
+    {
+      "page": "/signup-buyer",
+      "regex": "^/signup\\-buyer(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/signup\\-buyer(?:/)?$"
+    },
+    {
+      "page": "/signup-seller",
+      "regex": "^/signup\\-seller(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/signup\\-seller(?:/)?$"
     }
   ],
   "dataRoutes": [],

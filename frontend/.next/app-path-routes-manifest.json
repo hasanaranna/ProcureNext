@@ -1,5 +1,10 @@
 {
   "/_global-error/page": "/_global-error",
   "/_not-found/page": "/_not-found",
-  "/page": "/"
+  "/home-buyer/page": "/home-buyer",
+  "/home-seller/page": "/home-seller",
+  "/login/page": "/login",
+  "/page": "/",
+  "/signup-buyer/page": "/signup-buyer",
+  "/signup-seller/page": "/signup-seller"
 }

@@ -1,0 +1,15 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/home-buyer/layout,_N_T_/home-buyer/page,_N_T_/home-buyer"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/home-buyer/__PAGE__",
+    "/home-buyer",
+    "/_index",
+    "/_head"
+  ]
+}
