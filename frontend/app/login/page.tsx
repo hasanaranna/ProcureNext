@@ -32,10 +32,8 @@ export default function LoginPage() {
       return;
     }
 
-    if (formData.email === 'seller@abc.com') {
-      router.push('/home-seller');
-    } else if (formData.email === 'buyer@abc.com') {
-      router.push('/home-buyer');
+    if (formData.email === 'seller@abc.com' || formData.email === 'buyer@abc.com') {
+      router.push('/home');
     } else {
       setError('Invalid email. Use "seller@abc.com" or "buyer@abc.com" for testing.');
     }
