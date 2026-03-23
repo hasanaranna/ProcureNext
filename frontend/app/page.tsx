@@ -1,27 +1,16 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { HERO_BACKGROUND_IMAGE } from '@/lib/constants';
-import SignupModal from '@/components/SignupModal';
+import { useRouter } from "next/navigation";
+import { HERO_BACKGROUND_IMAGE } from "@/lib/constants";
 
 export default function Home() {
   const router = useRouter();
-  const [showSignupModal, setShowSignupModal] = useState(false);
-
-  const openModal = () => {
-    setShowSignupModal(true);
-  };
-
-  const closeModal = () => {
-    setShowSignupModal(false);
-  };
   return (
     <main className="w-full">
       {/* Hero Section with Grey to White Gradient */}
       <section className="relative w-full bg-gradient-to-b from-gray-800 to-white">
         {/* Background Image Section - 50vh */}
-        <div 
+        <div
           className="relative w-full h-[50vh] bg-cover bg-center"
           style={{
             backgroundImage: `url("${HERO_BACKGROUND_IMAGE}")`,
@@ -40,14 +29,14 @@ export default function Home() {
 
         {/* Buttons Section */}
         <div className="relative pt-12 pb-16 px-4 flex gap-6 justify-center flex-wrap">
-          <button 
-            onClick={() => router.push('/login')}
+          <button
+            onClick={() => router.push("/login")}
             className="px-8 py-3 bg-gradient-to-br from-gray-600 to-gray-800 text-white font-semibold rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all duration-200 cursor-pointer shadow-lg hover:shadow-xl hover:scale-105 border border-gray-500"
           >
             Login
           </button>
-          <button 
-            onClick={openModal}
+          <button
+            onClick={() => router.push("/signup-master")}
             className="px-8 py-3 bg-gradient-to-br from-gray-50 to-gray-200 text-gray-700 font-semibold border-2 border-gray-700 rounded-lg hover:from-gray-100 hover:to-gray-300 transition-all duration-200 cursor-pointer shadow-md hover:shadow-lg hover:scale-105"
           >
             Sign Up
@@ -66,37 +55,51 @@ export default function Home() {
           <div className="grid md:grid-cols-2 gap-12 mb-16">
             {/* Left Column */}
             <div>
-              <h3 className="text-2xl font-bold text-gray-800 mb-4">Our Mission</h3>
+              <h3 className="text-2xl font-bold text-gray-800 mb-4">
+                Our Mission
+              </h3>
               <p className="text-gray-600 leading-relaxed mb-6">
-                At ProcureNext, we believe that procurement should be simple, transparent, and efficient. 
-                Our mission is to revolutionize the way organizations manage their procurement processes 
-                by providing cutting-edge technology solutions.
+                At ProcureNext, we believe that procurement should be simple,
+                transparent, and efficient. Our mission is to revolutionize the
+                way organizations manage their procurement processes by
+                providing cutting-edge technology solutions.
               </p>
               <p className="text-gray-600 leading-relaxed">
-                We are committed to helping businesses reduce costs, improve supplier relationships, 
-                and streamline their supply chain operations.
+                We are committed to helping businesses reduce costs, improve
+                supplier relationships, and streamline their supply chain
+                operations.
               </p>
             </div>
 
             {/* Right Column */}
             <div>
-              <h3 className="text-2xl font-bold text-gray-800 mb-4">Why Choose Us?</h3>
+              <h3 className="text-2xl font-bold text-gray-800 mb-4">
+                Why Choose Us?
+              </h3>
               <ul className="space-y-4">
                 <li className="flex items-start gap-3">
                   <span className="text-gray-700 font-bold text-xl">✓</span>
-                  <span className="text-gray-600">Industry-leading automation tools</span>
+                  <span className="text-gray-600">
+                    Industry-leading automation tools
+                  </span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="text-gray-700 font-bold text-xl">✓</span>
-                  <span className="text-gray-600">Real-time analytics and reporting</span>
+                  <span className="text-gray-600">
+                    Real-time analytics and reporting
+                  </span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="text-gray-700 font-bold text-xl">✓</span>
-                  <span className="text-gray-600">Dedicated customer support 24/7</span>
+                  <span className="text-gray-600">
+                    Dedicated customer support 24/7
+                  </span>
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="text-gray-700 font-bold text-xl">✓</span>
-                  <span className="text-gray-600">Secure and compliant platform</span>
+                  <span className="text-gray-600">
+                    Secure and compliant platform
+                  </span>
                 </li>
               </ul>
             </div>
@@ -119,9 +122,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
-      {/* Signup Modal */}
-      <SignupModal isOpen={showSignupModal} onClose={closeModal} />
     </main>
   );
 }

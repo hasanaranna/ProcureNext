@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { SIGNUP_BACKGROUND_IMAGE } from '@/lib/constants';
+import { useState } from "react";
+import { SIGNUP_BACKGROUND_IMAGE } from "@/lib/constants";
 
 interface FileFields {
   nidFront: File | null;
@@ -14,10 +14,10 @@ interface FileFields {
 
 export default function SignupMasterPage() {
   const [formData, setFormData] = useState({
-    name: '',
-    organizationName: '',
-    email: '',
-    phone: '',
+    name: "",
+    organizationName: "",
+    email: "",
+    phone: "",
   });
 
   const [files, setFiles] = useState<FileFields>({
@@ -35,22 +35,22 @@ export default function SignupMasterPage() {
   };
 
   const handleSingleFile = (
-    field: keyof Omit<FileFields, 'additionalDocs'>,
+    field: keyof Omit<FileFields, "additionalDocs">,
     accept: string,
-    e: React.ChangeEvent<HTMLInputElement>
+    e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = e.target.files?.[0] ?? null;
     if (file) {
-      const isImage = accept === 'image/*';
-      const isPdf = accept === '.pdf';
-      if (isImage && !file.type.startsWith('image/')) {
-        alert('Please upload an image file.');
-        e.target.value = '';
+      const isImage = accept === "image/*";
+      const isPdf = accept === ".pdf";
+      if (isImage && !file.type.startsWith("image/")) {
+        alert("Please upload an image file.");
+        e.target.value = "";
         return;
       }
-      if (isPdf && file.type !== 'application/pdf') {
-        alert('Please upload a PDF file.');
-        e.target.value = '';
+      if (isPdf && file.type !== "application/pdf") {
+        alert("Please upload a PDF file.");
+        e.target.value = "";
         return;
       }
     }
@@ -76,7 +76,7 @@ export default function SignupMasterPage() {
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log('Form submitted:', formData, files);
+    console.log("Form submitted:", formData, files);
   };
 
   return (
@@ -84,11 +84,11 @@ export default function SignupMasterPage() {
       className="w-full min-h-screen flex items-center justify-center py-20 px-4 relative overflow-x-hidden"
       style={{
         backgroundImage: `url("${SIGNUP_BACKGROUND_IMAGE}")`,
-        backgroundAttachment: 'fixed',
-        backgroundPosition: 'center',
-        backgroundSize: 'cover',
-        backgroundRepeat: 'no-repeat',
-        backgroundColor: '#374151',
+        backgroundAttachment: "fixed",
+        backgroundPosition: "center",
+        backgroundSize: "cover",
+        backgroundRepeat: "no-repeat",
+        backgroundColor: "#374151",
       }}
     >
       <div className="relative z-10 max-w-2xl mx-auto w-full">
@@ -97,15 +97,21 @@ export default function SignupMasterPage() {
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-2 text-center">
             Create Master Account
           </h1>
-          <p className="text-lg text-gray-700 mb-8 text-center">
+          <p className="text-lg text-gray-700 mb-4 text-center">
             Register as an Owner to manage your organization on ProcureNext
+          </p>
+          <p className="text-sm text-gray-600 mb-8 text-center">
+            Are you an Employee? Use the invitation sent by your company owner
+            to sign up!
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-
             {/* Full Name */}
             <div>
-              <label htmlFor="name" className="block text-sm font-semibold text-gray-800 mb-2">
+              <label
+                htmlFor="name"
+                className="block text-sm font-semibold text-gray-800 mb-2"
+              >
                 Full Name <span className="text-red-600">*</span>
               </label>
               <input
@@ -122,7 +128,10 @@ export default function SignupMasterPage() {
 
             {/* Organization Name */}
             <div>
-              <label htmlFor="organizationName" className="block text-sm font-semibold text-gray-800 mb-2">
+              <label
+                htmlFor="organizationName"
+                className="block text-sm font-semibold text-gray-800 mb-2"
+              >
                 Organization Name <span className="text-red-600">*</span>
               </label>
               <input
@@ -139,7 +148,10 @@ export default function SignupMasterPage() {
 
             {/* Email */}
             <div>
-              <label htmlFor="email" className="block text-sm font-semibold text-gray-800 mb-2">
+              <label
+                htmlFor="email"
+                className="block text-sm font-semibold text-gray-800 mb-2"
+              >
                 Email Address <span className="text-red-600">*</span>
               </label>
               <input
@@ -156,7 +168,10 @@ export default function SignupMasterPage() {
 
             {/* Phone Number */}
             <div>
-              <label htmlFor="phone" className="block text-sm font-semibold text-gray-800 mb-2">
+              <label
+                htmlFor="phone"
+                className="block text-sm font-semibold text-gray-800 mb-2"
+              >
                 Phone Number <span className="text-red-600">*</span>
               </label>
               <input
@@ -173,7 +188,9 @@ export default function SignupMasterPage() {
 
             {/* Divider */}
             <div className="border-t border-gray-300 pt-4">
-              <p className="text-sm font-semibold text-gray-700 mb-4">Identity & Regulatory Documents</p>
+              <p className="text-sm font-semibold text-gray-700 mb-4">
+                Identity & Regulatory Documents
+              </p>
             </div>
 
             {/* NID — Front & Back side by side */}
@@ -184,24 +201,50 @@ export default function SignupMasterPage() {
               <div className="grid grid-cols-2 gap-4">
                 {/* NID Front */}
                 <div>
-                  <p className="text-xs text-gray-600 mb-1 font-medium">Front Side</p>
+                  <p className="text-xs text-gray-600 mb-1 font-medium">
+                    Front Side
+                  </p>
                   <label
                     htmlFor="nidFront"
                     className="flex flex-col items-center justify-center gap-1 px-3 py-4 border-2 border-dashed border-gray-400 rounded-lg bg-white/80 cursor-pointer hover:border-gray-600 transition"
                   >
                     {files.nidFront ? (
                       <>
-                        <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        <svg
+                          className="w-6 h-6 text-green-600"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
                         </svg>
-                        <span className="text-xs text-gray-700 text-center truncate w-full text-center">{files.nidFront.name}</span>
+                        <span className="text-xs text-gray-700 text-center truncate w-full text-center">
+                          {files.nidFront.name}
+                        </span>
                       </>
                     ) : (
                       <>
-                        <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        <svg
+                          className="w-6 h-6 text-gray-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                          />
                         </svg>
-                        <span className="text-xs text-gray-500">Upload image</span>
+                        <span className="text-xs text-gray-500">
+                          Upload image
+                        </span>
                       </>
                     )}
                     <input
@@ -210,31 +253,59 @@ export default function SignupMasterPage() {
                       accept="image/*"
                       className="hidden"
                       required
-                      onChange={(e) => handleSingleFile('nidFront', 'image/*', e)}
+                      onChange={(e) =>
+                        handleSingleFile("nidFront", "image/*", e)
+                      }
                     />
                   </label>
                 </div>
 
                 {/* NID Back */}
                 <div>
-                  <p className="text-xs text-gray-600 mb-1 font-medium">Back Side</p>
+                  <p className="text-xs text-gray-600 mb-1 font-medium">
+                    Back Side
+                  </p>
                   <label
                     htmlFor="nidBack"
                     className="flex flex-col items-center justify-center gap-1 px-3 py-4 border-2 border-dashed border-gray-400 rounded-lg bg-white/80 cursor-pointer hover:border-gray-600 transition"
                   >
                     {files.nidBack ? (
                       <>
-                        <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        <svg
+                          className="w-6 h-6 text-green-600"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
                         </svg>
-                        <span className="text-xs text-gray-700 text-center truncate w-full text-center">{files.nidBack.name}</span>
+                        <span className="text-xs text-gray-700 text-center truncate w-full text-center">
+                          {files.nidBack.name}
+                        </span>
                       </>
                     ) : (
                       <>
-                        <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        <svg
+                          className="w-6 h-6 text-gray-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                          />
                         </svg>
-                        <span className="text-xs text-gray-500">Upload image</span>
+                        <span className="text-xs text-gray-500">
+                          Upload image
+                        </span>
                       </>
                     )}
                     <input
@@ -243,7 +314,9 @@ export default function SignupMasterPage() {
                       accept="image/*"
                       className="hidden"
                       required
-                      onChange={(e) => handleSingleFile('nidBack', 'image/*', e)}
+                      onChange={(e) =>
+                        handleSingleFile("nidBack", "image/*", e)
+                      }
                     />
                   </label>
                 </div>
@@ -261,18 +334,44 @@ export default function SignupMasterPage() {
               >
                 {files.tradeLicense ? (
                   <>
-                    <svg className="w-5 h-5 text-red-600 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                    <svg
+                      className="w-5 h-5 text-red-600 flex-shrink-0"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                    >
                       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
                     </svg>
-                    <span className="text-sm text-gray-700 truncate">{files.tradeLicense.name}</span>
-                    <svg className="w-5 h-5 text-green-600 ml-auto flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    <span className="text-sm text-gray-700 truncate">
+                      {files.tradeLicense.name}
+                    </span>
+                    <svg
+                      className="w-5 h-5 text-green-600 ml-auto flex-shrink-0"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
                     </svg>
                   </>
                 ) : (
                   <>
-                    <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    <svg
+                      className="w-5 h-5 text-gray-400 flex-shrink-0"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                      />
                     </svg>
                     <span className="text-sm text-gray-500">Upload PDF</span>
                   </>
@@ -283,7 +382,7 @@ export default function SignupMasterPage() {
                   accept=".pdf"
                   className="hidden"
                   required
-                  onChange={(e) => handleSingleFile('tradeLicense', '.pdf', e)}
+                  onChange={(e) => handleSingleFile("tradeLicense", ".pdf", e)}
                 />
               </label>
             </div>
@@ -299,18 +398,44 @@ export default function SignupMasterPage() {
               >
                 {files.tinCertificate ? (
                   <>
-                    <svg className="w-5 h-5 text-red-600 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                    <svg
+                      className="w-5 h-5 text-red-600 flex-shrink-0"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                    >
                       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
                     </svg>
-                    <span className="text-sm text-gray-700 truncate">{files.tinCertificate.name}</span>
-                    <svg className="w-5 h-5 text-green-600 ml-auto flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    <span className="text-sm text-gray-700 truncate">
+                      {files.tinCertificate.name}
+                    </span>
+                    <svg
+                      className="w-5 h-5 text-green-600 ml-auto flex-shrink-0"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
                     </svg>
                   </>
                 ) : (
                   <>
-                    <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    <svg
+                      className="w-5 h-5 text-gray-400 flex-shrink-0"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                      />
                     </svg>
                     <span className="text-sm text-gray-500">Upload PDF</span>
                   </>
@@ -321,7 +446,9 @@ export default function SignupMasterPage() {
                   accept=".pdf"
                   className="hidden"
                   required
-                  onChange={(e) => handleSingleFile('tinCertificate', '.pdf', e)}
+                  onChange={(e) =>
+                    handleSingleFile("tinCertificate", ".pdf", e)
+                  }
                 />
               </label>
             </div>
@@ -337,18 +464,44 @@ export default function SignupMasterPage() {
               >
                 {files.vatCertificate ? (
                   <>
-                    <svg className="w-5 h-5 text-red-600 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                    <svg
+                      className="w-5 h-5 text-red-600 flex-shrink-0"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                    >
                       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
                     </svg>
-                    <span className="text-sm text-gray-700 truncate">{files.vatCertificate.name}</span>
-                    <svg className="w-5 h-5 text-green-600 ml-auto flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    <span className="text-sm text-gray-700 truncate">
+                      {files.vatCertificate.name}
+                    </span>
+                    <svg
+                      className="w-5 h-5 text-green-600 ml-auto flex-shrink-0"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
                     </svg>
                   </>
                 ) : (
                   <>
-                    <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    <svg
+                      className="w-5 h-5 text-gray-400 flex-shrink-0"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                      />
                     </svg>
                     <span className="text-sm text-gray-500">Upload PDF</span>
                   </>
@@ -359,7 +512,9 @@ export default function SignupMasterPage() {
                   accept=".pdf"
                   className="hidden"
                   required
-                  onChange={(e) => handleSingleFile('vatCertificate', '.pdf', e)}
+                  onChange={(e) =>
+                    handleSingleFile("vatCertificate", ".pdf", e)
+                  }
                 />
               </label>
             </div>
@@ -368,17 +523,33 @@ export default function SignupMasterPage() {
             <div>
               <label className="block text-sm font-semibold text-gray-800 mb-1">
                 Additional Regulatory Documents
-                <span className="ml-2 text-xs font-normal text-gray-500">(Optional)</span>
+                <span className="ml-2 text-xs font-normal text-gray-500">
+                  (Optional)
+                </span>
               </label>
-              <p className="text-xs text-gray-500 mb-2">Any other supporting documents (PDF, images, etc.)</p>
+              <p className="text-xs text-gray-500 mb-2">
+                Any other supporting documents (PDF, images, etc.)
+              </p>
               <label
                 htmlFor="additionalDocs"
                 className="flex items-center gap-3 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg bg-white/70 cursor-pointer hover:border-gray-500 transition"
               >
-                <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                <svg
+                  className="w-5 h-5 text-gray-400 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
                 </svg>
-                <span className="text-sm text-gray-500">Click to add documents</span>
+                <span className="text-sm text-gray-500">
+                  Click to add documents
+                </span>
                 <input
                   id="additionalDocs"
                   type="file"
@@ -392,12 +563,27 @@ export default function SignupMasterPage() {
               {files.additionalDocs.length > 0 && (
                 <div className="mt-3 space-y-2">
                   {files.additionalDocs.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between bg-white/80 px-3 py-2 rounded-lg border border-gray-300">
+                    <div
+                      key={index}
+                      className="flex items-center justify-between bg-white/80 px-3 py-2 rounded-lg border border-gray-300"
+                    >
                       <div className="flex items-center gap-2 min-w-0">
-                        <svg className="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                        <svg
+                          className="w-4 h-4 text-gray-500 flex-shrink-0"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                          />
                         </svg>
-                        <span className="text-sm text-gray-700 truncate">{file.name}</span>
+                        <span className="text-sm text-gray-700 truncate">
+                          {file.name}
+                        </span>
                       </div>
                       <button
                         type="button"
@@ -422,8 +608,11 @@ export default function SignupMasterPage() {
 
             {/* Login Link */}
             <p className="text-center text-gray-700 text-sm mt-4">
-              Already have an account?{' '}
-              <a href="/login" className="text-gray-800 font-semibold hover:text-gray-900 transition">
+              Already have an account?{" "}
+              <a
+                href="/login"
+                className="text-gray-800 font-semibold hover:text-gray-900 transition"
+              >
                 Login here
               </a>
             </p>

@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from "react";
 
 interface ModalShellProps {
   isOpen: boolean;
@@ -18,7 +18,7 @@ export default function ModalShell({
   isOpen,
   onClose,
   children,
-  maxWidth = 'max-w-md',
+  maxWidth = "max-w-md",
   width,
   height,
 }: ModalShellProps) {
@@ -37,16 +37,18 @@ export default function ModalShell({
   useEffect(() => {
     if (!isOpen) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') handleClose();
+      if (e.key === "Escape") handleClose();
     };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
   }, [isOpen]);
 
   // Lock body scroll
   useEffect(() => {
-    document.body.style.overflow = isOpen ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
+    document.body.style.overflow = isOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -64,19 +66,19 @@ export default function ModalShell({
   return (
     <div
       className={`fixed inset-0 flex items-center justify-center z-50 p-4 transition-opacity duration-300 ${
-        animating ? 'opacity-100' : 'opacity-0'
+        animating ? "opacity-100" : "opacity-0"
       }`}
-      style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+      style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
       onClick={handleClose}
     >
       <div
-        className={`relative flex flex-col rounded-xl shadow-2xl overflow-hidden transition-all duration-300 ${
-          maxWidth !== 'none' ? maxWidth : ''
-        } w-full ${animating ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-10'}`}
+        className={`relative flex flex-col rounded-xl shadow-2xl overflow-y-auto transition-all duration-300 ${
+          maxWidth !== "none" ? maxWidth : ""
+        } w-full max-h-[calc(100vh-2rem)] ${animating ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-10"}`}
         style={{
           ...(width ? { width } : {}),
           ...(height ? { height } : {}),
-          backgroundColor: '#ffffff',
+          backgroundColor: "#ffffff",
         }}
         onClick={(e) => e.stopPropagation()}
       >

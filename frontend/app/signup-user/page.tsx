@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { SIGNUP_BACKGROUND_IMAGE } from '@/lib/constants';
+import { useState } from "react";
+import { SIGNUP_BACKGROUND_IMAGE } from "@/lib/constants";
 
 interface FileFields {
   nidFront: File | null;
@@ -10,9 +10,9 @@ interface FileFields {
 
 export default function SignupUserPage() {
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
+    name: "",
+    email: "",
+    phone: "",
   });
 
   const [files, setFiles] = useState<FileFields>({
@@ -25,12 +25,15 @@ export default function SignupUserPage() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleNidFile = (field: keyof FileFields, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleNidFile = (
+    field: keyof FileFields,
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = e.target.files?.[0] ?? null;
     if (file) {
-      if (!file.type.startsWith('image/')) {
-        alert('Please upload an image file.');
-        e.target.value = '';
+      if (!file.type.startsWith("image/")) {
+        alert("Please upload an image file.");
+        e.target.value = "";
         return;
       }
     }
@@ -39,7 +42,7 @@ export default function SignupUserPage() {
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log('Form submitted:', formData, files);
+    console.log("Form submitted:", formData, files);
   };
 
   return (
@@ -47,11 +50,11 @@ export default function SignupUserPage() {
       className="w-full min-h-screen flex items-center justify-center py-20 px-4 relative overflow-x-hidden"
       style={{
         backgroundImage: `url("${SIGNUP_BACKGROUND_IMAGE}")`,
-        backgroundAttachment: 'fixed',
-        backgroundPosition: 'center',
-        backgroundSize: 'cover',
-        backgroundRepeat: 'no-repeat',
-        backgroundColor: '#374151',
+        backgroundAttachment: "fixed",
+        backgroundPosition: "center",
+        backgroundSize: "cover",
+        backgroundRepeat: "no-repeat",
+        backgroundColor: "#374151",
       }}
     >
       <div className="relative z-10 max-w-2xl mx-auto w-full">
@@ -62,14 +65,17 @@ export default function SignupUserPage() {
             Create Your Account
           </h1>
           <p className="text-lg text-gray-700 mb-8 text-center">
-            Join ProcureNext as a User and get started today
+            Register as a User of CompanyNameGoesHere with ProcureNext
           </p>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Full Name */}
             <div>
-              <label htmlFor="name" className="block text-sm font-semibold text-gray-800 mb-2">
+              <label
+                htmlFor="name"
+                className="block text-sm font-semibold text-gray-800 mb-2"
+              >
                 Full Name <span className="text-red-600">*</span>
               </label>
               <input
@@ -86,7 +92,10 @@ export default function SignupUserPage() {
 
             {/* Email */}
             <div>
-              <label htmlFor="email" className="block text-sm font-semibold text-gray-800 mb-2">
+              <label
+                htmlFor="email"
+                className="block text-sm font-semibold text-gray-800 mb-2"
+              >
                 Email Address <span className="text-red-600">*</span>
               </label>
               <input
@@ -103,7 +112,10 @@ export default function SignupUserPage() {
 
             {/* Mobile Phone */}
             <div>
-              <label htmlFor="phone" className="block text-sm font-semibold text-gray-800 mb-2">
+              <label
+                htmlFor="phone"
+                className="block text-sm font-semibold text-gray-800 mb-2"
+              >
                 Mobile Phone <span className="text-red-600">*</span>
               </label>
               <input
@@ -126,24 +138,50 @@ export default function SignupUserPage() {
               <div className="grid grid-cols-2 gap-4">
                 {/* NID Front */}
                 <div>
-                  <p className="text-xs text-gray-600 mb-1 font-medium">Front Side</p>
+                  <p className="text-xs text-gray-600 mb-1 font-medium">
+                    Front Side
+                  </p>
                   <label
                     htmlFor="nidFront"
                     className="flex flex-col items-center justify-center gap-1 px-3 py-4 border-2 border-dashed border-gray-400 rounded-lg bg-white/80 cursor-pointer hover:border-gray-600 transition"
                   >
                     {files.nidFront ? (
                       <>
-                        <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        <svg
+                          className="w-6 h-6 text-green-600"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
                         </svg>
-                        <span className="text-xs text-gray-700 text-center truncate w-full text-center">{files.nidFront.name}</span>
+                        <span className="text-xs text-gray-700 text-center truncate w-full text-center">
+                          {files.nidFront.name}
+                        </span>
                       </>
                     ) : (
                       <>
-                        <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        <svg
+                          className="w-6 h-6 text-gray-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                          />
                         </svg>
-                        <span className="text-xs text-gray-500">Upload image</span>
+                        <span className="text-xs text-gray-500">
+                          Upload image
+                        </span>
                       </>
                     )}
                     <input
@@ -152,31 +190,57 @@ export default function SignupUserPage() {
                       accept="image/*"
                       className="hidden"
                       required
-                      onChange={(e) => handleNidFile('nidFront', e)}
+                      onChange={(e) => handleNidFile("nidFront", e)}
                     />
                   </label>
                 </div>
 
                 {/* NID Back */}
                 <div>
-                  <p className="text-xs text-gray-600 mb-1 font-medium">Back Side</p>
+                  <p className="text-xs text-gray-600 mb-1 font-medium">
+                    Back Side
+                  </p>
                   <label
                     htmlFor="nidBack"
                     className="flex flex-col items-center justify-center gap-1 px-3 py-4 border-2 border-dashed border-gray-400 rounded-lg bg-white/80 cursor-pointer hover:border-gray-600 transition"
                   >
                     {files.nidBack ? (
                       <>
-                        <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        <svg
+                          className="w-6 h-6 text-green-600"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
                         </svg>
-                        <span className="text-xs text-gray-700 text-center truncate w-full text-center">{files.nidBack.name}</span>
+                        <span className="text-xs text-gray-700 text-center truncate w-full text-center">
+                          {files.nidBack.name}
+                        </span>
                       </>
                     ) : (
                       <>
-                        <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        <svg
+                          className="w-6 h-6 text-gray-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                          />
                         </svg>
-                        <span className="text-xs text-gray-500">Upload image</span>
+                        <span className="text-xs text-gray-500">
+                          Upload image
+                        </span>
                       </>
                     )}
                     <input
@@ -185,7 +249,7 @@ export default function SignupUserPage() {
                       accept="image/*"
                       className="hidden"
                       required
-                      onChange={(e) => handleNidFile('nidBack', e)}
+                      onChange={(e) => handleNidFile("nidBack", e)}
                     />
                   </label>
                 </div>
@@ -202,8 +266,11 @@ export default function SignupUserPage() {
 
             {/* Login Link */}
             <p className="text-center text-gray-700 text-sm mt-4">
-              Already have an account?{' '}
-              <a href="/login" className="text-gray-800 font-semibold hover:text-gray-900 transition">
+              Already have an account?{" "}
+              <a
+                href="/login"
+                className="text-gray-800 font-semibold hover:text-gray-900 transition"
+              >
                 Login here
               </a>
             </p>
