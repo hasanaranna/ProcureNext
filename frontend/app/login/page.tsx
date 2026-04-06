@@ -13,6 +13,7 @@ export default function LoginPage() {
   });
   const [showSignupModal, setShowSignupModal] = useState(false);
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -26,7 +27,8 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
-    
+    setIsSubmitting(true);
+
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
@@ -41,16 +43,26 @@ export default function LoginPage() {
 
       if (res.ok) {
         const data = await res.json();
-        // In a real app, you would store these more securely (e.g., httpOnly cookies)
+        // Store tokens and user context
         localStorage.setItem('access_token', data.access_token);
         localStorage.setItem('refresh_token', data.refresh_token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+
+        // If account is pending, show message instead of redirecting
+        if (data.user.status === 'Pending') {
+          setError('Your account is pending admin approval. You will be notified once it is approved.');
+          return;
+        }
+
         router.push('/home');
       } else {
         const err = await res.json();
         setError(err.error?.message || 'Login failed. Please check your credentials.');
       }
-    } catch (err) {
+    } catch {
       setError('Network error. Unable to connect to the server.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -63,7 +75,7 @@ export default function LoginPage() {
   };
 
   return (
-    <main 
+    <main
       className="w-full min-h-screen flex items-center justify-center py-20 px-4 relative overflow-x-hidden"
       style={{
         backgroundImage: `url("${SIGNUP_BACKGROUND_IMAGE}")`,
@@ -71,11 +83,10 @@ export default function LoginPage() {
         backgroundPosition: 'center',
         backgroundSize: 'cover',
         backgroundRepeat: 'no-repeat',
-        backgroundColor: '#374151', // Fallback grey color for sides
+        backgroundColor: '#374151',
       }}
     >
       <div className="relative z-10 max-w-md mx-auto w-full">
-        {/* Form Container with Header */}
         <div className="bg-white/60 backdrop-blur-md rounded-xl shadow-2xl p-8 md:p-12 border border-white/30">
           {/* Header */}
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-2 text-center">
@@ -131,15 +142,26 @@ export default function LoginPage() {
             {/* Submit Button */}
             <button
               type="submit"
-              className="w-full py-3 mt-8 bg-gradient-to-br from-gray-600 to-gray-800 text-white font-semibold rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all duration-200 shadow-lg hover:shadow-xl"
+              disabled={isSubmitting}
+              className="w-full py-3 mt-8 bg-gradient-to-br from-gray-600 to-gray-800 text-white font-semibold rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Login
+              {isSubmitting ? (
+                <>
+                  <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Logging in...
+                </>
+              ) : (
+                'Login'
+              )}
             </button>
 
             {/* Sign Up Link */}
             <p className="text-center text-gray-700 text-sm mt-6">
-              Don't have an account?{' '}
-              <button 
+              Don&apos;t have an account?{' '}
+              <button
                 type="button"
                 onClick={openSignupModal}
                 className="text-gray-800 font-semibold hover:text-gray-900 transition cursor-pointer bg-none border-none p-0"

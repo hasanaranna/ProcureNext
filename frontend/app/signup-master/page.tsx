@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { SIGNUP_BACKGROUND_IMAGE } from "@/lib/constants";
 
 interface FileFields {
@@ -13,6 +14,7 @@ interface FileFields {
 }
 
 export default function SignupMasterPage() {
+  const router = useRouter();
   const [formData, setFormData] = useState({
     name: "",
     organizationName: "",
@@ -32,9 +34,14 @@ export default function SignupMasterPage() {
     additionalDocs: [],
   });
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    setSubmitError("");
   };
 
   const handleSingleFile = (
@@ -79,29 +86,104 @@ export default function SignupMasterPage() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setIsSubmitting(true);
+    setSubmitError("");
+
     try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: formData.email,
-          nid: Number(formData.nid),
-          date_of_birth: formData.date_of_birth,
-          password: formData.password,
-          phone: formData.phone
-        })
+      const body = new FormData();
+      // Text fields
+      body.append("name", formData.name);
+      body.append("organizationName", formData.organizationName);
+      body.append("email", formData.email);
+      body.append("phone", formData.phone);
+      body.append("nid", formData.nid);
+      body.append("date_of_birth", formData.date_of_birth);
+      body.append("password", formData.password);
+
+      // Files
+      if (files.nidFront) body.append("nidFront", files.nidFront);
+      if (files.nidBack) body.append("nidBack", files.nidBack);
+      if (files.tradeLicense) body.append("tradeLicense", files.tradeLicense);
+      if (files.tinCertificate) body.append("tinCertificate", files.tinCertificate);
+      if (files.vatCertificate) body.append("vatCertificate", files.vatCertificate);
+      files.additionalDocs.forEach((doc) => body.append("additionalDocs", doc));
+
+      const res = await fetch("/api/auth/register-master", {
+        method: "POST",
+        body, // No Content-Type header — browser sets multipart boundary
       });
+
       if (res.ok) {
-        alert("Registration successful. Please login.");
-        window.location.href = '/login';
+        const data = await res.json();
+        // Store tokens
+        localStorage.setItem("access_token", data.access_token);
+        localStorage.setItem("refresh_token", data.refresh_token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+        setSubmitSuccess(true);
       } else {
         const err = await res.json();
-        alert("Error: " + (err.error?.message || "Registration failed"));
+        setSubmitError(err.error?.message || "Registration failed.");
       }
-    } catch (err) {
-      alert("Network error.");
+    } catch {
+      setSubmitError("Network error. Unable to connect to the server.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
+  // Success state
+  if (submitSuccess) {
+    return (
+      <main
+        className="w-full min-h-screen flex items-center justify-center py-20 px-4 relative overflow-x-hidden"
+        style={{
+          backgroundImage: `url("${SIGNUP_BACKGROUND_IMAGE}")`,
+          backgroundAttachment: "fixed",
+          backgroundPosition: "center",
+          backgroundSize: "cover",
+          backgroundRepeat: "no-repeat",
+          backgroundColor: "#374151",
+        }}
+      >
+        <div className="relative z-10 max-w-xl mx-auto w-full">
+          <div className="bg-white/80 backdrop-blur-md rounded-xl shadow-2xl p-8 md:p-12 border border-white/30 text-center">
+            {/* Success Icon */}
+            <div className="w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: '#d1fae5' }}>
+              <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-3">
+              Application Submitted!
+            </h1>
+            <p className="text-gray-600 mb-2">
+              Your master account application has been submitted successfully.
+            </p>
+            <p className="text-gray-500 text-sm mb-8">
+              A system administrator will review your documents and approve your account.
+              You will be able to log in once your account is verified.
+            </p>
+            <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold"
+              style={{ backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #fde68a' }}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Pending Admin Approval
+            </div>
+            <div className="mt-8">
+              <button
+                onClick={() => router.push("/login")}
+                className="px-8 py-3 bg-gradient-to-br from-gray-600 to-gray-800 text-white font-semibold rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all duration-200 shadow-lg hover:shadow-xl"
+              >
+                Go to Login
+              </button>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main
@@ -129,6 +211,13 @@ export default function SignupMasterPage() {
             to sign up!
           </p>
 
+          {/* Error Message */}
+          {submitError && (
+            <div className="mb-6 p-4 bg-red-500/20 border border-red-500 rounded-lg text-red-700 text-sm">
+              {submitError}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Full Name */}
             <div>
@@ -155,7 +244,7 @@ export default function SignupMasterPage() {
                 htmlFor="organizationName"
                 className="block text-sm font-semibold text-gray-800 mb-2"
               >
-                Organization Name
+                Organization Name <span className="text-red-600">*</span>
               </label>
               <input
                 type="text"
@@ -164,6 +253,7 @@ export default function SignupMasterPage() {
                 value={formData.organizationName}
                 onChange={handleChange}
                 placeholder="Enter your organization name"
+                required
                 className="w-full px-4 py-3 border border-gray-400 rounded-lg bg-white/90 text-gray-900 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent transition backdrop-blur-sm"
               />
             </div>
@@ -261,8 +351,9 @@ export default function SignupMasterPage() {
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
-                placeholder="Create a strong password"
+                placeholder="Create a strong password (min 8 characters)"
                 required
+                minLength={8}
                 className="w-full px-4 py-3 border border-gray-400 rounded-lg bg-white/90 text-gray-900 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent transition backdrop-blur-sm"
               />
             </div>
@@ -677,9 +768,20 @@ export default function SignupMasterPage() {
             {/* Submit Button */}
             <button
               type="submit"
-              className="w-full py-3 mt-4 bg-gradient-to-br from-gray-600 to-gray-800 text-white font-semibold rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all duration-200 shadow-lg hover:shadow-xl"
+              disabled={isSubmitting}
+              className="w-full py-3 mt-4 bg-gradient-to-br from-gray-600 to-gray-800 text-white font-semibold rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Create Master Account
+              {isSubmitting ? (
+                <>
+                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Submitting...
+                </>
+              ) : (
+                "Create Master Account"
+              )}
             </button>
 
             {/* Login Link */}

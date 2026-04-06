@@ -1,8 +1,14 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { env } from './config/env.js';
 import { pool } from './config/db.js';
 import authRoutes from './modules/auth/auth.routes.js';
+import orgRoutes from './modules/org/org.routes.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 
@@ -10,8 +16,17 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Serve uploaded files statically
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // Main Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/org', orgRoutes);
+
+// Default API route
+app.get('/', (req, res) => {
+  res.send('ProcureNext API is running. Please access the frontend at its respective port (usually http://localhost:3000).');
+});
 
 // Health check and DB test route
 app.get('/health', async (req, res) => {

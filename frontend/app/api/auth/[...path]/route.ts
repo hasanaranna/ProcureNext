@@ -14,16 +14,29 @@ type RouteContext = {
 async function proxyRequest(request: NextRequest, context: RouteContext) {
   const { path } = await context.params;
   const endpoint = path.join('/');
-  const targetUrl = `${backendBaseUrl}/api/auth/${endpoint}`;
+
+  // Preserve query string
+  const url = new URL(request.url);
+  const queryString = url.search;
+  const targetUrl = `${backendBaseUrl}/api/auth/${endpoint}${queryString}`;
 
   try {
     const outboundHeaders = new Headers(request.headers);
     outboundHeaders.delete('host');
 
-    const requestBody =
-      request.method === 'GET' || request.method === 'HEAD'
-        ? undefined
-        : await request.text();
+    let requestBody: BodyInit | undefined;
+
+    if (request.method === 'GET' || request.method === 'HEAD') {
+      requestBody = undefined;
+    } else {
+      const contentType = request.headers.get('content-type') || '';
+      if (contentType.includes('multipart/form-data')) {
+        // Forward multipart form data as-is (binary body)
+        requestBody = await request.arrayBuffer();
+      } else {
+        requestBody = await request.text();
+      }
+    }
 
     const upstreamResponse = await fetch(targetUrl, {
       method: request.method,

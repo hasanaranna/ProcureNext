@@ -43,6 +43,7 @@ services:
     volumes:
       # Syncs local code with container for hot reload
       - ./frontend/app:/app/app:z
+      - ./frontend/components:/app/components:z
       - ./frontend/public:/app/public:z
       - ./frontend/tsconfig.json:/app/tsconfig.json:z
       - ./frontend/next.config.ts:/app/next.config.ts:z

@@ -1,40 +1,106 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 interface SentInvitation {
+  invitation_id: number;
   email: string;
-  sentAt: string;
+  token: string;
+  status: string;
+  created_at: string;
+  expires_at: string;
 }
-
-const dummyInvitations: SentInvitation[] = [
-  { email: 'alice.johnson@example.com', sentAt: 'March 10, 2026' },
-  { email: 'robert.khan@techcorp.io', sentAt: 'March 9, 2026' },
-  { email: 'sara.ahmed@buildright.com', sentAt: 'March 7, 2026' },
-  { email: 'mike.torres@globalco.net', sentAt: 'March 5, 2026' },
-];
 
 export default function InvitationSection() {
   const [activeTab, setActiveTab] = useState<'invite' | 'sent'>('invite');
   const [email, setEmail] = useState('');
-  const [invitations, setInvitations] = useState<SentInvitation[]>(dummyInvitations);
+  const [invitations, setInvitations] = useState<SentInvitation[]>([]);
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [copiedId, setCopiedId] = useState<number | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const getAuthHeaders = (): Record<string, string> => {
+    const token = localStorage.getItem('access_token');
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    };
+  };
+
+  const fetchInvitations = useCallback(async () => {
+    try {
+      const res = await fetch('/api/org/invitations', {
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setInvitations(data.invitations || []);
+      }
+    } catch {
+      console.error('Failed to fetch invitations');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchInvitations();
+  }, [fetchInvitations]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
-    setInvitations((prev) => [
-      { email: email.trim(), sentAt: 'March 12, 2026' },
-      ...prev,
-    ]);
-    setEmail('');
-    setSubmitted(true);
-    setTimeout(() => setSubmitted(false), 3000);
+    setError('');
+
+    try {
+      const res = await fetch('/api/org/invitations', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ email: email.trim() }),
+      });
+
+      if (res.ok) {
+        setEmail('');
+        setSubmitted(true);
+        setTimeout(() => setSubmitted(false), 3000);
+        fetchInvitations(); // Refresh the list
+      } else {
+        const err = await res.json();
+        setError(err.error?.message || 'Failed to send invitation.');
+      }
+    } catch {
+      setError('Network error. Please try again.');
+    }
   };
 
-  const handleCancel = (targetEmail: string) => {
-    setInvitations((prev) => prev.filter((inv) => inv.email !== targetEmail));
+  const handleCancel = async (invitationId: number) => {
+    try {
+      const res = await fetch(`/api/org/invitations/${invitationId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+
+      if (res.ok) {
+        setInvitations((prev) => prev.filter((inv) => inv.invitation_id !== invitationId));
+      } else {
+        const err = await res.json();
+        alert(err.error?.message || 'Failed to cancel invitation.');
+      }
+    } catch {
+      alert('Network error.');
+    }
   };
+
+  const handleCopyLink = (invitation: SentInvitation) => {
+    const link = `${window.location.origin}/signup-user?token=${invitation.token}`;
+    navigator.clipboard.writeText(link).then(() => {
+      setCopiedId(invitation.invitation_id);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  };
+
+  const pendingInvitations = invitations.filter((inv) => inv.status === 'Pending');
 
   return (
     <div className="flex flex-col h-full">
@@ -59,12 +125,12 @@ export default function InvitationSection() {
           }}
         >
           📬 Sent Invitations
-          {invitations.length > 0 && (
+          {pendingInvitations.length > 0 && (
             <span
               className="ml-2 px-2 py-0.5 rounded-full text-xs font-bold text-white"
               style={{ backgroundColor: '#4a5668' }}
             >
-              {invitations.length}
+              {pendingInvitations.length}
             </span>
           )}
         </button>
@@ -76,7 +142,8 @@ export default function InvitationSection() {
           <div className="max-w-lg mx-auto">
             <h3 className="text-lg font-bold text-gray-800 mb-1">Send an Invitation</h3>
             <p className="text-gray-500 text-sm mb-6">
-              Enter the email address of the employee you'd like to invite to your organization.
+              Enter the email address of the employee you&apos;d like to invite to your organization.
+              An invitation link will be generated for you to share.
             </p>
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -88,7 +155,7 @@ export default function InvitationSection() {
                   id="invite-email"
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => { setEmail(e.target.value); setError(''); }}
                   placeholder="colleague@company.com"
                   required
                   className="w-full px-4 py-3 rounded-xl border-2 text-gray-900 placeholder-gray-400 focus:outline-none transition"
@@ -97,6 +164,19 @@ export default function InvitationSection() {
                   onBlur={(e) => (e.currentTarget.style.borderColor = '#d1d5db')}
                 />
               </div>
+
+              {error && (
+                <div
+                  className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium"
+                  style={{ backgroundColor: '#fef2f2', color: '#b91c1c', border: '1px solid #fecaca' }}
+                >
+                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  {error}
+                </div>
+              )}
 
               <button
                 type="submit"
@@ -114,7 +194,7 @@ export default function InvitationSection() {
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  Invitation sent successfully!
+                  Invitation sent successfully! Copy the link from the &quot;Sent Invitations&quot; tab.
                 </div>
               )}
             </form>
@@ -123,12 +203,21 @@ export default function InvitationSection() {
           <div>
             <h3 className="text-lg font-bold text-gray-800 mb-1">Sent Invitations</h3>
             <p className="text-gray-500 text-sm mb-6">
-              {invitations.length === 0
-                ? 'No pending invitations.'
-                : `${invitations.length} pending invitation${invitations.length > 1 ? 's' : ''}`}
+              {loading
+                ? 'Loading...'
+                : invitations.length === 0
+                  ? 'No invitations sent yet.'
+                  : `${invitations.length} invitation${invitations.length > 1 ? 's' : ''} total (${pendingInvitations.length} pending)`}
             </p>
 
-            {invitations.length === 0 ? (
+            {loading ? (
+              <div className="flex justify-center py-12">
+                <svg className="animate-spin h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              </div>
+            ) : invitations.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-gray-400">
                 <svg className="w-12 h-12 mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -139,29 +228,70 @@ export default function InvitationSection() {
               <div className="flex flex-col gap-3">
                 {invitations.map((inv) => (
                   <div
-                    key={inv.email}
+                    key={inv.invitation_id}
                     className="flex items-center justify-between px-5 py-4 rounded-xl border"
-                    style={{ backgroundColor: '#f9fafb', borderColor: '#e5e7eb' }}
+                    style={{
+                      backgroundColor: inv.status === 'Pending' ? '#f9fafb' : '#f3f4f6',
+                      borderColor: '#e5e7eb',
+                      opacity: inv.status === 'Pending' ? 1 : 0.7,
+                    }}
                   >
                     <div className="flex items-center gap-3">
                       <div
                         className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
-                        style={{ backgroundColor: '#4a5668' }}
+                        style={{ backgroundColor: inv.status === 'Pending' ? '#4a5668' : '#9ca3af' }}
                       >
                         {inv.email[0].toUpperCase()}
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-gray-900">{inv.email}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">Sent on {inv.sentAt}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <p className="text-xs text-gray-400">
+                            Sent on {new Date(inv.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </p>
+                          <span
+                            className="px-2 py-0.5 rounded-full text-xs font-semibold"
+                            style={{
+                              backgroundColor:
+                                inv.status === 'Pending' ? '#fef3c7' :
+                                inv.status === 'Accepted' ? '#d1fae5' :
+                                '#fee2e2',
+                              color:
+                                inv.status === 'Pending' ? '#92400e' :
+                                inv.status === 'Accepted' ? '#065f46' :
+                                '#b91c1c',
+                            }}
+                          >
+                            {inv.status}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleCancel(inv.email)}
-                      className="px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 hover:opacity-80"
-                      style={{ backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5' }}
-                    >
-                      Cancel Invitation
-                    </button>
+
+                    <div className="flex items-center gap-2">
+                      {inv.status === 'Pending' && (
+                        <>
+                          <button
+                            onClick={() => handleCopyLink(inv)}
+                            className="px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 hover:opacity-80"
+                            style={{
+                              backgroundColor: copiedId === inv.invitation_id ? '#d1fae5' : '#e0e7ff',
+                              color: copiedId === inv.invitation_id ? '#065f46' : '#3730a3',
+                              border: `1px solid ${copiedId === inv.invitation_id ? '#86efac' : '#c7d2fe'}`,
+                            }}
+                          >
+                            {copiedId === inv.invitation_id ? '✓ Copied!' : '🔗 Copy Link'}
+                          </button>
+                          <button
+                            onClick={() => handleCancel(inv.invitation_id)}
+                            className="px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 hover:opacity-80"
+                            style={{ backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5' }}
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
