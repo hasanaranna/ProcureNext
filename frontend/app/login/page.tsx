@@ -23,19 +23,34 @@ export default function LoginPage() {
     setError('');
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setError('');
     
-    // Simple authentication logic for testing
-    if (formData.password !== '123') {
-      setError('Invalid password. Use "123" for testing.');
-      return;
-    }
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+        }),
+      });
 
-    if (formData.email === 'seller@abc.com' || formData.email === 'buyer@abc.com') {
-      router.push('/home');
-    } else {
-      setError('Invalid email. Use "seller@abc.com" or "buyer@abc.com" for testing.');
+      if (res.ok) {
+        const data = await res.json();
+        // In a real app, you would store these more securely (e.g., httpOnly cookies)
+        localStorage.setItem('access_token', data.access_token);
+        localStorage.setItem('refresh_token', data.refresh_token);
+        router.push('/home');
+      } else {
+        const err = await res.json();
+        setError(err.error?.message || 'Login failed. Please check your credentials.');
+      }
+    } catch (err) {
+      setError('Network error. Unable to connect to the server.');
     }
   };
 

@@ -13,6 +13,9 @@ export default function SignupUserPage() {
     name: "",
     email: "",
     phone: "",
+    nid: "",
+    date_of_birth: "",
+    password: "",
   });
 
   const [files, setFiles] = useState<FileFields>({
@@ -40,9 +43,30 @@ export default function SignupUserPage() {
     setFiles((prev) => ({ ...prev, [field]: file }));
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log("Form submitted:", formData, files);
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.email,
+          nid: Number(formData.nid),
+          date_of_birth: formData.date_of_birth,
+          password: formData.password,
+          phone: formData.phone
+        })
+      });
+      if (res.ok) {
+        alert("Registration successful. Please login.");
+        window.location.href = '/login';
+      } else {
+        const err = await res.json();
+        alert("Error: " + (err.error?.message || "Registration failed"));
+      }
+    } catch (err) {
+      alert("Network error.");
+    }
   };
 
   return (
@@ -76,7 +100,7 @@ export default function SignupUserPage() {
                 htmlFor="name"
                 className="block text-sm font-semibold text-gray-800 mb-2"
               >
-                Full Name <span className="text-red-600">*</span>
+                Full Name
               </label>
               <input
                 type="text"
@@ -85,7 +109,6 @@ export default function SignupUserPage() {
                 value={formData.name}
                 onChange={handleChange}
                 placeholder="Enter your full name"
-                required
                 className="w-full px-4 py-3 border border-gray-400 rounded-lg bg-white/90 text-gray-900 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent transition backdrop-blur-sm"
               />
             </div>
@@ -130,10 +153,69 @@ export default function SignupUserPage() {
               />
             </div>
 
+            {/* NID Number */}
+            <div>
+              <label
+                htmlFor="nid"
+                className="block text-sm font-semibold text-gray-800 mb-2"
+              >
+                National ID Number <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="number"
+                id="nid"
+                name="nid"
+                value={formData.nid}
+                onChange={handleChange}
+                placeholder="Enter your NID number"
+                required
+                className="w-full px-4 py-3 border border-gray-400 rounded-lg bg-white/90 text-gray-900 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent transition backdrop-blur-sm"
+              />
+            </div>
+
+            {/* Date of Birth */}
+            <div>
+              <label
+                htmlFor="date_of_birth"
+                className="block text-sm font-semibold text-gray-800 mb-2"
+              >
+                Date of Birth <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="date"
+                id="date_of_birth"
+                name="date_of_birth"
+                value={formData.date_of_birth}
+                onChange={handleChange}
+                required
+                className="w-full px-4 py-3 border border-gray-400 rounded-lg bg-white/90 text-gray-900 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent transition backdrop-blur-sm"
+              />
+            </div>
+
+            {/* Password */}
+            <div>
+              <label
+                htmlFor="password"
+                className="block text-sm font-semibold text-gray-800 mb-2"
+              >
+                Password <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="password"
+                id="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="Create a strong password"
+                required
+                className="w-full px-4 py-3 border border-gray-400 rounded-lg bg-white/90 text-gray-900 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent transition backdrop-blur-sm"
+              />
+            </div>
+
             {/* NID — Front & Back side by side */}
             <div>
               <label className="block text-sm font-semibold text-gray-800 mb-2">
-                National ID (NID) <span className="text-red-600">*</span>
+                National ID (NID)
               </label>
               <div className="grid grid-cols-2 gap-4">
                 {/* NID Front */}
@@ -189,7 +271,6 @@ export default function SignupUserPage() {
                       type="file"
                       accept="image/*"
                       className="hidden"
-                      required
                       onChange={(e) => handleNidFile("nidFront", e)}
                     />
                   </label>
@@ -248,7 +329,6 @@ export default function SignupUserPage() {
                       type="file"
                       accept="image/*"
                       className="hidden"
-                      required
                       onChange={(e) => handleNidFile("nidBack", e)}
                     />
                   </label>

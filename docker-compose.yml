@@ -1,20 +1,59 @@
 version: '3.8'
 
 services:
-  frontend:
-    build: ./frontend     # Builds image from Dockerfile
-    container_name: nextjs-frontend
+  db:
+    image: postgres:15-alpine
+    container_name: postgres-db
     ports:
-      - "3000:3000"   # Maps container port 3000 to localhost:3000
-    volumes:    # Syncs local code with container for hot reload
-      - ./frontend/app:/app/app
-      - ./frontend/public:/app/public
-      - ./frontend/tsconfig.json:/app/tsconfig.json
-      - ./frontend/next.config.ts:/app/next.config.ts
+      - "5433:5432"
     environment:
-      - WATCHPACK_POLLING=true    # Makes hot reload work reliably
-    stdin_open: true    # Keeps the container running
-    tty: true
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: procurenext
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:z
+
+  backend:
+    build: ./backend
+    container_name: express-backend
+    ports:
+      - "5000:5000"
+    environment:
+      PORT: 5000
+      DB_USER: user
+      DB_PASSWORD: password
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: procurenext
+      JWT_ACCESS_SECRET: supersecretaccess
+      JWT_REFRESH_SECRET: supersecretrefresh
+    volumes:
+      - ./backend:/app:z
+      - /app/node_modules
+    depends_on:
+      - db
     command: npm run dev
 
+  frontend:
+    build: ./frontend # Builds image from Dockerfile
+    container_name: nextjs-frontend
+    ports:
+      - "3000:3000" # Maps container port 3000 to localhost:3000
+    volumes:
+      # Syncs local code with container for hot reload
+      - ./frontend/app:/app/app:z
+      - ./frontend/public:/app/public:z
+      - ./frontend/tsconfig.json:/app/tsconfig.json:z
+      - ./frontend/next.config.ts:/app/next.config.ts:z
+    environment:
+      - WATCHPACK_POLLING=true # Makes hot reload work reliably
+      - BACKEND_API_URL=http://backend:5000
+    stdin_open: true # Keeps the container running
+    tty: true
+    depends_on:
+      - backend
+    command: npm run dev
 
+volumes:
+  postgres_data:
