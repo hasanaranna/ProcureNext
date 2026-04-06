@@ -113,6 +113,20 @@ export default function MessagingSidebar({ isOpen, onClose }: MessagingSidebarPr
   const [orgModalOpen, setOrgModalOpen] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  const [isOwner, setIsOwner] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('user');
+      if (stored) {
+        const userData = JSON.parse(stored);
+        if (userData.role_in_org === 'Owner') {
+          setIsOwner(true);
+        }
+      }
+    } catch { }
+  }, []);
+
   useEffect(() => {
     if (activeChat) {
       chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -180,15 +194,17 @@ export default function MessagingSidebar({ isOpen, onClose }: MessagingSidebarPr
             >
               <h2 className="text-xl font-bold text-white">TechVision Corp</h2>
               <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setOrgModalOpen(true)}
-                  className="px-4 py-1.5 rounded-full text-sm font-semibold transition-colors duration-200"
-                  style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#e0e7ff' }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.25)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
-                >
-                  Organization Management
-                </button>
+                {isOwner && (
+                  <button
+                    onClick={() => setOrgModalOpen(true)}
+                    className="px-4 py-1.5 rounded-full text-sm font-semibold transition-colors duration-200"
+                    style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#e0e7ff' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.25)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.15)')}
+                  >
+                    Organization Management
+                  </button>
+                )}
                 <button
                   onClick={onClose}
                   className="p-1 rounded-full transition-colors duration-200 text-gray-300 hover:text-white"
