@@ -1,0 +1,56 @@
+# ============================================================
+# ProcureNext Backend - Python Dependencies
+# ============================================================
+
+# --- Web Framework ---
+fastapi
+uvicorn[standard]
+
+# --- Database & ORM ---
+sqlalchemy
+asyncpg
+psycopg2-binary
+alembic
+
+# --- pgvector support for semantic search embeddings ---
+pgvector
+
+# --- Data Validation ---
+pydantic
+pydantic-settings
+email-validator
+
+# --- Authentication & Security ---
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+pyotp
+
+# --- Async Task Queue ---
+celery[redis]
+redis
+
+# --- Payment Gateway ---
+# SSLCommerz Python SDK (or raw HTTP integration)
+requests
+
+# --- File/Object Storage (S3/MinIO) ---
+boto3
+
+# --- Email ---
+fastapi-mail
+
+# --- PDF Processing (triggers to ML service) ---
+python-multipart
+aiofiles
+
+# --- WebSocket support (for real-time notifications/chat) ---
+websockets
+
+# --- Testing ---
+pytest
+pytest-asyncio
+httpx
+
+# --- Utilities ---
+python-dotenv
