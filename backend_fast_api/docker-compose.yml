@@ -1,0 +1,26 @@
+# ============================================================
+# Docker Compose - ProcureNext Development Stack
+# ============================================================
+# PURPOSE:
+# Orchestrates the full development environment with all services:
+#
+# Services to define:
+#   1. backend     - FastAPI application (this codebase)
+#   2. db          - PostgreSQL 15+ with pgvector extension
+#   3. redis       - Redis for caching, session store, and Celery broker
+#   4. celery      - Celery worker for async tasks (PDF processing,
+#                    notification dispatch, payment processing)
+#   5. minio       - MinIO object storage (S3-compatible) for PDFs,
+#                    NDAs, certificates, and audit reports
+#   6. ml_service  - ML microservice (separate repo/container) for
+#                    semantic search and vendor matching
+#
+# Volumes:
+#   - postgres_data: Persistent database storage
+#   - minio_data:    Persistent object storage
+#
+# Networks:
+#   - procurenext-network: Internal bridge network for service comms
+#
+# USAGE: docker-compose up --build
+# ============================================================
