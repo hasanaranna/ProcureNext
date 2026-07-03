@@ -24,17 +24,16 @@ export default function HomePage() {
     email?: string;
     organization_name?: string;
     role_in_org?: string;
-    status?: string;
   }>({});
 
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem('user');
-      if (stored) {
-        setUserData(JSON.parse(stored));
-      }
-    } catch { }
-  }, []);
+  // useEffect(() => {
+  //   try {
+  //     const stored = localStorage.getItem('user');
+  //     if (stored) {
+  //       setUserData(JSON.parse(stored));
+  //     }
+  //   } catch { }
+  // }, []);
 
   const handleModeSwitch = (newMode: 'buyer' | 'seller') => {
     if (newMode === mode) return;
@@ -77,7 +76,7 @@ export default function HomePage() {
     email: userData.email || 'user@example.com',
     avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.full_name || 'User')}&background=0D8ABC&color=fff`,
     orgName: userData.organization_name || 'Organization',
-    role: userData.role_in_org || null,
+    role: userData.role_in_org || 'Owner',
   };
 
   const isOwner = user.role === 'Owner';
