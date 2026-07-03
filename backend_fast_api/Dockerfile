@@ -1,12 +1,15 @@
-# ============================================================
-# Dockerfile for ProcureNext FastAPI Backend
-# ============================================================
-# PURPOSE:
-# - Containerize the FastAPI application with all dependencies
-# - Ensure identical behavior across dev and production
-# - Include system-level dependencies needed for PDF processing
-#   and ML model inference
-#
-# BUILD: docker build -t procurenext-backend .
-# RUN:   docker run -p 8000:8000 procurenext-backend
-# ============================================================
+FROM python:3.11-slim
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
+COPY . /app
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

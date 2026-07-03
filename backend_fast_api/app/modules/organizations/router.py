@@ -59,3 +59,32 @@
 # GET /search-organization
 #   - Search organizations by name, type, location
 # ============================================================
+
+from fastapi import APIRouter
+
+from app.modules.organizations.schemas import OrgInvitationCreateRequest
+
+router = APIRouter(prefix="/api/org", tags=["organizations"])
+
+
+@router.get("/invitations")
+async def list_invitations() -> dict:
+	return {"invitations": []}
+
+
+@router.post("/invitations")
+async def create_invitation(payload: OrgInvitationCreateRequest) -> dict:
+	# Required debugging hook: print incoming request body in backend console.
+	print(f"[POST /api/org/invitations] body={payload.model_dump()}", flush=True)
+	return {
+		"message": "Invitation payload received.",
+		"invitation": payload.model_dump(),
+	}
+
+
+@router.delete("/invitations/{invitation_id}")
+async def cancel_invitation(invitation_id: int) -> dict:
+	return {
+		"message": "Invitation canceled.",
+		"invitation_id": invitation_id,
+	}

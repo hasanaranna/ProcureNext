@@ -20,3 +20,9 @@
 # - OrgReportRequest: reason, description
 # - OrgSearchQuery: name, type, location filters
 # ============================================================
+
+from pydantic import BaseModel, EmailStr
+
+
+class OrgInvitationCreateRequest(BaseModel):
+	email: EmailStr
