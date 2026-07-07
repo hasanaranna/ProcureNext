@@ -60,11 +60,33 @@
 #   - Search organizations by name, type, location
 # ============================================================
 
-from fastapi import APIRouter
+import os
+import secrets
+
+# pyrefly: ignore [missing-import]
+import asyncpg
+from fastapi import APIRouter, HTTPException
 
 from app.modules.organizations.schemas import OrgInvitationCreateRequest
 
 router = APIRouter(prefix="/api/org", tags=["organizations"])
+
+
+def _get_database_url() -> str | None:
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        return database_url
+
+    db_user = os.getenv("DB_USER")
+    db_password = os.getenv("DB_PASSWORD")
+    db_host = os.getenv("DB_HOST")
+    db_port = os.getenv("DB_PORT", "5432")
+    db_name = os.getenv("DB_NAME")
+
+    if all([db_user, db_password, db_host, db_name]):
+        return f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+
+    return None
 
 
 @router.get("/invitations")
@@ -74,13 +96,87 @@ async def list_invitations() -> dict:
 
 @router.post("/invitations")
 async def create_invitation(payload: OrgInvitationCreateRequest) -> dict:
-	# Required debugging hook: print incoming request body in backend console.
-	print(f"[POST /api/org/invitations] body={payload.model_dump()}", flush=True)
-	return {
-		"message": "Invitation payload received.",
-		"invitation": payload.model_dump(),
-	}
+    # Required debugging hook: print incoming request body in backend console.
+    print(f"[POST /api/org/invitations] body={payload.model_dump()}", flush=True)
 
+    token = secrets.token_urlsafe(32)
+    database_url = _get_database_url()
+
+    if not database_url:
+        print("[ERROR] DATABASE_URL is not set in environment variables.", flush=True)
+        raise HTTPException(status_code=500, detail="Database connection settings are not configured.")
+
+    try:
+        connection = await asyncpg.connect(database_url)
+        try:
+            # Check if an invitation with the same (organization_id, invited_by, email) already exists
+            existing = await connection.fetchrow(
+                """
+                SELECT invitation_id
+                FROM user_invitations
+                WHERE organization_id = $1
+                  AND invited_by = $2
+                  AND email = $3
+                """,
+                payload.organization_id,
+                payload.invited_by,
+                payload.email,
+            )
+
+            if existing is not None:
+                # Update existing invitation: refresh timestamps and regenerate token
+                invitation = await connection.fetchrow(
+                    """
+                    UPDATE user_invitations
+                    SET token = $1,
+                        created_at = NOW(),
+                        expires_at = NOW() + INTERVAL '7 days'
+                    WHERE invitation_id = $2
+                    RETURNING invitation_id, organization_id, invited_by, email, token, status, created_at, expires_at
+                    """,
+                    token,
+                    existing["invitation_id"],
+                )
+                message = "Invitation updated."
+            else:
+                # Insert a new invitation
+                invitation = await connection.fetchrow(
+                    """
+                    INSERT INTO user_invitations (
+                        organization_id,
+                        invited_by,
+                        email,
+                        token,
+                        status
+                    )
+                    VALUES ($1, $2, $3, $4, 'Pending')
+                    RETURNING invitation_id, organization_id, invited_by, email, token, status, created_at, expires_at
+                    """,
+                    payload.organization_id,
+                    payload.invited_by,
+                    payload.email,
+                    token,
+                )
+                message = "Invitation created."
+
+            if invitation is None:
+                raise HTTPException(status_code=500, detail="Failed to create invitation: query returned None.")
+            return {
+                "message": message,
+                "invitation": dict(invitation.items()),
+            }
+        finally:
+            await connection.close()
+            
+    except asyncpg.PostgresError as exc:
+        # Captures specific PostgreSQL errors (e.g., unique violation, missing column)
+        print(f"[DB ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Database Error: {str(exc)}") from exc
+        
+    except Exception as exc:
+        # Captures other Python/connection errors
+        print(f"[SYSTEM ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
 
 @router.delete("/invitations/{invitation_id}")
 async def cancel_invitation(invitation_id: int) -> dict:

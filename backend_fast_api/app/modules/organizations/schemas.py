@@ -26,3 +26,5 @@ from pydantic import BaseModel, EmailStr
 
 class OrgInvitationCreateRequest(BaseModel):
 	email: EmailStr
+	organization_id: int
+	invited_by: int

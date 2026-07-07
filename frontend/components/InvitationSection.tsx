@@ -11,6 +11,8 @@ interface SentInvitation {
   expires_at: string;
 }
 
+//organization id, invited_by id (user id) lagbe when sending invitation. for now dummy vals.
+
 export default function InvitationSection() {
   const [activeTab, setActiveTab] = useState<'invite' | 'sent'>('invite');
   const [email, setEmail] = useState('');
@@ -19,6 +21,8 @@ export default function InvitationSection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [invitationToken, setInvitationToken] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const getAuthHeaders = (): Record<string, string> => {
     const token = localStorage.getItem('access_token');
@@ -57,13 +61,19 @@ export default function InvitationSection() {
       const res = await fetch('/api/org/invitations', {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ email: email.trim() }),
+        body: JSON.stringify({ email: email.trim(), 
+                               organization_id: 1, // Replace with actual organization ID
+                               invited_by: 1  // Replace with actual user ID
+                            }),
       });
 
       if (res.ok) {
+        const data = await res.json();
+        const token = data.invitation?.token;
         setEmail('');
         setSubmitted(true);
-        setTimeout(() => setSubmitted(false), 3000);
+        setInvitationToken(token || null);
+        setLinkCopied(false);
         fetchInvitations(); // Refresh the list
       } else {
         const err = await res.json();
@@ -188,13 +198,60 @@ export default function InvitationSection() {
 
               {submitted && (
                 <div
-                  className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium"
-                  style={{ backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' }}
+                  className="flex flex-col gap-3 px-4 py-4 rounded-xl text-sm"
+                  style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0' }}
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Invitation sent successfully! Copy the link from the &quot;Sent Invitations&quot; tab.
+                  <div className="flex items-center gap-2 font-medium" style={{ color: '#15803d' }}>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Invitation sent successfully!
+                  </div>
+                  {invitationToken && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={`${typeof window !== 'undefined' ? window.location.origin : ''}/signup-user?token=${invitationToken}`}
+                        className="flex-1 px-3 py-2 rounded-lg text-xs text-gray-700 border"
+                        style={{ backgroundColor: '#fff', borderColor: '#d1d5db' }}
+                        onFocus={(e) => e.currentTarget.select()}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const link = `${window.location.origin}/signup-user?token=${invitationToken}`;
+                          navigator.clipboard.writeText(link).then(() => {
+                            setLinkCopied(true);
+                            setTimeout(() => setLinkCopied(false), 2000);
+                          });
+                        }}
+                        className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200 hover:opacity-80 flex-shrink-0"
+                        style={{
+                          backgroundColor: linkCopied ? '#d1fae5' : '#e0e7ff',
+                          color: linkCopied ? '#065f46' : '#3730a3',
+                          border: `1px solid ${linkCopied ? '#86efac' : '#c7d2fe'}`,
+                        }}
+                      >
+                        {linkCopied ? (
+                          <>
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Copied!
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            Copy Link
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </form>
