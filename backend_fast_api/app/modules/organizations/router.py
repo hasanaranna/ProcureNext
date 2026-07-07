@@ -60,33 +60,16 @@
 #   - Search organizations by name, type, location
 # ============================================================
 
-import os
 import secrets
 
 # pyrefly: ignore [missing-import]
 import asyncpg
 from fastapi import APIRouter, HTTPException
 
+from app.core.database_url import get_database_url
 from app.modules.organizations.schemas import OrgInvitationCreateRequest
 
 router = APIRouter(prefix="/api/org", tags=["organizations"])
-
-
-def _get_database_url() -> str | None:
-    database_url = os.getenv("DATABASE_URL")
-    if database_url:
-        return database_url
-
-    db_user = os.getenv("DB_USER")
-    db_password = os.getenv("DB_PASSWORD")
-    db_host = os.getenv("DB_HOST")
-    db_port = os.getenv("DB_PORT", "5432")
-    db_name = os.getenv("DB_NAME")
-
-    if all([db_user, db_password, db_host, db_name]):
-        return f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
-
-    return None
 
 
 @router.get("/invitations")
@@ -100,14 +83,14 @@ async def create_invitation(payload: OrgInvitationCreateRequest) -> dict:
     print(f"[POST /api/org/invitations] body={payload.model_dump()}", flush=True)
 
     token = secrets.token_urlsafe(32)
-    database_url = _get_database_url()
+    database_url = get_database_url()
 
     if not database_url:
         print("[ERROR] DATABASE_URL is not set in environment variables.", flush=True)
         raise HTTPException(status_code=500, detail="Database connection settings are not configured.")
 
     try:
-        connection = await asyncpg.connect(database_url)
+        connection = await asyncpg.connect(database_url, ssl="require")
         try:
             # Check if an invitation with the same (organization_id, invited_by, email) already exists
             existing = await connection.fetchrow(
