@@ -27,7 +27,13 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
     const requestBody =
       request.method === 'GET' || request.method === 'HEAD'
         ? undefined
-        : await request.text();
+        : await (async () => {
+            const contentType = request.headers.get('content-type') || '';
+            if (contentType.includes('multipart/form-data')) {
+              return request.arrayBuffer();
+            }
+            return request.text();
+          })();
 
     const upstreamResponse = await fetch(targetUrl, {
       method: request.method,

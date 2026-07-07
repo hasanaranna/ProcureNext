@@ -108,21 +108,23 @@ export default function SignupMasterPage() {
       if (files.vatCertificate) body.append("vatCertificate", files.vatCertificate);
       files.additionalDocs.forEach((doc) => body.append("additionalDocs", doc));
 
-      const res = await fetch("/api/auth/register-master", {
+      const res = await fetch("/api/org/orgs", {
         method: "POST",
         body, // No Content-Type header — browser sets multipart boundary
       });
 
       if (res.ok) {
         const data = await res.json();
-        // Store tokens
-        localStorage.setItem("access_token", data.access_token);
-        localStorage.setItem("refresh_token", data.refresh_token);
         localStorage.setItem("user", JSON.stringify(data.user));
+        localStorage.setItem("organization", JSON.stringify(data.organization));
         setSubmitSuccess(true);
       } else {
         const err = await res.json();
-        setSubmitError(err.error?.message || "Registration failed.");
+        const message =
+          typeof err.detail === "string"
+            ? err.detail
+            : err.error?.message || "Registration failed.";
+        setSubmitError(message);
       }
     } catch {
       setSubmitError("Network error. Unable to connect to the server.");

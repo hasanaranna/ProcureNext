@@ -26,10 +26,13 @@
 # RUN: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 # ============================================================
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.modules.organizations.router import router as organizations_router
+
+load_dotenv()
 
 app = FastAPI(title="ProcureNext FastAPI Backend")
 
