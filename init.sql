@@ -82,8 +82,9 @@ CREATE TABLE organizations (
     website              VARCHAR(255),
     description          TEXT,
     verification_status  verification_status DEFAULT 'Pending',
-    tin_number           VARCHAR(50),
-    bin_number           VARCHAR(50),
+    -- Temporarily store Supabase Storage URLs until real TIN/BIN values are collected
+    tin_number           TEXT,  -- TIN certificate PDF URL
+    bin_number           TEXT,  -- VAT certificate PDF URL
     credit_balance       INT                 DEFAULT 0,
     unique_join_code     VARCHAR(50)         UNIQUE,
     created_at           TIMESTAMP           DEFAULT NOW()

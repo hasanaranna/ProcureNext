@@ -21,8 +21,8 @@ pydantic-settings
 email-validator
 
 # --- Authentication & Security ---
+bcrypt
 python-jose[cryptography]
-passlib[bcrypt]
 python-multipart
 pyotp
 

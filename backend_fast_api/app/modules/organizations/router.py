@@ -61,15 +61,86 @@
 # ============================================================
 
 import secrets
+from datetime import date
+from typing import Literal
 
 # pyrefly: ignore [missing-import]
 import asyncpg
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
-from app.core.database_url import get_database_url
-from app.modules.organizations.schemas import OrgInvitationCreateRequest
+from app.core.db import get_db_connection
+from app.modules.organizations.schemas import OrgCreateRequest, OrgCreateResponse, OrgInvitationCreateRequest
+from app.modules.organizations.service import create_master_organization
+from app.services.supabase_storage import build_registration_prefix, upload_optional_file, upload_optional_files
 
 router = APIRouter(prefix="/api/org", tags=["organizations"])
+
+
+@router.post("/orgs", response_model=OrgCreateResponse, status_code=201)
+async def create_organization(
+    name: str = Form(...),
+    organization_name: str = Form(..., alias="organizationName"),
+    email: str = Form(...),
+    phone: str = Form(...),
+    nid: int = Form(...),
+    date_of_birth: date = Form(...),
+    password: str = Form(...),
+    organization_type: Literal["Buyer", "Vendor"] = Form("Buyer"),
+    address: str | None = Form(None),
+    website: str | None = Form(None),
+    description: str | None = Form(None),
+    nid_front: UploadFile | None = File(None, alias="nidFront"),
+    nid_back: UploadFile | None = File(None, alias="nidBack"),
+    trade_license: UploadFile | None = File(None, alias="tradeLicense"),
+    tin_certificate: UploadFile | None = File(None, alias="tinCertificate"),
+    vat_certificate: UploadFile | None = File(None, alias="vatCertificate"),
+    additional_docs: list[UploadFile] = File(default=[], alias="additionalDocs"),
+) -> OrgCreateResponse:
+    storage_prefix = build_registration_prefix(email)
+
+    nid_front_url = await upload_optional_file(nid_front, f"{storage_prefix}/nid")
+    nid_back_url = await upload_optional_file(nid_back, f"{storage_prefix}/nid")
+    trade_license_url = await upload_optional_file(trade_license, f"{storage_prefix}/org")
+    tin_certificate_url = await upload_optional_file(tin_certificate, f"{storage_prefix}/org")
+    vat_certificate_url = await upload_optional_file(vat_certificate, f"{storage_prefix}/org")
+    additional_document_urls = await upload_optional_files(additional_docs, f"{storage_prefix}/org/additional")
+
+    payload = OrgCreateRequest(
+        full_name=name,
+        email=email,
+        phone=phone,
+        nid=nid,
+        date_of_birth=date_of_birth,
+        password=password,
+        organization_name=organization_name,
+        organization_type=organization_type,
+        address=address,
+        website=website,
+        description=description,
+        nid_front_url=nid_front_url,
+        nid_back_url=nid_back_url,
+        trade_license_url=trade_license_url,
+        tin_certificate_url=tin_certificate_url,
+        vat_certificate_url=vat_certificate_url,
+        additional_document_urls=additional_document_urls,
+    )
+
+    print(
+        f"[POST /api/org/orgs] body={payload.model_dump(exclude={'password'})}",
+        flush=True,
+    )
+
+    try:
+        async with get_db_connection() as connection:
+            return await create_master_organization(connection, payload)
+    except HTTPException:
+        raise
+    except asyncpg.PostgresError as exc:
+        print(f"[DB ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Database Error: {str(exc)}") from exc
+    except Exception as exc:
+        print(f"[SYSTEM ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
 
 
 @router.get("/invitations")
@@ -83,15 +154,9 @@ async def create_invitation(payload: OrgInvitationCreateRequest) -> dict:
     print(f"[POST /api/org/invitations] body={payload.model_dump()}", flush=True)
 
     token = secrets.token_urlsafe(32)
-    database_url = get_database_url()
-
-    if not database_url:
-        print("[ERROR] DATABASE_URL is not set in environment variables.", flush=True)
-        raise HTTPException(status_code=500, detail="Database connection settings are not configured.")
 
     try:
-        connection = await asyncpg.connect(database_url, ssl="require")
-        try:
+        async with get_db_connection() as connection:
             # Check if an invitation with the same (organization_id, invited_by, email) already exists
             existing = await connection.fetchrow(
                 """
@@ -148,9 +213,8 @@ async def create_invitation(payload: OrgInvitationCreateRequest) -> dict:
                 "message": message,
                 "invitation": dict(invitation.items()),
             }
-        finally:
-            await connection.close()
-            
+    except HTTPException:
+        raise
     except asyncpg.PostgresError as exc:
         # Captures specific PostgreSQL errors (e.g., unique violation, missing column)
         print(f"[DB ERROR] {exc}", flush=True)
