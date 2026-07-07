@@ -28,3 +28,23 @@
 # - NID format validation
 # - Phone number format validation (Bangladesh format)
 # ============================================================
+
+from pydantic import BaseModel, EmailStr
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class UserResponse(BaseModel):
+    user_id: int
+    email: str
+    status: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    user: UserResponse

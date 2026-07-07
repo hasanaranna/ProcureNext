@@ -52,3 +52,25 @@
 # POST /auth/disable-2fa
 #   - Disable 2FA (requires current TOTP code to confirm)
 # ============================================================
+
+from fastapi import APIRouter, Depends, HTTPException
+from app.core.db import get_db_connection
+from app.modules.auth.schemas import LoginRequest, TokenResponse
+from app.modules.auth.service import authenticate_user
+import asyncpg
+
+router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+@router.post("/login", response_model=TokenResponse)
+async def login(payload: LoginRequest):
+    try:
+        async with get_db_connection() as connection:
+            return await authenticate_user(connection, payload)
+    except HTTPException:
+        raise
+    except asyncpg.PostgresError as exc:
+        print(f"[DB ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Database Error: {str(exc)}") from exc
+    except Exception as exc:
+        print(f"[SYSTEM ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
