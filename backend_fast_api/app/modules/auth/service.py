@@ -53,6 +53,16 @@ async def authenticate_user(connection: asyncpg.Connection, payload: LoginReques
         status=user["status"],
     )
 
+    # Update last login timestamp
+    await connection.execute(
+        """
+        UPDATE users
+        SET last_login_at = NOW()
+        WHERE user_id = $1
+        """,
+        user["user_id"],
+    )
+
     access_token = create_access_token({"sub": str(user["user_id"]), "email": user["email"]})
     refresh_token = create_refresh_token({"sub": str(user["user_id"]), "email": user["email"]})
 
