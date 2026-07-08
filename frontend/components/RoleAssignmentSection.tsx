@@ -38,7 +38,7 @@ export default function RoleAssignmentSection() {
 
   const fetchMembers = useCallback(async () => {
     try {
-      const res = await fetch('/api/org/members', {
+      const res = await fetch(`/api/org/members?t=${new Date().getTime()}`, {
         headers: getAuthHeaders(),
       });
       if (res.ok) {
@@ -120,7 +120,7 @@ export default function RoleAssignmentSection() {
         ) : (
           <div className="flex flex-col gap-3">
             {members.map((member) => {
-              const isPrimaryOwner = currentUser && member.user_id === currentUser.id;
+              const isPrimaryOwner = currentUser && member.user_id === currentUser.user_id;
               const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(member.full_name || member.email)}&background=${member.role_in_org === 'Owner' ? 'f59e0b' :
                   member.role_in_org === 'ProcurementOfficer' ? '3b82f6' :
                     member.role_in_org === 'Finance' ? '10b981' :

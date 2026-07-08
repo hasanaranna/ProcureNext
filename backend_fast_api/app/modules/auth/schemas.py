@@ -41,6 +41,9 @@ class UserResponse(BaseModel):
     user_id: int
     email: str
     status: str
+    full_name: str | None = None
+    organization_name: str | None = None
+    role_in_org: str | None = None
 
 
 class TokenResponse(BaseModel):

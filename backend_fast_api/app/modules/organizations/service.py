@@ -301,3 +301,84 @@ async def get_invitation_details_by_token(connection: asyncpg.Connection, token:
         "status": row["status"],
         "is_valid": row["is_valid"] and row["status"] == 'Pending'
     }
+
+async def get_organization_members(connection: asyncpg.Connection, organization_id: int) -> list[dict]:
+    rows = await connection.fetch(
+        """
+        SELECT 
+            oe.org_user_id,
+            oe.user_id,
+            u.full_name,
+            u.email,
+            u.phone,
+            oe.role_in_org,
+            u.status,
+            oe.joined_at
+        FROM organization_employees oe
+        JOIN users u ON oe.user_id = u.user_id
+        WHERE oe.organization_id = $1
+        ORDER BY oe.joined_at DESC
+        """,
+        organization_id
+    )
+    return [dict(row.items()) for row in rows]
+
+async def update_member_role(
+    connection: asyncpg.Connection, 
+    organization_id: int, 
+    target_org_user_id: int, 
+    new_role: str,
+    current_user_role: str
+) -> dict:
+    if current_user_role != 'Owner':
+        raise HTTPException(status_code=403, detail="Only Owners can change roles.")
+
+    # Fetch the target member to ensure they belong to the same org
+    target = await connection.fetchrow(
+        "SELECT role_in_org FROM organization_employees WHERE org_user_id = $1 AND organization_id = $2",
+        target_org_user_id, organization_id
+    )
+    
+    if not target:
+        raise HTTPException(status_code=404, detail="Member not found in your organization.")
+        
+    if target["role_in_org"] == 'Owner':
+        raise HTTPException(status_code=400, detail="Cannot change the role of an Owner.")
+
+    await connection.execute(
+        "UPDATE organization_employees SET role_in_org = $1 WHERE org_user_id = $2",
+        new_role, target_org_user_id
+    )
+    
+    return {"message": "Role updated successfully."}
+
+async def get_organization_invitations(connection: asyncpg.Connection, organization_id: int) -> list[dict]:
+    rows = await connection.fetch(
+        """
+        SELECT invitation_id, email, token, status, created_at, expires_at
+        FROM user_invitations
+        WHERE organization_id = $1
+        ORDER BY created_at DESC
+        """,
+        organization_id
+    )
+    return [dict(row.items()) for row in rows]
+
+async def delete_organization_invitation(
+    connection: asyncpg.Connection, 
+    invitation_id: int, 
+    organization_id: int,
+    current_user_role: str
+) -> dict:
+    if current_user_role != 'Owner':
+        raise HTTPException(status_code=403, detail="Only Owners can cancel invitations.")
+        
+    result = await connection.execute(
+        "DELETE FROM user_invitations WHERE invitation_id = $1 AND organization_id = $2 AND status = 'Pending'",
+        invitation_id, organization_id
+    )
+    
+    if result == "DELETE 0":
+        raise HTTPException(status_code=404, detail="Pending invitation not found.")
+        
+    return {"message": "Invitation canceled successfully."}
