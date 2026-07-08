@@ -19,6 +19,9 @@ services:
     container_name: fastapi-backend
     ports:
       - "8000:8000"
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     env_file:
       - ./backend_fast_api/.env
     environment:
