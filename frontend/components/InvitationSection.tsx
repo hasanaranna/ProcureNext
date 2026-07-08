@@ -34,7 +34,7 @@ export default function InvitationSection() {
 
   const fetchInvitations = useCallback(async () => {
     try {
-      const res = await fetch('/api/org/invitations', {
+      const res = await fetch(`/api/org/invitations?t=${new Date().getTime()}`, {
         headers: getAuthHeaders(),
       });
       if (res.ok) {
@@ -62,9 +62,7 @@ export default function InvitationSection() {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          email: email.trim(),
-          organization_id: 1, // Replace with actual organization ID
-          invited_by: 2  // Replace with actual user ID
+          email: email.trim()
         }),
       });
 

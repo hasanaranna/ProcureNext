@@ -66,11 +66,21 @@ from typing import Literal
 
 # pyrefly: ignore [missing-import]
 import asyncpg
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, Depends
+from pydantic import BaseModel
 
 from app.core.db import get_db_connection
+from app.modules.auth.dependencies import get_current_user_org
 from app.modules.organizations.schemas import OrgCreateRequest, OrgCreateResponse, OrgInvitationCreateRequest
-from app.modules.organizations.service import create_master_organization, create_or_update_invitation, get_invitation_details_by_token
+from app.modules.organizations.service import (
+    create_master_organization,
+    create_or_update_invitation,
+    get_invitation_details_by_token,
+    get_organization_members,
+    update_member_role,
+    get_organization_invitations,
+    delete_organization_invitation
+)
 from app.services.supabase_storage import build_registration_prefix, upload_optional_file, upload_optional_files
 
 router = APIRouter(prefix="/api/org", tags=["organizations"])
@@ -157,38 +167,85 @@ async def get_invitation_details(token: str):
         raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
 
 @router.get("/invitations")
-async def list_invitations() -> dict:
-	return {"invitations": []}
+async def list_invitations(current_user: dict = Depends(get_current_user_org)) -> dict:
+    try:
+        async with get_db_connection() as connection:
+            invitations = await get_organization_invitations(connection, current_user["organization_id"])
+            return {"invitations": invitations}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
 
 
 @router.post("/invitations")
-async def create_invitation(payload: OrgInvitationCreateRequest) -> dict:
-    # Required debugging hook: print incoming request body in backend console.
-    print(f"[POST /api/org/invitations] body={payload.model_dump()}", flush=True)
-
+async def create_invitation(payload: OrgInvitationCreateRequest, current_user: dict = Depends(get_current_user_org)) -> dict:
+    # Use context from authenticated user
+    organization_id = current_user["organization_id"]
+    invited_by = current_user["user_id"]
     token = secrets.token_urlsafe(32)
 
     try:
         async with get_db_connection() as connection:
             return await create_or_update_invitation(
                 connection,
-                organization_id=payload.organization_id,
-                invited_by=payload.invited_by,
+                organization_id=organization_id,
+                invited_by=invited_by,
                 email=payload.email,
                 token=token,
             )
     except HTTPException:
         raise
     except asyncpg.PostgresError as exc:
-        print(f"[DB ERROR] {exc}", flush=True)
         raise HTTPException(status_code=500, detail=f"Database Error: {str(exc)}") from exc
     except Exception as exc:
-        print(f"[SYSTEM ERROR] {exc}", flush=True)
         raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
 
 @router.delete("/invitations/{invitation_id}")
-async def cancel_invitation(invitation_id: int) -> dict:
-	return {
-		"message": "Invitation canceled.",
-		"invitation_id": invitation_id,
-	}
+async def cancel_invitation(invitation_id: int, current_user: dict = Depends(get_current_user_org)) -> dict:
+    try:
+        async with get_db_connection() as connection:
+            return await delete_organization_invitation(
+                connection, 
+                invitation_id=invitation_id,
+                organization_id=current_user["organization_id"],
+                current_user_role=current_user["role_in_org"]
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+@router.get("/members")
+async def list_members(current_user: dict = Depends(get_current_user_org)) -> dict:
+    try:
+        async with get_db_connection() as connection:
+            members = await get_organization_members(connection, current_user["organization_id"])
+            return {"members": members}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+class RoleUpdateRequest(BaseModel):
+    role: str
+
+@router.patch("/members/{org_user_id}/role")
+async def update_member_role_endpoint(
+    org_user_id: int, 
+    payload: RoleUpdateRequest,
+    current_user: dict = Depends(get_current_user_org)
+) -> dict:
+    try:
+        async with get_db_connection() as connection:
+            return await update_member_role(
+                connection,
+                organization_id=current_user["organization_id"],
+                target_org_user_id=org_user_id,
+                new_role=payload.role,
+                current_user_role=current_user["role_in_org"]
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc

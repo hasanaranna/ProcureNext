@@ -26,14 +26,14 @@ export default function HomePage() {
     role_in_org?: string;
   }>({});
 
-  // useEffect(() => {
-  //   try {
-  //     const stored = localStorage.getItem('user');
-  //     if (stored) {
-  //       setUserData(JSON.parse(stored));
-  //     }
-  //   } catch { }
-  // }, []);
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('user');
+      if (stored) {
+        setUserData(JSON.parse(stored));
+      }
+    } catch { }
+  }, []);
 
   const handleModeSwitch = (newMode: 'buyer' | 'seller') => {
     if (newMode === mode) return;

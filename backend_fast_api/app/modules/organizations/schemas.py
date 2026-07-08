@@ -6,8 +6,6 @@ from pydantic import BaseModel, EmailStr, Field
 
 class OrgInvitationCreateRequest(BaseModel):
     email: EmailStr
-    organization_id: int
-    invited_by: int
 
 
 class OrgCreateRequest(BaseModel):

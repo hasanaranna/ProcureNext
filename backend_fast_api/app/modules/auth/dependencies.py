@@ -5,10 +5,44 @@
 # Auth-specific FastAPI dependencies that extend the core
 # dependencies for specialized authentication flows.
 #
-# DEPENDENCIES TO DEFINE:
-# - get_token_from_header(): Extract Bearer token from Authorization
-# - validate_refresh_token(): Validate refresh token is not expired/blacklisted
-# - require_email_verified(): Ensure user has completed email verification
-# - require_phone_verified(): Ensure user has completed OTP verification
-# - require_fully_verified(): Both email and phone must be verified
-# ============================================================
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
+import asyncpg
+
+from app.core.security import SECRET_KEY, ALGORITHM
+from app.core.db import get_db_connection
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+
+async def get_current_user_org(token: str = Depends(oauth2_scheme)) -> dict:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id_str: str = payload.get("sub")
+        if user_id_str is None:
+            raise credentials_exception
+        user_id = int(user_id_str)
+    except JWTError:
+        raise credentials_exception
+
+    async with get_db_connection() as connection:
+        user_org = await connection.fetchrow(
+            """
+            SELECT u.user_id, u.email, oe.organization_id, oe.role_in_org, oe.org_user_id
+            FROM users u
+            JOIN organization_employees oe ON u.user_id = oe.user_id
+            WHERE u.user_id = $1
+            LIMIT 1
+            """,
+            user_id
+        )
+        
+        if user_org is None:
+            raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+            
+        return dict(user_org.items())

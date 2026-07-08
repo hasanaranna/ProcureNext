@@ -34,26 +34,26 @@ from app.services.supabase_storage import build_registration_prefix, upload_opti
 
 
 async def authenticate_user(connection: asyncpg.Connection, payload: LoginRequest) -> TokenResponse:
+    # Added JOIN to get full_name, organization_name, and role_in_org
     user = await connection.fetchrow(
         """
-        SELECT user_id, email, password_hash, status
-        FROM users
-        WHERE email = $1
+        SELECT 
+            u.user_id, u.email, u.password_hash, u.status, u.full_name,
+            oe.role_in_org,
+            o.organization_name
+        FROM users u
+        LEFT JOIN organization_employees oe ON u.user_id = oe.user_id
+        LEFT JOIN organizations o ON oe.organization_id = o.organization_id
+        WHERE u.email = $1
         """,
         payload.email,
     )
 
     if not user:
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        raise HTTPException(status_code=401, detail="Invalid email or password.")
 
     if not verify_password(payload.password, user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-
-    user_response = UserResponse(
-        user_id=user["user_id"],
-        email=user["email"],
-        status=user["status"],
-    )
+        raise HTTPException(status_code=401, detail="Invalid email or password.")
 
     # Update last login timestamp
     await connection.execute(
@@ -63,6 +63,15 @@ async def authenticate_user(connection: asyncpg.Connection, payload: LoginReques
         WHERE user_id = $1
         """,
         user["user_id"],
+    )
+
+    user_response = UserResponse(
+        user_id=user["user_id"],
+        email=user["email"],
+        status=user["status"],
+        full_name=user["full_name"],
+        organization_name=user["organization_name"],
+        role_in_org=user["role_in_org"],
     )
 
     access_token = create_access_token({"sub": str(user["user_id"]), "email": user["email"]})
@@ -87,12 +96,13 @@ async def register_employee_user(
     nid_front: UploadFile | None,
     nid_back: UploadFile | None,
 ) -> TokenResponse:
-    # 1. Validate Invitation
+    # 1. Validate Invitation (Added JOIN to get organization_name)
     invitation = await connection.fetchrow(
         """
-        SELECT invitation_id, organization_id, status, expires_at
-        FROM user_invitations
-        WHERE token = $1 AND email = $2
+        SELECT i.invitation_id, i.organization_id, i.status, i.expires_at, o.organization_name
+        FROM user_invitations i
+        JOIN organizations o ON i.organization_id = o.organization_id
+        WHERE i.token = $1 AND i.email = $2
         """,
         token, email
     )
@@ -160,6 +170,9 @@ async def register_employee_user(
         user_id=user["user_id"],
         email=user["email"],
         status=user["status"],
+        full_name=name,
+        organization_name=invitation["organization_name"],
+        role_in_org="Viewer"
     )
     access_token = create_access_token({"sub": str(user_id), "email": user["email"]})
     refresh_token = create_refresh_token({"sub": str(user_id), "email": user["email"]})
