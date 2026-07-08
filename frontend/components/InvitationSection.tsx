@@ -61,10 +61,11 @@ export default function InvitationSection() {
       const res = await fetch('/api/org/invitations', {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ email: email.trim(), 
-                               organization_id: 1, // Replace with actual organization ID
-                               invited_by: 1  // Replace with actual user ID
-                            }),
+        body: JSON.stringify({
+          email: email.trim(),
+          organization_id: 1, // Replace with actual organization ID
+          invited_by: 2  // Replace with actual user ID
+        }),
       });
 
       if (res.ok) {
@@ -311,12 +312,12 @@ export default function InvitationSection() {
                             style={{
                               backgroundColor:
                                 inv.status === 'Pending' ? '#fef3c7' :
-                                inv.status === 'Accepted' ? '#d1fae5' :
-                                '#fee2e2',
+                                  inv.status === 'Accepted' ? '#d1fae5' :
+                                    '#fee2e2',
                               color:
                                 inv.status === 'Pending' ? '#92400e' :
-                                inv.status === 'Accepted' ? '#065f46' :
-                                '#b91c1c',
+                                  inv.status === 'Accepted' ? '#065f46' :
+                                    '#b91c1c',
                             }}
                           >
                             {inv.status}
