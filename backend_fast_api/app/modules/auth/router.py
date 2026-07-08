@@ -53,10 +53,11 @@
 #   - Disable 2FA (requires current TOTP code to confirm)
 # ============================================================
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Form, File, UploadFile
+from datetime import date
 from app.core.db import get_db_connection
 from app.modules.auth.schemas import LoginRequest, TokenResponse
-from app.modules.auth.service import authenticate_user
+from app.modules.auth.service import authenticate_user, register_employee_user
 import asyncpg
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -66,6 +67,42 @@ async def login(payload: LoginRequest):
     try:
         async with get_db_connection() as connection:
             return await authenticate_user(connection, payload)
+    except HTTPException:
+        raise
+    except asyncpg.PostgresError as exc:
+        print(f"[DB ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Database Error: {str(exc)}") from exc
+    except Exception as exc:
+        print(f"[SYSTEM ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
+@router.post("/register-user", response_model=TokenResponse)
+async def register_user(
+    name: str = Form(...),
+    email: str = Form(...),
+    phone: str = Form(...),
+    nid: int = Form(...),
+    date_of_birth: date = Form(...),
+    password: str = Form(...),
+    token: str = Form(...),
+    nidFront: UploadFile | None = File(None),
+    nidBack: UploadFile | None = File(None),
+):
+    try:
+        async with get_db_connection() as connection:
+            return await register_employee_user(
+                connection,
+                name=name,
+                email=email,
+                phone=phone,
+                nid=nid,
+                date_of_birth=date_of_birth,
+                password=password,
+                token=token,
+                nid_front=nidFront,
+                nid_back=nidBack,
+            )
     except HTTPException:
         raise
     except asyncpg.PostgresError as exc:

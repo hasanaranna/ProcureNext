@@ -273,3 +273,31 @@ async def create_or_update_invitation(
         "message": message,
         "invitation": dict(invitation.items()),
     }
+
+
+async def get_invitation_details_by_token(connection: asyncpg.Connection, token: str) -> dict:
+    row = await connection.fetchrow(
+        """
+        SELECT 
+            i.email, 
+            i.status, 
+            i.organization_id, 
+            o.organization_name,
+            (i.expires_at > NOW()) as is_valid
+        FROM user_invitations i
+        JOIN organizations o ON i.organization_id = o.organization_id
+        WHERE i.token = $1
+        """,
+        token,
+    )
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Invitation not found.")
+
+    return {
+        "email": row["email"],
+        "organization_name": row["organization_name"],
+        "organization_id": row["organization_id"],
+        "status": row["status"],
+        "is_valid": row["is_valid"] and row["status"] == 'Pending'
+    }

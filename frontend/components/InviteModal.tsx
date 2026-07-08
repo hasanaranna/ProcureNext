@@ -23,23 +23,94 @@ const dummyInvitations: SentInvitation[] = [
 export default function InviteModal({ isOpen, onClose }: InviteModalProps) {
   const [activeTab, setActiveTab] = useState<'invite' | 'sent'>('invite');
   const [email, setEmail] = useState('');
-  const [invitations, setInvitations] = useState<SentInvitation[]>(dummyInvitations);
+  const [invitations, setInvitations] = useState<SentInvitation[]>([]);
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState('');
+  const [invitationToken, setInvitationToken] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim()) return;
-    setInvitations((prev) => [
-      { email: email.trim(), sentAt: 'March 12, 2026' },
-      ...prev,
-    ]);
-    setEmail('');
-    setSubmitted(true);
-    setTimeout(() => setSubmitted(false), 3000);
+  const getAuthHeaders = (): Record<string, string> => {
+    const token = localStorage.getItem('access_token');
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    };
   };
 
-  const handleCancel = (targetEmail: string) => {
-    setInvitations((prev) => prev.filter((inv) => inv.email !== targetEmail));
+  const fetchInvitations = async () => {
+    try {
+      const res = await fetch('/api/org/invitations', { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        // The API returns invitation_id, email, token, status, created_at, expires_at
+        // Map it to match what the component expects (email, sentAt, token)
+        setInvitations(
+          (data.invitations || []).map((inv: any) => ({
+            id: inv.invitation_id,
+            email: inv.email,
+            sentAt: new Date(inv.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            token: inv.token,
+            status: inv.status
+          }))
+        );
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchInvitations();
+    }
+  }, [isOpen]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setError('');
+
+    try {
+      const userStr = localStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : null;
+      const res = await fetch('/api/org/invitations', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          email: email.trim(),
+          organization_id: 1, // hardcoded for now until org context is added
+          invited_by: user ? user.user_id : 1
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setSubmitted(true);
+        setInvitationToken(data.invitation?.token || null);
+        setEmail('');
+        fetchInvitations();
+        setTimeout(() => setSubmitted(false), 5000);
+      } else {
+        const err = await res.json();
+        setError(err.error?.message || 'Failed to send invitation');
+      }
+    } catch (e) {
+      setError('Network error');
+    }
+  };
+
+  const handleCancel = async (targetEmail: string, id: number) => {
+    try {
+      const res = await fetch(`/api/org/invitations/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        setInvitations((prev) => prev.filter((inv) => inv.email !== targetEmail));
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   return (
@@ -182,20 +253,20 @@ export default function InviteModal({ isOpen, onClose }: InviteModalProps) {
                         <p className="text-xs text-gray-400 mt-0.5">Sent on {inv.sentAt}</p>
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleCancel(inv.email)}
-                      className="px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 hover:opacity-80"
-                      style={{ backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5' }}
-                    >
-                      Cancel Invitation
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </ModalShell>
-  );
-}
+                      <button
+                        onClick={() => handleCancel(inv.email, (inv as any).id)}
+                        className="px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 hover:opacity-80"
+                        style={{ backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5' }}
+                      >
+                        Cancel Invitation
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </ModalShell>
+    );
+  }
