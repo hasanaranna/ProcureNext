@@ -209,3 +209,67 @@ async def create_master_organization(
             created_at=organization["created_at"],
         ),
     )
+
+
+async def create_or_update_invitation(
+    connection: asyncpg.Connection,
+    organization_id: int,
+    invited_by: int,
+    email: str,
+    token: str,
+) -> dict:
+    """Create a new invitation or re-issue an existing one with fresh timestamps."""
+    existing = await connection.fetchrow(
+        """
+        SELECT invitation_id
+        FROM user_invitations
+        WHERE organization_id = $1
+          AND invited_by = $2
+          AND email = $3
+        """,
+        organization_id,
+        invited_by,
+        email,
+    )
+
+    if existing is not None:
+        invitation = await connection.fetchrow(
+            """
+            UPDATE user_invitations
+            SET token = $1,
+                created_at = NOW(),
+                expires_at = NOW() + INTERVAL '7 days'
+            WHERE invitation_id = $2
+            RETURNING invitation_id, organization_id, invited_by, email, token, status, created_at, expires_at
+            """,
+            token,
+            existing["invitation_id"],
+        )
+        message = "Invitation updated."
+    else:
+        invitation = await connection.fetchrow(
+            """
+            INSERT INTO user_invitations (
+                organization_id,
+                invited_by,
+                email,
+                token,
+                status
+            )
+            VALUES ($1, $2, $3, $4, 'Pending')
+            RETURNING invitation_id, organization_id, invited_by, email, token, status, created_at, expires_at
+            """,
+            organization_id,
+            invited_by,
+            email,
+            token,
+        )
+        message = "Invitation created."
+
+    if invitation is None:
+        raise HTTPException(status_code=500, detail="Failed to create invitation: query returned None.")
+
+    return {
+        "message": message,
+        "invitation": dict(invitation.items()),
+    }

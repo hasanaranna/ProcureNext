@@ -70,7 +70,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from app.core.db import get_db_connection
 from app.modules.organizations.schemas import OrgCreateRequest, OrgCreateResponse, OrgInvitationCreateRequest
-from app.modules.organizations.service import create_master_organization
+from app.modules.organizations.service import create_master_organization, create_or_update_invitation
 from app.services.supabase_storage import build_registration_prefix, upload_optional_file, upload_optional_files
 
 router = APIRouter(prefix="/api/org", tags=["organizations"])
@@ -157,71 +157,19 @@ async def create_invitation(payload: OrgInvitationCreateRequest) -> dict:
 
     try:
         async with get_db_connection() as connection:
-            # Check if an invitation with the same (organization_id, invited_by, email) already exists
-            existing = await connection.fetchrow(
-                """
-                SELECT invitation_id
-                FROM user_invitations
-                WHERE organization_id = $1
-                  AND invited_by = $2
-                  AND email = $3
-                """,
-                payload.organization_id,
-                payload.invited_by,
-                payload.email,
+            return await create_or_update_invitation(
+                connection,
+                organization_id=payload.organization_id,
+                invited_by=payload.invited_by,
+                email=payload.email,
+                token=token,
             )
-
-            if existing is not None:
-                # Update existing invitation: refresh timestamps and regenerate token
-                invitation = await connection.fetchrow(
-                    """
-                    UPDATE user_invitations
-                    SET token = $1,
-                        created_at = NOW(),
-                        expires_at = NOW() + INTERVAL '7 days'
-                    WHERE invitation_id = $2
-                    RETURNING invitation_id, organization_id, invited_by, email, token, status, created_at, expires_at
-                    """,
-                    token,
-                    existing["invitation_id"],
-                )
-                message = "Invitation updated."
-            else:
-                # Insert a new invitation
-                invitation = await connection.fetchrow(
-                    """
-                    INSERT INTO user_invitations (
-                        organization_id,
-                        invited_by,
-                        email,
-                        token,
-                        status
-                    )
-                    VALUES ($1, $2, $3, $4, 'Pending')
-                    RETURNING invitation_id, organization_id, invited_by, email, token, status, created_at, expires_at
-                    """,
-                    payload.organization_id,
-                    payload.invited_by,
-                    payload.email,
-                    token,
-                )
-                message = "Invitation created."
-
-            if invitation is None:
-                raise HTTPException(status_code=500, detail="Failed to create invitation: query returned None.")
-            return {
-                "message": message,
-                "invitation": dict(invitation.items()),
-            }
     except HTTPException:
         raise
     except asyncpg.PostgresError as exc:
-        # Captures specific PostgreSQL errors (e.g., unique violation, missing column)
         print(f"[DB ERROR] {exc}", flush=True)
         raise HTTPException(status_code=500, detail=f"Database Error: {str(exc)}") from exc
-        
     except Exception as exc:
-        # Captures other Python/connection errors
         print(f"[SYSTEM ERROR] {exc}", flush=True)
         raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
 
