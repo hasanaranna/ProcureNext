@@ -70,7 +70,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from app.core.db import get_db_connection
 from app.modules.organizations.schemas import OrgCreateRequest, OrgCreateResponse, OrgInvitationCreateRequest
-from app.modules.organizations.service import create_master_organization, create_or_update_invitation
+from app.modules.organizations.service import create_master_organization, create_or_update_invitation, get_invitation_details_by_token
 from app.services.supabase_storage import build_registration_prefix, upload_optional_file, upload_optional_files
 
 router = APIRouter(prefix="/api/org", tags=["organizations"])
@@ -142,6 +142,19 @@ async def create_organization(
         print(f"[SYSTEM ERROR] {exc}", flush=True)
         raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
 
+
+@router.get("/invitation-details")
+async def get_invitation_details(token: str):
+    try:
+        async with get_db_connection() as connection:
+            details = await get_invitation_details_by_token(connection, token)
+            return {"invitation": details}
+    except HTTPException:
+        raise
+    except asyncpg.PostgresError as exc:
+        raise HTTPException(status_code=500, detail=f"Database Error: {str(exc)}") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
 
 @router.get("/invitations")
 async def list_invitations() -> dict:
