@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import PendingRequestDetailModal, {
   RegistrationDetail,
 } from "@/components/PendingRequestDetailModal";
@@ -218,12 +219,33 @@ const stats = [
 ];
 
 export default function AdminHomePage() {
+  const router = useRouter();
   const [pending, setPending] = useState(pendingRegistrations);
   const [approvedIds, setApprovedIds] = useState<number[]>([]);
   const [rejectedIds, setRejectedIds] = useState<number[]>([]);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedRegistration, setSelectedRegistration] =
     useState<RegistrationDetail | null>(null);
+  const [adminName, setAdminName] = useState<string>("System Administrator");
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("user");
+      if (stored) {
+        const user = JSON.parse(stored);
+        if (user?.full_name) setAdminName(user.full_name);
+      }
+    } catch {
+      // localStorage unavailable or malformed — keep fallback
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    localStorage.removeItem("user");
+    router.push("/");
+  };
 
   const handleViewDetails = (reg: RegistrationDetail) => {
     setSelectedRegistration(reg);
@@ -260,40 +282,65 @@ export default function AdminHomePage() {
     <main className="min-h-screen bg-gray-100">
       {/* Top Bar */}
       <header className="bg-gradient-to-r from-gray-800 to-gray-900 text-white px-8 py-4 flex items-center justify-between shadow-lg">
-        <div className="flex items-center gap-3">
-          <svg
-            className="w-8 h-8 text-gray-300"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
-            />
-          </svg>
-          <span className="text-xl font-bold tracking-wide">ProcureNext</span>
-          <span className="ml-2 px-2 py-0.5 bg-gray-600 text-gray-200 text-xs rounded-full font-medium">
+        <div className="flex flex-col gap-0.5">
+          <div className="flex items-center gap-3">
+            <svg
+              className="w-8 h-8 text-gray-300"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
+              />
+            </svg>
+            <span className="text-xl font-bold tracking-wide">ProcureNext</span>
+          </div>
+          <span className="ml-11 px-2 py-0.5 bg-gray-600 text-gray-200 text-xs rounded-full font-medium w-fit">
             Admin Panel
           </span>
         </div>
-        <div className="flex items-center gap-3 text-sm text-gray-300">
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+
+        {/* Right side: user name + logout stacked */}
+        <div className="flex flex-col items-end gap-1.5">
+          <div className="flex items-center gap-2 text-sm text-gray-300">
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+            </svg>
+            <span>{adminName}</span>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 px-4 py-1.5 text-sm font-medium text-gray-300 hover:text-white bg-white/10 hover:bg-white/20 rounded-lg border border-white/10 hover:border-white/20 transition-all duration-200 cursor-pointer"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z"
-            />
-          </svg>
-          <span>System Administrator</span>
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+              />
+            </svg>
+            Logout
+          </button>
         </div>
       </header>
 

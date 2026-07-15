@@ -51,3 +51,19 @@ class TokenResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     user: UserResponse
+
+
+class AdminUserResponse(BaseModel):
+    user_id: int
+    admin_id: int
+    email: str
+    full_name: str | None = None
+    admin_role: str
+    status: str
+
+
+class AdminTokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    user: AdminUserResponse

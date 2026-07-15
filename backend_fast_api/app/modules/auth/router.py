@@ -58,6 +58,7 @@ from datetime import date
 from app.core.db import get_db_connection
 from app.modules.auth.schemas import LoginRequest, TokenResponse
 from app.modules.auth.service import authenticate_user, register_employee_user
+# pyrefly: ignore [missing-import]
 import asyncpg
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])

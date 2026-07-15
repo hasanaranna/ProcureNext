@@ -120,6 +120,40 @@ export default function Home() {
               <p className="text-gray-600">Uptime Guarantee</p>
             </div>
           </div>
+
+          {/* Admin Portal Section */}
+          <div className="mt-16 pt-12 border-t border-gray-200">
+            <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-8 md:p-10 text-center shadow-xl border border-gray-700">
+              <div className="flex justify-center mb-4">
+                <svg
+                  className="w-10 h-10 text-gray-300"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"
+                  />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">
+                Admin Portal
+              </h3>
+              <p className="text-gray-400 text-sm mb-6 max-w-md mx-auto">
+                Platform administrators can access the management dashboard to
+                oversee operations, verify organizations, and manage users.
+              </p>
+              <button
+                onClick={() => router.push("/admin-login")}
+                className="px-8 py-3 bg-gradient-to-br from-gray-50 to-gray-200 text-gray-800 font-semibold rounded-lg hover:from-white hover:to-gray-100 transition-all duration-200 cursor-pointer shadow-md hover:shadow-lg hover:scale-105 border border-gray-400"
+              >
+                Admin Login
+              </button>
+            </div>
+          </div>
         </div>
       </section>
     </main>

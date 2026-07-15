@@ -8,6 +8,7 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
+# pyrefly: ignore [missing-import]
 import asyncpg
 
 from app.core.security import SECRET_KEY, ALGORITHM

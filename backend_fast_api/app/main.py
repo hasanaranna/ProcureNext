@@ -32,6 +32,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.modules.organizations.router import router as organizations_router
 from app.modules.auth.router import router as auth_router
+from app.modules.admin.router import router as admin_router
 load_dotenv()
 
 app = FastAPI(title="ProcureNext FastAPI Backend")
@@ -46,6 +47,7 @@ app.add_middleware(
 
 app.include_router(organizations_router)
 app.include_router(auth_router)
+app.include_router(admin_router)
 
 @app.get("/health")
 async def health_check() -> dict:

@@ -24,12 +24,13 @@
 # - change_phone_number(): Verify both OTPs, update phone
 # ============================================================
 
+# pyrefly: ignore [missing-import]
 import asyncpg
 from datetime import date
 from fastapi import HTTPException, UploadFile
 
 from app.core.security import create_access_token, create_refresh_token, verify_password, hash_password
-from app.modules.auth.schemas import LoginRequest, TokenResponse, UserResponse
+from app.modules.auth.schemas import LoginRequest, TokenResponse, UserResponse, AdminTokenResponse, AdminUserResponse
 from app.services.supabase_storage import build_registration_prefix, upload_optional_file
 
 
@@ -181,4 +182,68 @@ async def register_employee_user(
         access_token=access_token,
         refresh_token=refresh_token,
         user=user_response,
+    )
+
+
+async def authenticate_admin(connection: asyncpg.Connection, payload: LoginRequest) -> AdminTokenResponse:
+    """
+    Authenticate a platform admin.
+
+    Looks up the user by email, confirms the row exists in the `admins`
+    table (i.e. the user actually holds an admin role), verifies the
+    bcrypt password hash, then returns a JWT pair.
+    """
+    row = await connection.fetchrow(
+        """
+        SELECT
+            u.user_id,
+            u.email,
+            u.password_hash,
+            u.full_name,
+            u.status,
+            a.admin_id,
+            a.admin_role
+        FROM users u
+        JOIN admins a ON u.user_id = a.user_id
+        WHERE u.email = $1
+        """,
+        payload.email,
+    )
+
+    # Use a generic error message to avoid leaking whether the email exists
+    if not row:
+        raise HTTPException(status_code=401, detail="Invalid credentials or insufficient privileges.")
+
+    if not verify_password(payload.password, row["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid credentials or insufficient privileges.")
+
+    # Stamp last login time on the underlying user record
+    await connection.execute(
+        "UPDATE users SET last_login_at = NOW() WHERE user_id = $1",
+        row["user_id"],
+    )
+
+    admin_user = AdminUserResponse(
+        user_id=row["user_id"],
+        admin_id=row["admin_id"],
+        email=row["email"],
+        full_name=row["full_name"],
+        admin_role=row["admin_role"],
+        status=row["status"],
+    )
+
+    # Include admin_role in the JWT payload so guards can verify it without
+    # an extra DB round-trip on every protected admin request.
+    token_data = {
+        "sub": str(row["user_id"]),
+        "email": row["email"],
+        "admin_role": row["admin_role"],
+    }
+    access_token = create_access_token(token_data)
+    refresh_token = create_refresh_token(token_data)
+
+    return AdminTokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        user=admin_user,
     )

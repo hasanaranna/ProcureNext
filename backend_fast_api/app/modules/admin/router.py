@@ -55,3 +55,35 @@
 # PUT /admin/user-reports/{report_id}
 #   - Admin resolves a report (take action or dismiss)
 # ============================================================
+
+from fastapi import APIRouter, HTTPException
+from app.core.db import get_db_connection
+from app.modules.auth.schemas import LoginRequest, AdminTokenResponse
+from app.modules.auth.service import authenticate_admin
+# pyrefly: ignore [missing-import]
+import asyncpg
+
+# Prefix /api/auth so the full URL is POST /api/auth/admin/login,
+# matching the frontend fetch call and the existing API proxy rule.
+router = APIRouter(prefix="/api/auth", tags=["admin"])
+
+
+@router.post("/admin/login", response_model=AdminTokenResponse)
+async def admin_login(payload: LoginRequest):
+    """
+    Admin-only login endpoint.
+    Verifies the user exists in the `admins` table and that the
+    password matches the bcrypt hash stored in `users.password_hash`.
+    Returns a JWT pair with `admin_role` embedded in the token payload.
+    """
+    try:
+        async with get_db_connection() as connection:
+            return await authenticate_admin(connection, payload)
+    except HTTPException:
+        raise
+    except asyncpg.PostgresError as exc:
+        print(f"[DB ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Database Error: {str(exc)}") from exc
+    except Exception as exc:
+        print(f"[SYSTEM ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
