@@ -6,88 +6,6 @@ import PendingRequestDetailModal, {
   RegistrationDetail,
 } from "@/components/PendingRequestDetailModal";
 
-const pendingRegistrations: RegistrationDetail[] = [
-  {
-    id: 1,
-    name: "Rafiqul Islam",
-    company: "Islam Builders Ltd.",
-    email: "rafiqul@islambuilders.com",
-    phone: "+880 1711-234567",
-    submittedAt: "2025-05-18",
-    documents: {
-      nidFront: "rafiqul_nid_front.jpg",
-      nidBack: "rafiqul_nid_back.jpg",
-      tradeLicense: "islam_builders_trade_license.pdf",
-      tinCertificate: "islam_builders_tin.pdf",
-      vatCertificate: "islam_builders_vat.pdf",
-      additionalDocs: ["islam_builders_incorporation.pdf"],
-    },
-  },
-  {
-    id: 2,
-    name: "Sumaiya Hossain",
-    company: "GreenEdge Supplies Co.",
-    email: "sumaiya.h@greenedge.com.bd",
-    phone: "+880 1822-345678",
-    submittedAt: "2025-05-19",
-    documents: {
-      nidFront: null,
-      nidBack: null,
-      tradeLicense: null,
-      tinCertificate: null,
-      vatCertificate: null,
-      additionalDocs: [],
-    },
-  },
-  {
-    id: 3,
-    name: "Tanvir Ahmed",
-    company: "Apex Procurement Group",
-    email: "t.ahmed@apexpg.net",
-    phone: "+880 1933-456789",
-    submittedAt: "2025-05-20",
-    documents: {
-      nidFront: null,
-      nidBack: null,
-      tradeLicense: null,
-      tinCertificate: null,
-      vatCertificate: null,
-      additionalDocs: [],
-    },
-  },
-  {
-    id: 4,
-    name: "Nusrat Jahan",
-    company: "NovaTech Solutions",
-    email: "nusrat@novatech.io",
-    phone: "+880 1644-567890",
-    submittedAt: "2025-05-21",
-    documents: {
-      nidFront: null,
-      nidBack: null,
-      tradeLicense: null,
-      tinCertificate: null,
-      vatCertificate: null,
-      additionalDocs: [],
-    },
-  },
-  {
-    id: 5,
-    name: "Mahmudul Karim",
-    company: "Delta Trade & Logistics",
-    email: "mkarim@deltatrade.com",
-    phone: "+880 1755-678901",
-    submittedAt: "2025-05-22",
-    documents: {
-      nidFront: null,
-      nidBack: null,
-      tradeLicense: null,
-      tinCertificate: null,
-      vatCertificate: null,
-      additionalDocs: [],
-    },
-  },
-];
 
 const stats = [
   {
@@ -220,7 +138,9 @@ const stats = [
 
 export default function AdminHomePage() {
   const router = useRouter();
-  const [pending, setPending] = useState(pendingRegistrations);
+  const [pending, setPending] = useState<RegistrationDetail[]>([]);
+  const [loadingPending, setLoadingPending] = useState(true);
+  const [pendingError, setPendingError] = useState("");
   const [approvedIds, setApprovedIds] = useState<number[]>([]);
   const [rejectedIds, setRejectedIds] = useState<number[]>([]);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -238,6 +158,59 @@ export default function AdminHomePage() {
     } catch {
       // localStorage unavailable or malformed — keep fallback
     }
+  }, []);
+
+  // Fetch pending master accounts from the API
+  useEffect(() => {
+    const fetchPending = async () => {
+      setLoadingPending(true);
+      setPendingError("");
+      try {
+        const token = localStorage.getItem("access_token");
+        const res = await fetch("/api/auth/admin/pending-accounts", {
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        if (!res.ok) {
+          throw new Error("Failed to fetch pending accounts.");
+        }
+        const data = await res.json();
+
+        // Map API response to RegistrationDetail[]
+        const mapped: RegistrationDetail[] = (data.accounts || []).map(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (acc: any) => ({
+            id: acc.user_id,
+            orgId: acc.organization_id,
+            name: acc.full_name,
+            company: acc.organization_name,
+            email: acc.email,
+            phone: acc.phone || "",
+            submittedAt: acc.submitted_at
+              ? acc.submitted_at.split("T")[0]
+              : "",
+            documents: {
+              nidFront: acc.documents?.nid_front || null,
+              nidBack: acc.documents?.nid_back || null,
+              tradeLicense: acc.documents?.trade_license || null,
+              tinCertificate: acc.documents?.tin_certificate || null,
+              vatCertificate: acc.documents?.vat_certificate || null,
+              additionalDocs: acc.documents?.additional_docs || [],
+            },
+          }),
+        );
+        setPending(mapped);
+      } catch (err) {
+        setPendingError(
+          err instanceof Error ? err.message : "Unknown error.",
+        );
+      } finally {
+        setLoadingPending(false);
+      }
+    };
+    fetchPending();
   }, []);
 
   const handleLogout = () => {
@@ -259,12 +232,56 @@ export default function AdminHomePage() {
   });
   const [pricingSaved, setPricingSaved] = useState(false);
 
-  const handleApprove = (id: number) => {
-    setApprovedIds((prev) => [...prev, id]);
+  const handleApprove = async (reg: RegistrationDetail) => {
+    try {
+      const token = localStorage.getItem("access_token");
+      const res = await fetch(`/api/auth/admin/verify/${reg.orgId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          verification_status: "Verified",
+          review_notes: "Approved by admin",
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to verify organization");
+      }
+      setApprovedIds((prev) => [...prev, reg.id]);
+      setDetailModalOpen(false);
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
   };
 
-  const handleReject = (id: number) => {
-    setRejectedIds((prev) => [...prev, id]);
+  const handleReject = async (reg: RegistrationDetail) => {
+    try {
+      const token = localStorage.getItem("access_token");
+      const res = await fetch(`/api/auth/admin/verify/${reg.orgId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          verification_status: "Rejected",
+          review_notes: "Rejected by admin",
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to verify organization");
+      }
+      setRejectedIds((prev) => [...prev, reg.id]);
+      setDetailModalOpen(false);
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
   };
 
   const handlePricingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -406,6 +423,38 @@ export default function AdminHomePage() {
           </div>
 
           <div className="overflow-x-auto">
+            {loadingPending ? (
+              <div className="flex flex-col items-center justify-center py-16">
+                <svg
+                  className="animate-spin h-8 w-8 text-gray-500 mb-3"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
+                </svg>
+                <p className="text-sm text-gray-400">Loading pending accounts…</p>
+              </div>
+            ) : pendingError ? (
+              <div className="py-12 text-center">
+                <p className="text-sm text-red-500">{pendingError}</p>
+              </div>
+            ) : pending.length === 0 ? (
+              <div className="py-12 text-center">
+                <p className="text-sm text-gray-400">No pending accounts to review.</p>
+              </div>
+            ) : (
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 text-gray-500 uppercase text-xs tracking-wider">
@@ -462,16 +511,8 @@ export default function AdminHomePage() {
                       </td>
                       <td className="px-6 py-4">
                         <button
-                          onClick={
-                            reg.id === 1
-                              ? () => handleViewDetails(reg)
-                              : undefined
-                          }
-                          className={`px-3 py-1.5 text-white text-xs font-semibold rounded-lg transition shadow-sm ${
-                            reg.id === 1
-                              ? "bg-gray-700 hover:bg-gray-800 cursor-pointer"
-                              : "bg-gray-300 cursor-not-allowed"
-                          }`}
+                          onClick={() => handleViewDetails(reg)}
+                          className="px-3 py-1.5 text-white text-xs font-semibold rounded-lg transition shadow-sm bg-gray-700 hover:bg-gray-800 cursor-pointer"
                         >
                           View Details
                         </button>
@@ -481,6 +522,7 @@ export default function AdminHomePage() {
                 })}
               </tbody>
             </table>
+            )}
           </div>
         </section>
 
@@ -488,6 +530,8 @@ export default function AdminHomePage() {
         <PendingRequestDetailModal
           isOpen={detailModalOpen}
           onClose={() => setDetailModalOpen(false)}
+          onAccept={handleApprove}
+          onDecline={handleReject}
           registration={selectedRegistration}
         />
 

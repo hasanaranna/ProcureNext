@@ -60,6 +60,8 @@ from fastapi import APIRouter, HTTPException
 from app.core.db import get_db_connection
 from app.modules.auth.schemas import LoginRequest, AdminTokenResponse
 from app.modules.auth.service import authenticate_admin
+from app.modules.admin.schemas import PendingMasterAccountsResponse, VerifyOrgRequest
+from app.modules.admin.service import get_pending_master_accounts, verify_organization
 # pyrefly: ignore [missing-import]
 import asyncpg
 
@@ -79,6 +81,46 @@ async def admin_login(payload: LoginRequest):
     try:
         async with get_db_connection() as connection:
             return await authenticate_admin(connection, payload)
+    except HTTPException:
+        raise
+    except asyncpg.PostgresError as exc:
+        print(f"[DB ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Database Error: {str(exc)}") from exc
+    except Exception as exc:
+        print(f"[SYSTEM ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
+@router.get("/admin/pending-accounts", response_model=PendingMasterAccountsResponse)
+async def list_pending_master_accounts():
+    """
+    Retrieve all master accounts (organization Owners) whose user
+    status is still 'Pending', including their NID documents and
+    organization regulatory documents.
+    """
+    try:
+        async with get_db_connection() as connection:
+            return await get_pending_master_accounts(connection)
+    except HTTPException:
+        raise
+    except asyncpg.PostgresError as exc:
+        print(f"[DB ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Database Error: {str(exc)}") from exc
+    except Exception as exc:
+        print(f"[SYSTEM ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
+@router.post("/admin/verify/{organization_id}")
+async def verify_organization_endpoint(organization_id: int, payload: VerifyOrgRequest):
+    """
+    Admin manually verifies organization documents.
+    Sets organization verification_status to Verified or Rejected.
+    Also updates the owner's status and document statuses.
+    """
+    try:
+        async with get_db_connection() as connection:
+            return await verify_organization(connection, organization_id, payload)
     except HTTPException:
         raise
     except asyncpg.PostgresError as exc:

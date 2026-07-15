@@ -115,8 +115,8 @@ export default function SignupMasterPage() {
 
       if (res.ok) {
         const data = await res.json();
-        localStorage.setItem("user", JSON.stringify(data.user));
-        localStorage.setItem("organization", JSON.stringify(data.organization));
+        // localStorage.setItem("user", JSON.stringify(data.user));
+        // localStorage.setItem("organization", JSON.stringify(data.organization));
         setSubmitSuccess(true);
       } else {
         const err = await res.json();

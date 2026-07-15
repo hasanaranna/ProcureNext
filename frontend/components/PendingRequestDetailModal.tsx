@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import ModalShell from "@/components/ModalShell";
 
 export interface RegistrationDetail {
   id: number;
+  orgId: number;
   name: string;
   company: string;
   email: string;
@@ -22,6 +24,8 @@ export interface RegistrationDetail {
 interface PendingRequestDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onAccept?: (reg: RegistrationDetail) => Promise<void> | void;
+  onDecline?: (reg: RegistrationDetail) => Promise<void> | void;
   registration: RegistrationDetail | null;
 }
 
@@ -96,9 +100,32 @@ function DocRow({
 export default function PendingRequestDetailModal({
   isOpen,
   onClose,
+  onAccept,
+  onDecline,
   registration,
 }: PendingRequestDetailModalProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
   if (!registration) return null;
+
+  const handleAction = async (
+    actionFn?: (reg: RegistrationDetail) => Promise<void> | void
+  ) => {
+    if (!actionFn) {
+      onClose();
+      return;
+    }
+    setIsSubmitting(true);
+    setErrorMsg(null);
+    try {
+      await actionFn(registration);
+    } catch (err: any) {
+      setErrorMsg(err.message || "An unexpected error occurred.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <ModalShell isOpen={isOpen} onClose={onClose} maxWidth="max-w-2xl">
@@ -250,19 +277,40 @@ export default function PendingRequestDetailModal({
       </div>
 
       {/* Footer — Accept / Decline */}
-      <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 bg-white flex items-center justify-end gap-3">
-        <button
-          onClick={onClose}
-          className="px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold rounded-lg transition shadow-sm"
-        >
-          Decline
-        </button>
-        <button
-          onClick={onClose}
-          className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition shadow-sm"
-        >
-          Accept
-        </button>
+      <div className="flex-shrink-0 px-6 py-4 border-t border-gray-200 bg-white">
+        <div className="flex items-center justify-end gap-3">
+          <button
+            onClick={() => handleAction(onDecline)}
+            disabled={isSubmitting}
+            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-red-500 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition shadow-sm"
+          >
+            {isSubmitting && (
+              <svg className="animate-spin w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+              </svg>
+            )}
+            Decline
+          </button>
+          <button
+            onClick={() => handleAction(onAccept)}
+            disabled={isSubmitting}
+            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition shadow-sm"
+          >
+            {isSubmitting && (
+              <svg className="animate-spin w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+              </svg>
+            )}
+            Accept
+          </button>
+        </div>
+        {errorMsg && (
+          <div className="mt-3 text-right text-sm text-red-600 font-medium">
+            {errorMsg}
+          </div>
+        )}
       </div>
     </ModalShell>
   );
