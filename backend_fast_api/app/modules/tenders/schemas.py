@@ -30,3 +30,44 @@
 # - ClarificationResponse: question, answer, timestamps
 # - TenderAmendmentResponse: amendment details
 # ============================================================
+
+from pydantic import BaseModel, Field
+from typing import Optional, List
+from datetime import datetime
+from app.modules.tenders.models import TenderVisibility, TenderStatus
+
+class TenderCreateRequest(BaseModel):
+    title: str
+    description: str
+    category_id: Optional[int] = None
+    nature_id: Optional[int] = None
+    method_id: Optional[int] = None
+    visibility_type: TenderVisibility = TenderVisibility.Public
+    budget_min: Optional[float] = None
+    budget_max: Optional[float] = None
+    security_required: bool = False
+    security_valid_until: Optional[datetime] = None
+    proposal_valid_until: Optional[datetime] = None
+    submission_deadline: Optional[datetime] = None
+
+class TenderResponse(BaseModel):
+    tender_id: int
+    buyer_id: int
+    created_by: int
+    title: str
+    description: str
+    status: TenderStatus
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class TenderDocumentResponse(BaseModel):
+    tender_doc_id: int
+    tender_id: int
+    file_name: str
+    file_path: str
+    uploaded_at: datetime
+    
+    class Config:
+        from_attributes = True

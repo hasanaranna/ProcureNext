@@ -81,11 +81,14 @@ export default function HomePage() {
 
   const isOwner = user.role === 'Owner';
 
-  const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (e) {
+      console.error(e);
+    }
     localStorage.removeItem('user');
-    router.push('/');
+    window.location.href = '/login';
   };
 
   return (

@@ -166,11 +166,9 @@ export default function AdminHomePage() {
       setLoadingPending(true);
       setPendingError("");
       try {
-        const token = localStorage.getItem("access_token");
         const res = await fetch("/api/auth/admin/pending-accounts", {
           headers: {
             "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
         });
         if (!res.ok) {
@@ -213,11 +211,14 @@ export default function AdminHomePage() {
     fetchPending();
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    localStorage.removeItem("user");
-    router.push("/");
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (e) {
+      console.error(e);
+    }
+    localStorage.removeItem('user');
+    window.location.href = '/admin-login';
   };
 
   const handleViewDetails = (reg: RegistrationDetail) => {

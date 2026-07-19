@@ -15,6 +15,13 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
   const { path } = await context.params;
   const endpoint = path.join('/');
 
+  if (endpoint === 'logout' && request.method === 'POST') {
+    const response = NextResponse.json({ message: 'Logged out successfully' });
+    response.cookies.delete('access_token');
+    response.cookies.delete('refresh_token');
+    return response;
+  }
+
   // Preserve query string
   const url = new URL(request.url);
   const queryString = url.search;
@@ -23,6 +30,11 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
   try {
     const outboundHeaders = new Headers(request.headers);
     outboundHeaders.delete('host');
+
+    const token = request.cookies.get('access_token')?.value;
+    if (token) {
+      outboundHeaders.set('Authorization', `Bearer ${token}`);
+    }
 
     let requestBody: BodyInit | undefined;
 
@@ -45,6 +57,46 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
       cache: 'no-store',
     });
 
+    if (!upstreamResponse.ok) {
+      const responseBody = await upstreamResponse.arrayBuffer();
+      return new NextResponse(responseBody, {
+        status: upstreamResponse.status,
+        headers: new Headers(upstreamResponse.headers),
+      });
+    }
+
+    const isLoginOrRegister = endpoint === 'login' || endpoint === 'register-user';
+    
+    if (isLoginOrRegister) {
+      const data = await upstreamResponse.json();
+      const response = NextResponse.json(data);
+      
+      if (data.access_token) {
+        response.cookies.set({
+          name: 'access_token',
+          value: data.access_token,
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          maxAge: 30 * 60, // 30 minutes
+        });
+      }
+      
+      if (data.refresh_token) {
+        response.cookies.set({
+          name: 'refresh_token',
+          value: data.refresh_token,
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          maxAge: 7 * 24 * 60 * 60, // 7 days
+        });
+      }
+      return response;
+    }
+
     const responseBody = await upstreamResponse.arrayBuffer();
     const responseHeaders = new Headers(upstreamResponse.headers);
 
@@ -52,7 +104,7 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
       status: upstreamResponse.status,
       headers: responseHeaders,
     });
-  } catch {
+  } catch (error) {
     return NextResponse.json(
       {
         error: {

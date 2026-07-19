@@ -46,7 +46,8 @@ export default function AdminLoginPage() {
         localStorage.setItem('refresh_token', data.refresh_token);
         localStorage.setItem('user', JSON.stringify(data.user));
 
-        router.push('/admin-home');
+        // Use hard redirect to force RootLayout to re-evaluate cookies
+        window.location.href = '/admin-home';
       } else {
         const err = await res.json();
         setError(

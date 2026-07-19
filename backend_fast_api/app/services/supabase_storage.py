@@ -28,7 +28,7 @@ def _sanitize_path_segment(value: str) -> str:
 
 
 def _build_object_path(prefix: str, filename: str) -> str:
-    safe_name = Path(filename or "file").name
+    safe_name = _sanitize_path_segment(Path(filename or "file").name)
     return f"{prefix}/{uuid.uuid4().hex}_{safe_name}"
 
 
@@ -64,6 +64,38 @@ async def upload_file(upload: UploadFile, prefix: str) -> str:
         )
 
     return _public_file_url(supabase_url, object_path)
+
+
+async def upload_local_file(local_path: str, filename: str, prefix: str, content_type: str = "application/octet-stream") -> str:
+    if not os.path.exists(local_path):
+        raise HTTPException(status_code=400, detail=f"Local file not found: {local_path}")
+
+    supabase_url, service_role_key = _get_supabase_config()
+    object_path = _build_object_path(prefix, filename)
+    
+    with open(local_path, "rb") as f:
+        file_bytes = f.read()
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        response = await client.post(
+            f"{supabase_url}/storage/v1/object/{BUCKET_NAME}/{object_path}",
+            headers={
+                "Authorization": f"Bearer {service_role_key}",
+                "apikey": service_role_key,
+                "Content-Type": content_type,
+                "x-upsert": "false",
+            },
+            content=file_bytes,
+        )
+
+    if response.status_code >= 400:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Failed to upload '{filename}' to Supabase Storage: {response.text}",
+        )
+
+    return _public_file_url(supabase_url, object_path)
+
 
 
 async def upload_optional_file(upload: UploadFile | None, prefix: str) -> str | None:

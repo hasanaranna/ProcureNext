@@ -72,3 +72,81 @@
 # POST /tenders/{tender_id}/clarifications/{query_id}/reply
 #   - Buyer answers a vendor's clarification question
 # ============================================================
+
+import os
+import json
+import uuid
+import shutil
+from typing import List
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
+from app.core.db import get_db_connection
+from app.modules.auth.dependencies import get_current_user_org
+from app.modules.tenders.schemas import TenderCreateRequest, TenderResponse
+from app.modules.tenders.service import publish_tender_with_documents
+
+router = APIRouter(prefix="/tenders", tags=["Tenders"])
+
+TEMP_UPLOAD_DIR = "/app/uploads"
+os.makedirs(TEMP_UPLOAD_DIR, exist_ok=True)
+
+@router.post("/buyer/publish-with-documents", response_model=TenderResponse, status_code=status.HTTP_201_CREATED)
+async def publish_with_documents(
+    tender_data: str = Form(...),
+    file_names: str = Form(...),
+    files: List[UploadFile] = File(...),
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    Publish a tender with documents.
+    - tender_data: JSON string of TenderCreateRequest
+    - file_names: JSON string list of custom names matching the files array length
+    - files: Multiple files to upload
+    """
+    # 1. Parse JSON inputs
+    try:
+        tender_dict = json.loads(tender_data)
+        tender_req = TenderCreateRequest(**tender_dict)
+        custom_names = json.loads(file_names)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON data: {e}")
+
+    if len(custom_names) != len(files):
+        raise HTTPException(status_code=400, detail="Number of file_names must match number of files")
+
+    # 2. Save files locally to temp folder for Celery
+    files_data = []
+    for i, file_obj in enumerate(files):
+        if not file_obj.filename:
+            continue
+            
+        custom_name = custom_names[i]
+        safe_filename = f"{uuid.uuid4().hex}_{file_obj.filename}"
+        local_path = os.path.join(TEMP_UPLOAD_DIR, safe_filename)
+        
+        with open(local_path, "wb") as buffer:
+            shutil.copyfileobj(file_obj.file, buffer)
+            
+        files_data.append({
+            "local_path": local_path,
+            "custom_name": custom_name
+        })
+
+    # Dummy organization_id retrieval for buyer (in a real app, this comes from current_user)
+    # Using 1 for simplicity since this is a POC. The real auth logic needs to fetch it.
+    buyer_id = current_user.get("organization_id", 1)
+    org_user_id = current_user.get("org_user_id", 1)
+
+    # 3. Save to DB and Dispatch background task
+    try:
+        async with get_db_connection() as connection:
+            new_tender = await publish_tender_with_documents(
+                connection=connection,
+                buyer_id=buyer_id,
+                user_id=org_user_id,
+                tender_data=tender_req,
+                files_data=files_data
+            )
+            return new_tender
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+

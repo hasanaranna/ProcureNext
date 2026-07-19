@@ -43,9 +43,7 @@ export default function LoginPage() {
 
       if (res.ok) {
         const data = await res.json();
-        // Store tokens and user context
-        localStorage.setItem('access_token', data.access_token);
-        localStorage.setItem('refresh_token', data.refresh_token);
+        // Store user context only (tokens are set as HttpOnly cookies by the API proxy)
         localStorage.setItem('user', JSON.stringify(data.user));
 
         // If account is pending, show message instead of redirecting
@@ -54,7 +52,8 @@ export default function LoginPage() {
           return;
         }
 
-        router.push('/home');
+        // Use hard redirect to force RootLayout to re-evaluate cookies
+        window.location.href = '/home';
       } else {
         const err = await res.json();
         setError(err.error?.message || 'Login failed. Please check your credentials.');
