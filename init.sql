@@ -152,5 +152,29 @@ CREATE INDEX idx_org_verify            ON organizations(verification_status);
 CREATE INDEX idx_org_employees_org     ON organization_employees(organization_id);
 CREATE INDEX idx_org_employees_user    ON organization_employees(user_id);
 CREATE INDEX idx_invitations_token     ON user_invitations(token);
-CREATE INDEX idx_invitations_org       ON user_invitations(organization_id);
 CREATE INDEX idx_invitations_email     ON user_invitations(email);
+
+-- ============================================================
+-- TENDERS & DOCUMENTS
+-- ============================================================
+
+CREATE TABLE tenders (
+    tender_id SERIAL PRIMARY KEY,
+    buyer_id INT REFERENCES organizations(organization_id),
+    created_by INT REFERENCES users(user_id),
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    visibility_type VARCHAR(50),
+    budget_min NUMERIC,
+    budget_max NUMERIC,
+    status VARCHAR(50),
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE tender_documents (
+    document_id SERIAL PRIMARY KEY,
+    tender_id INT REFERENCES tenders(tender_id) ON DELETE CASCADE,
+    file_name VARCHAR(255) NOT NULL,
+    file_path TEXT NOT NULL,
+    uploaded_at TIMESTAMP DEFAULT NOW()
+);

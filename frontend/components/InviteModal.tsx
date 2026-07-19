@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ModalShell from '@/components/ModalShell';
 
 interface SentInvitation {

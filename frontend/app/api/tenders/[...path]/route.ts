@@ -19,12 +19,13 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
   // Preserve query string
   const url = new URL(request.url);
   const queryString = url.search;
-  const targetUrl = `${backendBaseUrl}/api/org/${endpoint}${queryString}`;
+  const targetUrl = `${backendBaseUrl}/tenders/${endpoint}${queryString}`;
 
   try {
     const outboundHeaders = new Headers(request.headers);
     outboundHeaders.delete('host');
 
+    // Automatically attach the HttpOnly access token
     const token = request.cookies.get('access_token')?.value;
     if (token) {
       outboundHeaders.set('Authorization', `Bearer ${token}`);

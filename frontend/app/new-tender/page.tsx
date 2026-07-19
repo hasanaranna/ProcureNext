@@ -7,6 +7,9 @@ export default function NewTenderPage() {
   const router = useRouter();
   const [sellerDocs, setSellerDocs] = useState<string[]>([]);
   const [newSellerDoc, setNewSellerDoc] = useState("");
+  
+  const [fileCount, setFileCount] = useState<number | "">("");
+  const [customFiles, setCustomFiles] = useState<{name: string, file: File | null}[]>([]);
 
   const addSellerDoc = () => {
     const trimmed = newSellerDoc.trim();
@@ -28,7 +31,6 @@ export default function NewTenderPage() {
     preBidMeeting: "",
     tenderOpeningDate: "",
     category: "",
-    files: [] as File[],
   });
 
   const handleChange = (
@@ -43,41 +45,91 @@ export default function NewTenderPage() {
     }));
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const selectedFiles = Array.from(e.target.files);
-      // Validate that all files are PDFs
-      const validFiles = selectedFiles.filter(
-        (file) => file.type === "application/pdf",
-      );
-      if (validFiles.length !== selectedFiles.length) {
-        alert("Only PDF files are allowed");
-        e.target.value = "";
+  const handleFileCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    if (val === "") {
+        setFileCount("");
+        setCustomFiles([]);
         return;
+    }
+    const count = parseInt(val);
+    if (isNaN(count) || count < 0) return;
+    
+    setFileCount(count);
+    setCustomFiles(prev => {
+      const newArray = [...prev];
+      if (count > newArray.length) {
+        for (let i = newArray.length; i < count; i++) {
+          newArray.push({ name: "", file: null });
+        }
+      } else if (count < newArray.length) {
+        newArray.length = count;
       }
-      setFormData((prev) => ({
-        ...prev,
-        files: validFiles,
-      }));
+      return newArray;
+    });
+  };
+
+  const updateCustomFile = (index: number, field: 'name' | 'file', value: any) => {
+    setCustomFiles(prev => {
+      const newArray = [...prev];
+      newArray[index] = { ...newArray[index], [field]: value };
+      return newArray;
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    
+    const count = typeof fileCount === "number" ? fileCount : 0;
+    const validFiles = customFiles.filter(cf => cf.name.trim() && cf.file);
+    if (validFiles.length !== count) {
+      alert(`Please ensure all ${count} files have a custom name and a file attached.`);
+      return;
+    }
+    
+    // Map to the backend schema TenderCreateRequest
+    const tenderData = {
+      title: formData.title,
+      description: formData.description,
+      budget_max: parseFloat(formData.budget) || null,
+      submission_deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null,
+      visibility_type: "Public",
+      security_required: false
+    };
+    
+    const fileNames = validFiles.map(cf => cf.name.trim());
+    const filesToUpload = validFiles.map(cf => cf.file);
+    
+    const data = new FormData();
+    data.append('tender_data', JSON.stringify(tenderData));
+    data.append('file_names', JSON.stringify(fileNames));
+    filesToUpload.forEach(f => {
+      if (f) data.append('files', f);
+    });
+    
+    try {
+        // Call the Next.js API proxy which automatically attaches the HttpOnly cookie token
+        const response = await fetch('/api/tenders/buyer/publish-with-documents', {
+            method: 'POST',
+            body: data,
+        });
+        
+        if (response.ok) {
+            console.log("Tender published successfully!");
+            router.push("/home");
+        } else {
+            const errorText = await response.text();
+            console.error("Failed to publish tender:", errorText);
+            alert("Failed to publish tender.");
+        }
+    } catch (e) {
+        console.error("Error submitting tender:", e);
+        alert("Error submitting tender.");
     }
   };
 
-  const removeFile = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      files: prev.files.filter((_, i) => i !== index),
-    }));
-  };
-
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    // TODO: Submit tender to backend
-    console.log("Tender submitted:", formData);
-    router.push("/home-buyer");
-  };
-
   const handleCancel = () => {
-    router.push("/home-buyer");
+    router.push("/home");
   };
 
   return (
@@ -263,80 +315,56 @@ export default function NewTenderPage() {
               </div>
             </div>
 
-            {/* File Upload */}
-            <div>
+            {/* Dynamic File Uploads */}
+            <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
               <label
-                htmlFor="files"
+                htmlFor="fileCount"
                 className="block text-sm font-semibold text-gray-700 mb-2"
               >
-                Attachments for Tender Details (PDF only)
+                How many files does this tender have?
               </label>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-600 transition">
-                <input
-                  type="file"
-                  id="files"
-                  name="files"
-                  multiple
-                  accept=".pdf"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-                <label htmlFor="files" className="cursor-pointer">
-                  <svg
-                    className="w-8 h-8 text-gray-400 mx-auto mb-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                    />
-                  </svg>
-                  <p className="text-gray-700 font-medium">
-                    Click to upload or drag and drop
-                  </p>
-                  <p className="text-sm text-gray-500">PDF files only</p>
-                </label>
-              </div>
-
-              {/* Display uploaded files */}
-              {formData.files.length > 0 && (
-                <div className="mt-4">
-                  <p className="text-sm font-semibold text-gray-700 mb-2">
-                    Uploaded Files:
-                  </p>
-                  <div className="space-y-2">
-                    {formData.files.map((file, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between bg-gray-100 p-3 rounded-lg"
-                      >
-                        <div className="flex items-center gap-2">
-                          <svg
-                            className="w-5 h-5 text-red-600"
-                            fill="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
-                            <polyline points="13 2 13 9 20 9" />
-                          </svg>
-                          <span className="text-sm text-gray-800">
-                            {file.name}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => removeFile(index)}
-                          className="text-red-600 hover:text-red-800 font-medium text-sm"
-                        >
-                          Remove
-                        </button>
+              <input
+                type="number"
+                id="fileCount"
+                name="fileCount"
+                value={fileCount}
+                onChange={handleFileCountChange}
+                placeholder="e.g. 3"
+                min="0"
+                className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:border-gray-600 focus:outline-none transition mb-6"
+              />
+              
+              {customFiles.length > 0 && (
+                <div className="space-y-4">
+                  <p className="text-sm font-semibold text-gray-700">Configure your files:</p>
+                  {customFiles.map((cf, index) => (
+                    <div key={index} className="flex flex-col sm:flex-row gap-4 p-4 bg-white border border-gray-300 rounded-lg shadow-sm">
+                      <div className="flex-1">
+                        <label className="block text-xs font-semibold text-gray-500 mb-1">File Name {index + 1}</label>
+                        <input
+                          type="text"
+                          value={cf.name}
+                          onChange={(e) => updateCustomFile(index, 'name', e.target.value)}
+                          placeholder="e.g. Technical Specifications"
+                          className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:border-gray-600 focus:outline-none transition text-sm"
+                          required
+                        />
                       </div>
-                    ))}
-                  </div>
+                      <div className="flex-1">
+                        <label className="block text-xs font-semibold text-gray-500 mb-1">Select Document</label>
+                        <input
+                          type="file"
+                          onChange={(e) => {
+                             if (e.target.files && e.target.files[0]) {
+                               updateCustomFile(index, 'file', e.target.files[0]);
+                             }
+                          }}
+                          className="w-full px-3 py-1.5 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 transition"
+                          required
+                        />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
