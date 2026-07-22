@@ -40,6 +40,7 @@ class TenderCreateRequest(BaseModel):
     title: str
     description: str
     category_id: Optional[int] = None
+    category: Optional[str] = None
     nature_id: Optional[int] = None
     method_id: Optional[int] = None
     visibility_type: TenderVisibility = TenderVisibility.Public
@@ -49,6 +50,10 @@ class TenderCreateRequest(BaseModel):
     security_valid_until: Optional[datetime] = None
     proposal_valid_until: Optional[datetime] = None
     submission_deadline: Optional[datetime] = None
+    tender_public_date: Optional[datetime] = None
+    pre_bid_meeting: Optional[datetime] = None
+    tender_opening_date: Optional[datetime] = None
+    required_seller_docs: Optional[List[str]] = None
 
 class TenderResponse(BaseModel):
     tender_id: int
