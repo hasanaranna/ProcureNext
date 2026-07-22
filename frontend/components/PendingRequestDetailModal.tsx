@@ -66,13 +66,15 @@ function DocRow({
         )}
         <div>
           <p className="text-sm font-medium text-gray-700">{label}</p>
-          {filename && (
-            <p className="text-xs text-gray-400 mt-0.5">{filename}</p>
-          )}
         </div>
       </div>
       {filename ? (
-        <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+        <a
+          href={filename}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 text-xs font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full hover:bg-indigo-100 transition-colors"
+        >
           <svg
             className="w-3 h-3"
             fill="none"
@@ -82,12 +84,12 @@ function DocRow({
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
-              strokeWidth={2.5}
-              d="M5 13l4 4L19 7"
+              strokeWidth={2}
+              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
             />
           </svg>
-          Uploaded
-        </span>
+          View Doc
+        </a>
       ) : (
         <span className="text-xs font-semibold text-gray-400 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-full">
           Not provided

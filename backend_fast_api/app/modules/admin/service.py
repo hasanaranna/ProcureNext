@@ -23,6 +23,7 @@ from app.modules.admin.schemas import (
     ModifyUserStatusRequest,
     VerifyOrgRequest,
 )
+from app.services.supabase_storage import generate_signed_url_optional, delete_files
 
 from fastapi import HTTPException
 
@@ -97,13 +98,25 @@ async def get_pending_master_accounts(
         oid = row["organization_id"]
         docs = org_docs.get(oid, {})
 
+        # Generate short-lived signed URLs (1 hour) for each document stored
+        # as an object path in the private Supabase Storage bucket.
+        additional_paths = docs.get("RJSC", [])
+        additional_signed = [
+            url
+            for url in [
+                await generate_signed_url_optional(path)
+                for path in additional_paths
+            ]
+            if url is not None
+        ]
+
         pending_docs = PendingDocuments(
-            nid_front=row["nid_front_file_path"],
-            nid_back=row["nid_back_file_path"],
-            trade_license=docs.get("TradeLicense", [None])[0],
-            tin_certificate=docs.get("TIN", [None])[0],
-            vat_certificate=docs.get("VAT", [None])[0],
-            additional_docs=docs.get("RJSC", []),
+            nid_front=await generate_signed_url_optional(row["nid_front_file_path"]),
+            nid_back=await generate_signed_url_optional(row["nid_back_file_path"]),
+            trade_license=await generate_signed_url_optional(docs.get("TradeLicense", [None])[0]),
+            tin_certificate=await generate_signed_url_optional(docs.get("TIN", [None])[0]),
+            vat_certificate=await generate_signed_url_optional(docs.get("VAT", [None])[0]),
+            additional_docs=additional_signed,
         )
 
         accounts.append(
@@ -116,7 +129,7 @@ async def get_pending_master_accounts(
                 organization_name=row["organization_name"],
                 organization_type=row["organization_type"],
                 submitted_at=row["created_at"].isoformat() if row["created_at"] else "",
-            documents=pending_docs,
+                documents=pending_docs,
             )
         )
 
@@ -163,7 +176,33 @@ async def verify_organization(
         )
 
         if payload.verification_status == "Rejected":
-            # Remove the organization
+            # ── Collect all file paths before records are deleted ──────────
+            file_paths: list[str] = []
+
+            if owner:
+                nid_rows = await connection.fetch(
+                    """
+                    SELECT nid_front_file_path, nid_back_file_path
+                    FROM user_verification
+                    WHERE user_id = $1
+                    """,
+                    owner["user_id"],
+                )
+                for row in nid_rows:
+                    if row["nid_front_file_path"]:
+                        file_paths.append(row["nid_front_file_path"])
+                    if row["nid_back_file_path"]:
+                        file_paths.append(row["nid_back_file_path"])
+
+            org_doc_rows = await connection.fetch(
+                "SELECT file_path FROM organization_documents WHERE organization_id = $1",
+                organization_id,
+            )
+            for row in org_doc_rows:
+                if row["file_path"]:
+                    file_paths.append(row["file_path"])
+
+            # ── Remove DB records ──────────────────────────────────────────
             res = await connection.execute(
                 "DELETE FROM organizations WHERE organization_id = $1",
                 organization_id,
@@ -171,12 +210,16 @@ async def verify_organization(
             if res == "DELETE 0":
                 raise HTTPException(status_code=404, detail="Organization not found")
 
-            # Remove the user
             if owner:
                 await connection.execute(
                     "DELETE FROM users WHERE user_id = $1",
                     owner["user_id"],
                 )
+
+        # ── Delete files from Supabase Storage (outside transaction so a
+        #    storage hiccup doesn't roll back the DB rejection) ────────────
+        if payload.verification_status == "Rejected" and file_paths:
+            await delete_files(file_paths)
 
             # approve or reject jai hok pore mail kore notify korte hobe user ke
             return {"message": f"Organization {organization_id} has been Rejected and the user was removed."}
