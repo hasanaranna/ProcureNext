@@ -178,3 +178,43 @@ CREATE TABLE tender_documents (
     file_path TEXT NOT NULL,
     uploaded_at TIMESTAMP DEFAULT NOW()
 );
+
+-- ============================================================
+-- MESSAGING (Real-time encrypted intra-company messaging)
+-- ============================================================
+
+CREATE TYPE thread_type AS ENUM ('IntraCompany', 'InterCompany');
+
+CREATE TABLE message_threads (
+    thread_id       SERIAL PRIMARY KEY,
+    thread_type     thread_type NOT NULL DEFAULT 'IntraCompany',
+    tender_id       INT REFERENCES tenders(tender_id),
+    group_name      VARCHAR(255),
+    created_by      INT NOT NULL REFERENCES users(user_id),
+    created_at      TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE thread_participants (
+    id              SERIAL PRIMARY KEY,
+    thread_id       INT NOT NULL REFERENCES message_threads(thread_id) ON DELETE CASCADE,
+    user_id         INT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    organization_id INT NOT NULL REFERENCES organizations(organization_id),
+    is_admin        BOOLEAN DEFAULT FALSE,
+    joined_at       TIMESTAMP DEFAULT NOW(),
+    last_read_at    TIMESTAMP,
+    UNIQUE(thread_id, user_id)
+);
+
+CREATE TABLE messages (
+    message_id      SERIAL PRIMARY KEY,
+    thread_id       INT NOT NULL REFERENCES message_threads(thread_id) ON DELETE CASCADE,
+    sender_user_id  INT NOT NULL REFERENCES users(user_id),
+    message_text    TEXT NOT NULL,
+    encryption_iv   TEXT NOT NULL,
+    sent_at         TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_thread_participants_user   ON thread_participants(user_id);
+CREATE INDEX idx_thread_participants_thread ON thread_participants(thread_id);
+CREATE INDEX idx_messages_thread            ON messages(thread_id, sent_at);
+CREATE INDEX idx_messages_sender            ON messages(sender_user_id);

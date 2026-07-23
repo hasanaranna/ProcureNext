@@ -27,6 +27,8 @@
 # ============================================================
 
 from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -34,7 +36,9 @@ from app.modules.organizations.router import router as organizations_router
 from app.modules.auth.router import router as auth_router
 from app.modules.admin.router import router as admin_router
 from app.modules.tenders.router import router as tenders_router
-load_dotenv()
+from app.modules.messaging.router import router as messaging_router
+from app.modules.messaging.websocket import websocket_endpoint
+
 
 app = FastAPI(title="ProcureNext FastAPI Backend")
 
@@ -50,7 +54,11 @@ app.include_router(organizations_router)
 app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(tenders_router)
+app.include_router(messaging_router)
+
+app.add_api_websocket_route("/ws/messages", websocket_endpoint)
 
 @app.get("/health")
 async def health_check() -> dict:
 	return {"status": "ok"}
+
