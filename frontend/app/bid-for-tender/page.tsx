@@ -36,14 +36,31 @@ function formatDate(dateStr: string | null): string {
   });
 }
 
+interface BidDocument {
+  bid_doc_id: number;
+  file_path: string | null;
+  document_type: string;
+}
+
+interface ExistingBid {
+  bid_id: number;
+  tender_id: number;
+  financial_amount: number | null;
+  status: string;
+  submitted_at: string | null;
+  documents: BidDocument[];
+}
+
 export default function BidForTenderPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tenderId = searchParams.get("id");
 
   const [tender, setTender] = useState<TenderDetail | null>(null);
+  const [existingBid, setExistingBid] = useState<ExistingBid | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
     description: "",
@@ -59,21 +76,28 @@ export default function BidForTenderPage() {
       setLoading(false);
       return;
     }
-    const fetchTender = async () => {
+    const fetchData = async () => {
       try {
-        const res = await fetch(`/api/tenders/${tenderId}/detail`);
-        if (!res.ok) {
-          throw new Error(res.status === 404 ? "Tender not found" : "Failed to load tender");
+        const tenderRes = await fetch(`/api/tenders/${tenderId}/detail`);
+        if (!tenderRes.ok) {
+          throw new Error(tenderRes.status === 404 ? "Tender not found" : "Failed to load tender");
         }
-        const data = await res.json();
-        setTender(data);
+        const tenderData = await tenderRes.json();
+        setTender(tenderData);
+
+        // Fetch existing bid if any
+        const bidRes = await fetch(`/api/bids/vendor/tender/${tenderId}`);
+        if (bidRes.ok) {
+          const bidData = await bidRes.json();
+          setExistingBid(bidData);
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load tender");
+        setError(err instanceof Error ? err.message : "Failed to load data");
       } finally {
         setLoading(false);
       }
     };
-    fetchTender();
+    fetchData();
   }, [tenderId]);
 
   const handleChange = (
@@ -103,10 +127,54 @@ export default function BidForTenderPage() {
     if (input) input.value = "";
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log("Bid submitted:", formData);
-    router.push("/home");
+    if (!tenderId || submitting) return;
+
+    setSubmitting(true);
+    try {
+      const body = new FormData();
+
+      // Bid data as JSON
+      body.append(
+        "bid_data",
+        JSON.stringify({
+          tender_id: parseInt(tenderId),
+          financial_amount: parseFloat(formData.bidAmount),
+        })
+      );
+
+      // Collect files and their document type names
+      const docFiles: { file: File; typeName: string }[] = [];
+      if (taxCertificate) docFiles.push({ file: taxCertificate, typeName: "TIN" });
+      if (businessId) docFiles.push({ file: businessId, typeName: "TradeLicense" });
+      if (otherDoc) docFiles.push({ file: otherDoc, typeName: "VAT" });
+
+      body.append(
+        "doc_type_names",
+        JSON.stringify(docFiles.map((d) => d.typeName))
+      );
+
+      for (const { file } of docFiles) {
+        body.append("files", file);
+      }
+
+      const res = await fetch("/api/bids/vendor/submit-with-documents", {
+        method: "POST",
+        body,
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.detail || "Failed to submit bid");
+      }
+
+      router.push("/home");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to submit bid");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // Loading state
@@ -330,133 +398,245 @@ export default function BidForTenderPage() {
           </div>
         </div>
 
-        {/* Bid Form Card */}
-        <div className="bg-white rounded-2xl shadow-2xl p-8 border border-gray-200">
-          <h2
-            style={{ color: "#111827" }}
-            className="text-2xl font-bold mb-1 text-center"
-          >
-            Place Your Bid
-          </h2>
-          <p className="text-gray-500 text-sm mb-8 text-center">
-            Provide your proposal details and bid amount
-          </p>
+        {/* Bid Form Card or Existing Bid View */}
+        {existingBid ? (
+          <div className="bg-white rounded-2xl shadow-2xl p-8 border border-gray-200 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4">
+              <span className="px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full border border-green-200 shadow-sm">
+                {existingBid.status}
+              </span>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-6 pb-4 border-b">
+              Your Submitted Bid
+            </h2>
+            
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Financial Proposal</h3>
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <span className="text-3xl font-bold text-gray-800">
+                    ${existingBid.financial_amount?.toLocaleString() || "0"}
+                  </span>
+                </div>
+              </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Description */}
-            <div>
-              <label
-                htmlFor="description"
-                className="block text-sm font-semibold text-gray-700 mb-2"
-              >
-                Your Proposal
-              </label>
-              <textarea
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                placeholder="Describe your proposal, delivery timeline, and any special offers..."
-                required
-                rows={5}
-                className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:border-gray-600 focus:outline-none transition resize-none"
-              />
+              <div>
+                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Submitted On</h3>
+                <p className="text-gray-800 text-lg">{formatDate(existingBid.submitted_at)}</p>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Submitted Documents</h3>
+                <div className="space-y-3">
+                  {existingBid.documents?.map((doc, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="flex items-center gap-3">
+                        <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
+                          <path d="M14 2v6h6" />
+                        </svg>
+                        <span className="font-medium text-gray-800">{doc.document_type}</span>
+                      </div>
+                    </div>
+                  ))}
+                  {!existingBid.documents?.length && (
+                    <p className="text-sm text-gray-500">No documents submitted.</p>
+                  )}
+                </div>
+              </div>
             </div>
 
-            {/* Bid Amount */}
-            <div>
-              <label
-                htmlFor="bidAmount"
-                className="block text-sm font-semibold text-gray-700 mb-2"
+            <div className="pt-6 border-t mt-6">
+              <button
+                type="button"
+                onClick={() => router.push("/home")}
+                className="w-full px-6 py-3 bg-gray-100 text-gray-700 font-semibold rounded-lg hover:bg-gray-200 transition"
               >
-                Bid Amount (in BDT)
-              </label>
-              <input
-                type="number"
-                id="bidAmount"
-                name="bidAmount"
-                value={formData.bidAmount}
-                onChange={handleChange}
-                placeholder="Enter your bid amount"
-                required
-                className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:border-gray-600 focus:outline-none transition"
-              />
+                Back to Dashboard
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl shadow-2xl p-8 border border-gray-200 relative">
+            <div className="absolute top-0 right-0 p-4">
+              <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded-full border border-yellow-200 shadow-sm flex items-center gap-1">
+                Draft
+              </span>
             </div>
 
-            {/* Document Uploads */}
-            <div className="space-y-3">
-              <p className="text-sm font-semibold text-gray-700">
-                Upload Documents{" "}
-                <span className="font-normal text-gray-400">(PDF only)</span>
-              </p>
+            <h2 className="text-2xl font-bold text-gray-800 mb-1 text-center">
+              Place Your Bid
+            </h2>
+            <p className="text-gray-500 text-sm mb-8 text-center">
+              Provide your proposal details and bid amount
+            </p>
 
-              {/* Reusable file row renderer */}
-              {[
-                {
-                  id: "file-tax",
-                  label: "Tax Certificate",
-                  required: true,
-                  file: taxCertificate,
-                  setter: setTaxCertificate,
-                },
-                {
-                  id: "file-bizid",
-                  label: "Business Identification",
-                  required: true,
-                  file: businessId,
-                  setter: setBusinessId,
-                },
-                {
-                  id: "file-other",
-                  label: "Other Documents",
-                  required: false,
-                  file: otherDoc,
-                  setter: setOtherDoc,
-                },
-              ].map(({ id, label, required, file, setter }) => (
-                <div
-                  key={id}
-                  className="flex items-center gap-3 border-2 border-gray-200 rounded-lg px-4 py-2.5 bg-gray-50 hover:border-gray-400 transition"
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Financial Amount */}
+              <div>
+                <label
+                  htmlFor="bidAmount"
+                  className="block text-sm font-semibold text-gray-700 mb-2"
                 >
-                  {/* PDF icon */}
-                  <svg
-                    className={`w-5 h-5 flex-shrink-0 ${file ? "text-red-500" : "text-gray-300"}`}
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
-                  </svg>
+                  Financial Amount (USD) <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">
+                    $
+                  </span>
+                  <input
+                    type="number"
+                    id="bidAmount"
+                    name="bidAmount"
+                    value={formData.bidAmount}
+                    onChange={handleChange}
+                    required
+                    min="0"
+                    step="0.01"
+                    className="w-full pl-8 pr-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 focus:bg-white transition text-gray-800 font-medium"
+                    placeholder="e.g. 25000.00"
+                  />
+                </div>
+              </div>
 
-                  {/* Label + filename */}
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm font-semibold text-gray-700">
-                      {label}
-                      {required && (
-                        <span className="text-red-500 ml-0.5">*</span>
-                      )}
-                      {!required && (
-                        <span className="ml-1 text-xs font-normal text-gray-400">
-                          (Optional)
-                        </span>
-                      )}
-                    </span>
-                    {file && (
-                      <p className="text-xs text-gray-400 truncate mt-0.5">
-                        {file.name}
-                      </p>
-                    )}
-                  </div>
+              {/* Supporting Documents */}
+              <div>
+                <h3 className="text-lg font-bold text-gray-800 mb-4 pb-2 border-b">
+                  Required Documents
+                </h3>
+                <p className="text-sm text-gray-500 mb-4">
+                  Please upload the necessary documents to support your bid. Only
+                  PDF files are accepted.
+                </p>
 
-                  {/* Choose / Clear */}
-                  {file ? (
-                    <button
-                      type="button"
-                      onClick={() => clearFile(setter, id)}
-                      className="flex-shrink-0 text-gray-400 hover:text-red-500 transition"
-                      aria-label="Remove file"
+                <div className="space-y-4">
+                  {[
+                    {
+                      id: "file-tax",
+                      label: "Tax Certificate",
+                      required: true,
+                      file: taxCertificate,
+                      setter: setTaxCertificate,
+                    },
+                    {
+                      id: "file-bizid",
+                      label: "Business Identification",
+                      required: true,
+                      file: businessId,
+                      setter: setBusinessId,
+                    },
+                    {
+                      id: "file-other",
+                      label: "Other Documents",
+                      required: false,
+                      file: otherDoc,
+                      setter: setOtherDoc,
+                    },
+                  ].map(({ id, label, required, file, setter }) => (
+                    <div
+                      key={id}
+                      className="flex items-center gap-3 border-2 border-gray-200 rounded-lg px-4 py-2.5 bg-gray-50 hover:border-gray-400 transition"
                     >
+                      {/* PDF icon */}
                       <svg
-                        className="w-4 h-4"
+                        className={`w-5 h-5 flex-shrink-0 ${file ? "text-red-500" : "text-gray-300"}`}
+                        fill="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
+                        <path d="M14 2v6h6" />
+                        <path d="M16 13H8" />
+                        <path d="M16 17H8" />
+                        <path d="M10 9H8" />
+                      </svg>
+
+                      <div className="flex-1 flex flex-col min-w-0">
+                        <span className="text-sm font-semibold text-gray-700 truncate">
+                          {label}{" "}
+                          {required && <span className="text-red-500">*</span>}
+                        </span>
+                        {file ? (
+                          <span className="text-xs text-gray-500 truncate">
+                            {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">
+                            No file selected
+                          </span>
+                        )}
+                      </div>
+
+                      {file ? (
+                        <button
+                          type="button"
+                          onClick={() => clearFile(setter, id)}
+                          className="flex-shrink-0 text-gray-400 hover:text-red-500 p-1 rounded-full transition"
+                          title="Remove file"
+                        >
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        </button>
+                      ) : (
+                        <label
+                          htmlFor={id}
+                          className="flex-shrink-0 cursor-pointer text-xs font-semibold text-gray-500 hover:text-gray-800 bg-white border border-gray-300 hover:border-gray-500 rounded-md px-3 py-1.5 transition"
+                        >
+                          Choose file
+                          <input
+                            type="file"
+                            id={id}
+                            accept=".pdf"
+                            required={required}
+                            className="hidden"
+                            onChange={(e) => handleSingleFile(setter, id, e)}
+                          />
+                        </label>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-4 pt-6 pb-4">
+                <button
+                  type="button"
+                  onClick={() => router.push("/home")}
+                  className="flex-1 px-6 py-3 bg-gray-300 text-gray-800 font-semibold rounded-lg hover:bg-gray-400 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  style={{
+                    background:
+                      "linear-gradient(135deg, #4a5668 0%, #3a4556 100%)",
+                  }}
+                  className="flex-1 px-6 py-3 text-white font-semibold rounded-lg hover:opacity-90 transition flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {submitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      Submit Bid
+                      <span className="text-sm">( 100</span>
+                      <svg
+                        className="w-4 h-4 text-yellow-400"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -464,92 +644,42 @@ export default function BidForTenderPage() {
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          strokeWidth={2.5}
-                          d="M6 18L18 6M6 6l12 12"
+                          strokeWidth={2}
+                          d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                         />
                       </svg>
-                    </button>
-                  ) : (
-                    <label
-                      htmlFor={id}
-                      className="flex-shrink-0 cursor-pointer text-xs font-semibold text-gray-500 hover:text-gray-800 bg-white border border-gray-300 hover:border-gray-500 rounded-md px-3 py-1.5 transition"
-                    >
-                      Choose file
-                      <input
-                        type="file"
-                        id={id}
-                        accept=".pdf"
-                        required={required}
-                        className="hidden"
-                        onChange={(e) => handleSingleFile(setter, id, e)}
-                      />
-                    </label>
+                      <span className="text-sm">)</span>
+                    </>
                   )}
-                </div>
-              ))}
-            </div>
+                </button>
+              </div>
 
-            {/* Buttons */}
-            <div className="flex gap-4 pt-6 pb-4">
-              <button
-                type="button"
-                onClick={() => router.push("/home")}
-                className="flex-1 px-6 py-3 bg-gray-300 text-gray-800 font-semibold rounded-lg hover:bg-gray-400 transition"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                style={{
-                  background:
-                    "linear-gradient(135deg, #4a5668 0%, #3a4556 100%)",
-                }}
-                className="flex-1 px-6 py-3 text-white font-semibold rounded-lg hover:opacity-90 transition flex items-center justify-center gap-1"
-              >
-                Submit Bid
-                <span className="text-sm">( 100</span>
-                <svg
-                  className="w-4 h-4 text-yellow-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <span className="text-sm">)</span>
-              </button>
-            </div>
-
-            {/* Token Info */}
-            <div className="text-center pt-4 border-t border-gray-300">
-              <p className="text-sm text-gray-600 flex items-center justify-center gap-1">
-                You currently have{" "}
-                <span className="font-semibold text-gray-800 flex items-center gap-1">
-                  180
-                  <svg
-                    className="w-4 h-4 text-yellow-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  tokens
-                </span>
-              </p>
-            </div>
-          </form>
-        </div>
+              {/* Token Info */}
+              <div className="text-center pt-4 border-t border-gray-300">
+                <p className="text-sm text-gray-600 flex items-center justify-center gap-1">
+                  You currently have{" "}
+                  <span className="font-semibold text-gray-800 flex items-center gap-1">
+                    180
+                    <svg
+                      className="w-4 h-4 text-yellow-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    tokens
+                  </span>
+                </p>
+              </div>
+            </form>
+          </div>
+        )}
       </div>
     </main>
   );

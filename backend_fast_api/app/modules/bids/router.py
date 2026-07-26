@@ -1,47 +1,113 @@
 # ============================================================
 # bids/router.py - Bid Management API Endpoints
 # ============================================================
-# COVERS: FR-15 (Bid Submission & Bid-Bond), FR-16 (Bid Status),
-#         FR-17 (Bid History)
-#
-# ENDPOINTS:
-#
-# --- Vendor Endpoints ---
-#
-# POST /vendor/bid/{tender_id}/publish
-#   - Submit a bid for a specific tender
-#   - Accepts: technical_doc (PDF upload), financial_amount,
-#     lot_id (if lot-wise), supporting documents
-#   - Must pay bid-bond amount specified by buyer
-#   - Deducts credit points from vendor's account
-#   - Validates all buyer-required documents are uploaded
-#   - Cannot submit after submission_deadline
-#
-# PUT /vendor/bid/{bid_id}
-#   - Amend/update a submitted bid (before deadline only)
-#   - Can update technical docs, financial amount
-#
-# POST /vendor/bid/{bid_id}/withdraw
-#   - Withdraw a submitted bid
-#   - Bid-bond refund rules apply
-#
-# GET /vendor/bid/{bid_id}
-#   - Get details of a specific bid
-#
-# GET /vendor/jobs
-#   - List all bids submitted by the vendor org (past and ongoing)
-#   - Shows bid lifecycle status for each
-#
-# --- Buyer Endpoints ---
-#
-# GET /tenders/{tender_id}/bids
-#   - List all bids received for a tender (Buyer only)
-#   - May or may not show other vendors' bids depending on
-#     buyer's setting (visibility_of_bids flag)
-#   - Supports sorting by: financial_amount, submission date,
-#     vendor rating
-#
-# GET /tenders/{tender_id}/bids/{bid_id}
-#   - Buyer views detailed bid including documents
-#   - Buyer can reject bids from vendors missing required documents
-# ============================================================
+
+import os
+import json
+import uuid
+import shutil
+from typing import List
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
+from app.core.db import get_db_connection
+from app.modules.auth.dependencies import get_current_user_org
+from app.modules.bids.schemas import BidResponse
+from app.modules.bids.service import submit_bid_with_documents, get_bid_by_tender_and_vendor
+
+router = APIRouter(prefix="/bids", tags=["Bids"])
+
+TEMP_UPLOAD_DIR = os.getenv("UPLOAD_DIR", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../uploads")))
+os.makedirs(TEMP_UPLOAD_DIR, exist_ok=True)
+
+
+@router.post("/vendor/submit-with-documents", response_model=BidResponse, status_code=status.HTTP_201_CREATED)
+async def submit_bid(
+    bid_data: str = Form(...),
+    doc_type_names: str = Form("[]"),
+    files: List[UploadFile] = File(default=[]),
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    Submit a bid with documents.
+    - bid_data: JSON string with keys: tender_id, financial_amount
+    - doc_type_names: JSON string list of document type names matching the files array
+      (e.g. ["TIN", "TradeLicense", "Other"])
+    - files: Multiple PDF files to upload
+    """
+    # 1. Parse JSON inputs
+    try:
+        bid_dict = json.loads(bid_data)
+        tender_id = int(bid_dict["tender_id"])
+        financial_amount = float(bid_dict["financial_amount"])
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid bid_data JSON: {e}")
+
+    try:
+        type_names = json.loads(doc_type_names)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid doc_type_names JSON: {e}")
+
+    # Filter out empty file uploads (files with no filename)
+    actual_files = [f for f in files if f.filename]
+
+    if len(type_names) != len(actual_files):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Number of doc_type_names ({len(type_names)}) must match number of files ({len(actual_files)})"
+        )
+
+    # 2. Save files locally to temp folder for Celery
+    files_data = []
+    for i, file_obj in enumerate(actual_files):
+        doc_type_name = type_names[i]
+        safe_filename = f"{uuid.uuid4().hex}_{file_obj.filename}"
+        local_path = os.path.join(TEMP_UPLOAD_DIR, safe_filename)
+
+        with open(local_path, "wb") as buffer:
+            shutil.copyfileobj(file_obj.file, buffer)
+
+        files_data.append({
+            "local_path": local_path,
+            "doc_type_name": doc_type_name,
+        })
+
+    vendor_org_id = current_user.get("organization_id", 1)
+    org_user_id = current_user.get("org_user_id", 1)
+
+    # 3. Save to DB and dispatch background task
+    try:
+        async with get_db_connection() as connection:
+            new_bid = await submit_bid_with_documents(
+                connection=connection,
+                vendor_org_id=vendor_org_id,
+                submitted_by=org_user_id,
+                tender_id=tender_id,
+                financial_amount=financial_amount,
+                files_data=files_data,
+            )
+            return new_bid
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+@router.get("/vendor/tender/{tender_id}", response_model=BidResponse)
+async def get_vendor_bid_for_tender(
+    tender_id: int,
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    Fetch the current vendor's bid for a specific tender.
+    Returns 404 if no bid has been submitted.
+    """
+    vendor_org_id = current_user.get("organization_id")
+    if not vendor_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            bid = await get_bid_by_tender_and_vendor(connection, tender_id, vendor_org_id)
+            if not bid:
+                raise HTTPException(status_code=404, detail="No bid found for this tender.")
+            return bid
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
