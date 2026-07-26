@@ -415,7 +415,7 @@ export default function BidForTenderPage() {
                 <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Financial Proposal</h3>
                 <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                   <span className="text-3xl font-bold text-gray-800">
-                    ${existingBid.financial_amount?.toLocaleString() || "0"}
+                    Tk {existingBid.financial_amount?.toLocaleString() || "0"}
                   </span>
                 </div>
               </div>
@@ -437,6 +437,24 @@ export default function BidForTenderPage() {
                         </svg>
                         <span className="font-medium text-gray-800">{doc.document_type}</span>
                       </div>
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          try {
+                            const res = await fetch(`/api/bids/documents/${doc.bid_doc_id}/view`);
+                            if (res.ok) {
+                              const data = await res.json();
+                              window.open(data.url, '_blank');
+                            }
+                          } catch (err) {
+                            console.error('Failed to open document:', err);
+                          }
+                        }}
+                        className="text-blue-600 hover:text-blue-800 text-sm font-semibold transition px-2 py-1"
+                      >
+                        View
+                      </button>
                     </div>
                   ))}
                   {!existingBid.documents?.length && (
@@ -478,11 +496,11 @@ export default function BidForTenderPage() {
                   htmlFor="bidAmount"
                   className="block text-sm font-semibold text-gray-700 mb-2"
                 >
-                  Financial Amount (USD) <span className="text-red-500">*</span>
+                  Financial Amount (BDT) <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">
-                    $
+                    Tk
                   </span>
                   <input
                     type="number"

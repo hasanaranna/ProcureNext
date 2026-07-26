@@ -72,3 +72,9 @@ async def get_bid_by_tender_and_vendor(
     bid_dict["documents"] = [dict(r) for r in docs_rows]
 
     return bid_dict
+
+async def get_bid_document_by_id(connection: asyncpg.Connection, doc_id: int) -> dict | None:
+    """Fetch bid document by its ID."""
+    query = "SELECT * FROM bid_documents WHERE bid_doc_id = $1"
+    row = await connection.fetchrow(query, doc_id)
+    return dict(row) if row else None

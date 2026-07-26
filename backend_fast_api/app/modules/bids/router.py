@@ -11,7 +11,8 @@ from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, s
 from app.core.db import get_db_connection
 from app.modules.auth.dependencies import get_current_user_org
 from app.modules.bids.schemas import BidResponse
-from app.modules.bids.service import submit_bid_with_documents, get_bid_by_tender_and_vendor
+from app.modules.bids.service import submit_bid_with_documents, get_bid_by_tender_and_vendor, get_bid_document_by_id
+from app.services.supabase_storage import generate_signed_url
 
 router = APIRouter(prefix="/bids", tags=["Bids"])
 
@@ -107,6 +108,30 @@ async def get_vendor_bid_for_tender(
             if not bid:
                 raise HTTPException(status_code=404, detail="No bid found for this tender.")
             return bid
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+@router.get("/documents/{doc_id}/view")
+async def view_bid_document(
+    doc_id: int,
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    Get a signed URL to view a bid document.
+    """
+    try:
+        async with get_db_connection() as connection:
+            doc = await get_bid_document_by_id(connection, doc_id)
+            if not doc:
+                raise HTTPException(status_code=404, detail="Document not found")
+            
+            url = await generate_signed_url(doc["file_path"], expires_in=3600)
+            if not url:
+                raise HTTPException(status_code=500, detail="Failed to generate signed URL")
+            
+            return {"url": url}
     except HTTPException:
         raise
     except Exception as e:
