@@ -56,20 +56,47 @@ export default function HomePage() {
     }, 200);
   };
 
-  // Seller tender data
-  const recommendedTenders: { title: string; subtitle: string; buyer: string; onClick?: () => void }[] = [
-    { title: 'Office Supplies Tender', subtitle: 'Procurement of office stationery and supplies for Q2 2026', buyer: 'Acme Corporation', onClick: () => router.push('/bid-for-tender') },
-    { title: 'IT Equipment Procurement', subtitle: 'Request for computers, monitors, and peripherals', buyer: 'TechStart Inc.' },
-    { title: 'Furniture & Fixtures', subtitle: 'Office furniture and interior fittings for new branch', buyer: 'Metro Industries' },
-    { title: 'Cleaning Services', subtitle: 'Annual facility cleaning and maintenance contract', buyer: 'Summit Holdings' },
-    { title: 'Catering Services', subtitle: 'Event catering and daily hospitality services', buyer: 'Greenfield Events' },
-  ];
+  // Tender data fetched from DB
+  interface TenderItem {
+    tender_id: number;
+    title: string;
+    description: string;
+    status: string;
+    buyer_org_name: string;
+    submission_deadline: string | null;
+    created_at: string;
+  }
 
-  const enlistedTenders: { title: string; subtitle: string; buyer: string; onClick?: () => void }[] = [
-    { title: 'Annual Stationery Supply', subtitle: 'Bulk supply of office stationery for all branches', buyer: 'Acme Corporation' },
-    { title: 'Server Room Setup', subtitle: 'Complete server room infrastructure and cabling', buyer: 'BuildRight Inc.' },
-    { title: 'Warehouse Shelving', subtitle: 'Industrial shelving units for warehouse expansion', buyer: 'Metro Industries' },
-  ];
+  const [buyerTenders, setBuyerTenders] = useState<TenderItem[]>([]);
+  const [sellerTenders, setSellerTenders] = useState<TenderItem[]>([]);
+  const [tendersLoading, setTendersLoading] = useState(false);
+
+  // Fetch tenders when mode changes
+  useEffect(() => {
+    const fetchTenders = async () => {
+      setTendersLoading(true);
+      try {
+        if (mode === 'buyer') {
+          const res = await fetch('/api/tenders/buyer/my-tenders');
+          if (res.ok) {
+            const data = await res.json();
+            setBuyerTenders(data);
+          }
+        } else {
+          const res = await fetch('/api/tenders/seller/all-tenders');
+          if (res.ok) {
+            const data = await res.json();
+            setSellerTenders(data);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch tenders:', err);
+      } finally {
+        setTendersLoading(false);
+      }
+    };
+    fetchTenders();
+  }, [mode]);
 
   const user = {
     name: userData.full_name || 'User',
@@ -473,36 +500,25 @@ export default function HomePage() {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      <TenderCard
-                        title="Office Supplies Tender"
-                        subtitle="Procurement of office stationery and supplies"
-                        vendor="Global Supplies Co."
-                      />
-                      <TenderCard
-                        title="IT Equipment Procurement"
-                        subtitle="Request for computers and peripherals"
-                        vendor="Tech Solutions Ltd."
-                      />
-                      <TenderCard
-                        title="Furniture & Fixtures"
-                        subtitle="Office furniture and interior fittings"
-                        onClick={() => router.push('/view-my-tender')}
-                      />
-                      <TenderCard
-                        title="Cleaning Services"
-                        subtitle="Facility cleaning and maintenance services"
-                        vendor="CleanPro Services"
-                      />
-                      <TenderCard
-                        title="Software Licenses"
-                        subtitle="Annual software subscription renewal"
-                        vendor="Enterprise Software Corp."
-                      />
-                      <TenderCard
-                        title="Catering Services"
-                        subtitle="Event catering and hospitality services"
-                        vendor="Gourmet Catering Ltd."
-                      />
+                      {tendersLoading ? (
+                        <div className="col-span-full flex justify-center py-12">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: '#4a5668' }} />
+                        </div>
+                      ) : buyerTenders.length === 0 ? (
+                        <div className="col-span-full text-center py-12">
+                          <p className="text-gray-400 text-lg">No tenders yet. Create your first tender!</p>
+                        </div>
+                      ) : (
+                        buyerTenders.map((tender) => (
+                          <TenderCard
+                            key={tender.tender_id}
+                            title={tender.title}
+                            subtitle={tender.description}
+                            vendor={tender.buyer_org_name}
+                            onClick={() => router.push(`/view-my-tender?id=${tender.tender_id}`)}
+                          />
+                        ))
+                      )}
                     </div>
                   </div>
                 </>
@@ -510,11 +526,19 @@ export default function HomePage() {
                 <>
                   {/* Seller Lower: Tender Cards */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {(activeTab === 'recommended' ? recommendedTenders : enlistedTenders).map(
-                      (tender, index) => (
+                    {tendersLoading ? (
+                      <div className="col-span-full flex justify-center py-12">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: '#4a5668' }} />
+                      </div>
+                    ) : sellerTenders.length === 0 ? (
+                      <div className="col-span-full text-center py-12">
+                        <p className="text-gray-400 text-lg">No tenders available at the moment.</p>
+                      </div>
+                    ) : (
+                      sellerTenders.map((tender) => (
                         <div
-                          key={`${activeTab}-${index}`}
-                          onClick={tender.onClick}
+                          key={tender.tender_id}
+                          onClick={() => router.push(`/bid-for-tender?id=${tender.tender_id}`)}
                           className="rounded-2xl p-5 cursor-pointer transition-shadow duration-200 hover:shadow-lg"
                           style={{ backgroundColor: '#f9fafb', border: '3px solid #9ca3af' }}
                         >
@@ -527,7 +551,7 @@ export default function HomePage() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <h3 className="text-lg font-bold text-gray-900">{tender.title}</h3>
-                              <p className="text-gray-500 text-sm mt-1">{tender.subtitle}</p>
+                              <p className="text-gray-500 text-sm mt-1">{tender.description}</p>
                             </div>
                           </div>
                           <div
@@ -535,11 +559,11 @@ export default function HomePage() {
                             style={{ backgroundColor: '#374151' }}
                           >
                             <p className="text-gray-300 text-xs font-medium">
-                              🏢 <span className="text-gray-100 ml-1">{tender.buyer}</span>
+                              🏢 <span className="text-gray-100 ml-1">{tender.buyer_org_name}</span>
                             </p>
                           </div>
                         </div>
-                      )
+                      ))
                     )}
                   </div>
                 </>

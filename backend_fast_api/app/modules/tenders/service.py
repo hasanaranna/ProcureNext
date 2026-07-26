@@ -73,3 +73,96 @@ async def publish_tender_with_documents(
         upload_tender_documents_to_supabase.delay(tender_id, files_data)
 
     return dict(row)
+
+
+async def get_buyer_tenders(
+    connection: asyncpg.Connection,
+    buyer_org_id: int,
+) -> list[dict]:
+    """
+    Fetch all tenders created by the given buyer organization.
+    """
+    query = """
+        SELECT
+            t.tender_id,
+            t.title,
+            t.description,
+            t.status,
+            o.organization_name AS buyer_org_name,
+            t.submission_deadline,
+            t.created_at
+        FROM tenders t
+        JOIN organizations o ON t.buyer_id = o.organization_id
+        WHERE t.buyer_id = $1
+        ORDER BY t.created_at DESC;
+    """
+    rows = await connection.fetch(query, buyer_org_id)
+    return [dict(row) for row in rows]
+
+
+async def get_all_published_tenders(
+    connection: asyncpg.Connection,
+) -> list[dict]:
+    """
+    Fetch all published tenders (for seller browsing).
+    """
+    query = """
+        SELECT
+            t.tender_id,
+            t.title,
+            t.description,
+            t.status,
+            o.organization_name AS buyer_org_name,
+            t.submission_deadline,
+            t.created_at
+        FROM tenders t
+        JOIN organizations o ON t.buyer_id = o.organization_id
+        WHERE t.status = 'Published'
+        ORDER BY t.created_at DESC;
+    """
+    rows = await connection.fetch(query)
+    return [dict(row) for row in rows]
+
+
+async def get_tender_detail(
+    connection: asyncpg.Connection,
+    tender_id: int,
+) -> dict | None:
+    """
+    Fetch full tender details including buyer org name and attached documents.
+    """
+    tender_query = """
+        SELECT
+            t.tender_id,
+            t.title,
+            t.description,
+            t.status,
+            o.organization_name AS buyer_org_name,
+            t.submission_deadline,
+            t.tender_public_date,
+            t.pre_bid_meeting,
+            t.tender_opening_date,
+            t.budget_min,
+            t.budget_max,
+            t.security_required,
+            t.created_at
+        FROM tenders t
+        JOIN organizations o ON t.buyer_id = o.organization_id
+        WHERE t.tender_id = $1;
+    """
+    row = await connection.fetchrow(tender_query, tender_id)
+    if row is None:
+        return None
+
+    result = dict(row)
+
+    docs_query = """
+        SELECT tender_doc_id, file_name, file_path, uploaded_at
+        FROM tender_documents
+        WHERE tender_id = $1
+        ORDER BY uploaded_at;
+    """
+    doc_rows = await connection.fetch(docs_query, tender_id)
+    result["documents"] = [dict(d) for d in doc_rows]
+
+    return result
