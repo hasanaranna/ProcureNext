@@ -83,6 +83,34 @@ class TenderListItem(BaseModel):
     class Config:
         from_attributes = True
 
+class TenderDocumentItem(BaseModel):
+    tender_doc_id: int
+    file_name: Optional[str] = None
+    file_path: Optional[str] = None
+    uploaded_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class TenderDetailResponse(BaseModel):
+    tender_id: int
+    title: str
+    description: str
+    status: TenderStatus
+    buyer_org_name: str
+    submission_deadline: Optional[datetime] = None
+    tender_public_date: Optional[datetime] = None
+    pre_bid_meeting: Optional[datetime] = None
+    tender_opening_date: Optional[datetime] = None
+    budget_min: Optional[float] = None
+    budget_max: Optional[float] = None
+    security_required: bool = False
+    created_at: datetime
+    documents: List[TenderDocumentItem] = []
+
+    class Config:
+        from_attributes = True
+
 class TenderDocumentResponse(BaseModel):
     tender_doc_id: int
     tender_id: int

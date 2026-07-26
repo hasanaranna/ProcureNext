@@ -81,8 +81,8 @@ from typing import List
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
 from app.core.db import get_db_connection
 from app.modules.auth.dependencies import get_current_user_org
-from app.modules.tenders.schemas import TenderCreateRequest, TenderResponse, TenderListItem
-from app.modules.tenders.service import publish_tender_with_documents, get_buyer_tenders, get_all_published_tenders
+from app.modules.tenders.schemas import TenderCreateRequest, TenderResponse, TenderListItem, TenderDetailResponse
+from app.modules.tenders.service import publish_tender_with_documents, get_buyer_tenders, get_all_published_tenders, get_tender_detail
 
 router = APIRouter(prefix="/tenders", tags=["Tenders"])
 
@@ -184,3 +184,22 @@ async def list_all_tenders_for_seller(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
 
+
+@router.get("/{tender_id}/detail", response_model=TenderDetailResponse)
+async def get_tender_details(
+    tender_id: int,
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    Get full details of a specific tender (including documents).
+    """
+    try:
+        async with get_db_connection() as connection:
+            tender = await get_tender_detail(connection, tender_id)
+            if tender is None:
+                raise HTTPException(status_code=404, detail="Tender not found")
+            return tender
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")

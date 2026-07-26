@@ -1,36 +1,50 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
-const tenderDetails = {
-  title: "Office Supplies Tender",
-  subtitle:
-    "Procurement of office stationery and supplies for Q2 2026. This tender includes bulk paper, writing instruments, filing systems, desk organizers, and other essential office materials. The buyer is looking for competitive pricing with reliable delivery schedules.",
-  buyer: "Acme Corporation",
-  files: ["requirements.pdf", "item_list.pdf"],
-  dates: {
-    deadline: { label: "Deadline", value: "30 Jun 2026", urgent: true },
-    tenderPublicDate: {
-      label: "Tender Public Date",
-      value: "01 Apr 2026",
-      urgent: false,
-    },
-    preBidMeeting: {
-      label: "Pre-Bid Meeting",
-      value: "15 Apr 2026",
-      urgent: false,
-    },
-    tenderOpeningDate: {
-      label: "Tender Opening Date",
-      value: "05 Jul 2026",
-      urgent: false,
-    },
-  },
-};
+interface TenderDocument {
+  tender_doc_id: number;
+  file_name: string | null;
+  file_path: string | null;
+  uploaded_at: string | null;
+}
+
+interface TenderDetail {
+  tender_id: number;
+  title: string;
+  description: string;
+  status: string;
+  buyer_org_name: string;
+  submission_deadline: string | null;
+  tender_public_date: string | null;
+  pre_bid_meeting: string | null;
+  tender_opening_date: string | null;
+  budget_min: number | null;
+  budget_max: number | null;
+  security_required: boolean;
+  created_at: string;
+  documents: TenderDocument[];
+}
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "N/A";
+  return new Date(dateStr).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 export default function BidForTenderPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const tenderId = searchParams.get("id");
+
+  const [tender, setTender] = useState<TenderDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [formData, setFormData] = useState({
     description: "",
     bidAmount: "",
@@ -38,6 +52,29 @@ export default function BidForTenderPage() {
   const [taxCertificate, setTaxCertificate] = useState<File | null>(null);
   const [businessId, setBusinessId] = useState<File | null>(null);
   const [otherDoc, setOtherDoc] = useState<File | null>(null);
+
+  useEffect(() => {
+    if (!tenderId) {
+      setError("No tender ID provided");
+      setLoading(false);
+      return;
+    }
+    const fetchTender = async () => {
+      try {
+        const res = await fetch(`/api/tenders/${tenderId}/detail`);
+        if (!res.ok) {
+          throw new Error(res.status === 404 ? "Tender not found" : "Failed to load tender");
+        }
+        const data = await res.json();
+        setTender(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load tender");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTender();
+  }, [tenderId]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -69,8 +106,61 @@ export default function BidForTenderPage() {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     console.log("Bid submitted:", formData);
-    router.push("/home-seller");
+    router.push("/home");
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <main className="w-full min-h-screen py-10 px-4 flex items-center justify-center" style={{ backgroundColor: "#3a4556" }}>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4" />
+          <p className="text-gray-300 text-lg">Loading tender details...</p>
+        </div>
+      </main>
+    );
+  }
+
+  // Error state
+  if (error || !tender) {
+    return (
+      <main className="w-full min-h-screen py-10 px-4 flex items-center justify-center" style={{ backgroundColor: "#3a4556" }}>
+        <div className="text-center">
+          <p className="text-red-400 text-lg mb-4">{error || "Tender not found"}</p>
+          <button
+            onClick={() => router.push("/home")}
+            className="px-6 py-2 bg-white text-gray-800 font-semibold rounded-lg hover:bg-gray-100 transition"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  // Build dates array for rendering
+  const dates = [
+    {
+      label: "Deadline",
+      value: formatDate(tender.submission_deadline),
+      urgent: true,
+    },
+    {
+      label: "Tender Public Date",
+      value: formatDate(tender.tender_public_date),
+      urgent: false,
+    },
+    {
+      label: "Pre-Bid Meeting",
+      value: formatDate(tender.pre_bid_meeting),
+      urgent: false,
+    },
+    {
+      label: "Tender Opening Date",
+      value: formatDate(tender.tender_opening_date),
+      urgent: false,
+    },
+  ];
 
   return (
     <main
@@ -80,7 +170,7 @@ export default function BidForTenderPage() {
       <div className="max-w-3xl mx-auto">
         {/* Back Button */}
         <button
-          onClick={() => router.push("/home-seller")}
+          onClick={() => router.push("/home")}
           className="mb-6 flex items-center gap-2 text-gray-300 hover:text-white transition"
         >
           <svg
@@ -113,23 +203,23 @@ export default function BidForTenderPage() {
               style={{ backgroundColor: "#374151" }}
               className="rounded-full px-4 py-1 text-white text-xs font-semibold"
             >
-              {tenderDetails.buyer}
+              {tender.buyer_org_name}
             </span>
           </div>
 
           <h1 style={{ color: "#111827" }} className="text-3xl font-bold mb-2">
-            {tenderDetails.title}
+            {tender.title}
           </h1>
           <p
             style={{ color: "#6b7280" }}
             className="text-base leading-relaxed mb-6"
           >
-            {tenderDetails.subtitle}
+            {tender.description}
           </p>
 
           {/* Key Dates */}
           <div className="grid grid-cols-2 gap-3 mb-6">
-            {Object.values(tenderDetails.dates).map((date) => (
+            {dates.map((date) => (
               <div
                 key={date.label}
                 className={`flex items-start gap-3 rounded-xl px-4 py-3 border ${
@@ -179,45 +269,49 @@ export default function BidForTenderPage() {
               Attached Files
             </p>
             <div className="flex flex-wrap gap-2">
-              {tenderDetails.files.map((file, index) => (
-                <div
-                  key={index}
-                  style={{ backgroundColor: "#f3f4f6" }}
-                  className="rounded-full px-4 py-2 flex items-center gap-2 border border-gray-300"
-                >
-                  <svg
-                    className="w-4 h-4 text-red-600"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
+              {tender.documents.length === 0 ? (
+                <p className="text-sm text-gray-400">No documents attached</p>
+              ) : (
+                tender.documents.map((doc) => (
+                  <div
+                    key={doc.tender_doc_id}
+                    style={{ backgroundColor: "#f3f4f6" }}
+                    className="rounded-full px-4 py-2 flex items-center gap-2 border border-gray-300"
                   >
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
-                    <path
-                      d="M14 2v6h6"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1"
-                    />
-                    <text
-                      x="7"
-                      y="19"
-                      fontSize="7"
-                      fill="white"
-                      fontWeight="bold"
+                    <svg
+                      className="w-4 h-4 text-red-600"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
                     >
-                      PDF
-                    </text>
-                  </svg>
-                  <span
-                    style={{ color: "#374151" }}
-                    className="text-sm font-medium"
-                  >
-                    {file}
-                  </span>
-                  <button className="text-blue-600 hover:text-blue-800 text-sm font-semibold transition">
-                    View
-                  </button>
-                </div>
-              ))}
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
+                      <path
+                        d="M14 2v6h6"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1"
+                      />
+                      <text
+                        x="7"
+                        y="19"
+                        fontSize="7"
+                        fill="white"
+                        fontWeight="bold"
+                      >
+                        PDF
+                      </text>
+                    </svg>
+                    <span
+                      style={{ color: "#374151" }}
+                      className="text-sm font-medium"
+                    >
+                      {doc.file_name || "Document"}
+                    </span>
+                    <button className="text-blue-600 hover:text-blue-800 text-sm font-semibold transition">
+                      View
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -385,7 +479,7 @@ export default function BidForTenderPage() {
             <div className="flex gap-4 pt-6 pb-4">
               <button
                 type="button"
-                onClick={() => router.push("/home-seller")}
+                onClick={() => router.push("/home")}
                 className="flex-1 px-6 py-3 bg-gray-300 text-gray-800 font-semibold rounded-lg hover:bg-gray-400 transition"
               >
                 Cancel
