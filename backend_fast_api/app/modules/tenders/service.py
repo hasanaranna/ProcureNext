@@ -42,8 +42,11 @@ async def publish_tender_with_documents(
     """
     
     query = """
-        INSERT INTO tenders (buyer_id, created_by, title, description, visibility_type, budget_min, budget_max, status)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        INSERT INTO tenders (
+            buyer_id, created_by, title, description, visibility_type, budget_min, budget_max, status,
+            submission_deadline, tender_public_date, pre_bid_meeting, tender_opening_date
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING *;
     """
     
@@ -56,7 +59,11 @@ async def publish_tender_with_documents(
         tender_data.visibility_type.value,
         tender_data.budget_min,
         tender_data.budget_max,
-        "Published"
+        "Published",
+        tender_data.submission_deadline,
+        tender_data.tender_public_date,
+        tender_data.pre_bid_meeting,
+        tender_data.tender_opening_date
     )
     
     tender_id = row['tender_id']
