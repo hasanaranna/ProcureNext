@@ -9,6 +9,9 @@ CREATE EXTENSION IF NOT EXISTS vector;
 -- DROP EXISTING TABLES AND ENUMS (Reverse Dependency Order)
 -- ============================================================
 
+DROP TABLE IF EXISTS messages CASCADE;
+DROP TABLE IF EXISTS thread_participants CASCADE;
+DROP TABLE IF EXISTS message_threads CASCADE;
 DROP TABLE IF EXISTS tender_chat_seen CASCADE;
 DROP TABLE IF EXISTS tender_chat_messages CASCADE;
 DROP TABLE IF EXISTS tender_chat_participants CASCADE;
@@ -45,6 +48,7 @@ DROP TABLE IF EXISTS user_verification CASCADE;
 DROP TABLE IF EXISTS admins CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
+DROP TYPE IF EXISTS thread_type CASCADE;
 DROP TYPE IF EXISTS procurement_method_val CASCADE;
 DROP TYPE IF EXISTS procurement_nature_val CASCADE;
 DROP TYPE IF EXISTS suggestion_status CASCADE;
@@ -234,7 +238,9 @@ CREATE TABLE tenders (
     security_required   BOOLEAN         DEFAULT FALSE,
     security_valid_until DATE,
     proposal_valid_until DATE,
-    publish_datetime    TIMESTAMP,
+    tender_public_date  TIMESTAMP,
+    pre_bid_meeting     TIMESTAMP,
+    tender_opening_date TIMESTAMP,
     submission_deadline TIMESTAMP,
     status              tender_status   DEFAULT 'Draft',
     embedding           VECTOR(768),

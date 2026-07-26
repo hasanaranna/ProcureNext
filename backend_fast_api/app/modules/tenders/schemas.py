@@ -62,6 +62,10 @@ class TenderResponse(BaseModel):
     title: str
     description: str
     status: TenderStatus
+    submission_deadline: Optional[datetime] = None
+    tender_public_date: Optional[datetime] = None
+    pre_bid_meeting: Optional[datetime] = None
+    tender_opening_date: Optional[datetime] = None
     created_at: datetime
     
     class Config:
