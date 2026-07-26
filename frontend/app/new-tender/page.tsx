@@ -94,7 +94,12 @@ export default function NewTenderPage() {
       budget_max: parseFloat(formData.budget) || null,
       submission_deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null,
       visibility_type: "Public",
-      security_required: false
+      security_required: false,
+      category: formData.category || null,
+      tender_public_date: formData.tenderPublicDate ? new Date(formData.tenderPublicDate).toISOString() : null,
+      pre_bid_meeting: formData.preBidMeeting ? new Date(formData.preBidMeeting).toISOString() : null,
+      tender_opening_date: formData.tenderOpeningDate ? new Date(formData.tenderOpeningDate).toISOString() : null,
+      required_seller_docs: sellerDocs.length > 0 ? sellerDocs : null,
     };
     
     const fileNames = validFiles.map(cf => cf.name.trim());

@@ -25,6 +25,7 @@ bcrypt
 python-jose[cryptography]
 python-multipart
 pyotp
+cryptography
 
 # --- Async Task Queue ---
 celery[redis]
