@@ -71,6 +71,18 @@ class TenderResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class TenderListItem(BaseModel):
+    tender_id: int
+    title: str
+    description: str
+    status: TenderStatus
+    buyer_org_name: str
+    submission_deadline: Optional[datetime] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
 class TenderDocumentResponse(BaseModel):
     tender_doc_id: int
     tender_id: int

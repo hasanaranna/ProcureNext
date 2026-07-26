@@ -81,8 +81,8 @@ from typing import List
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
 from app.core.db import get_db_connection
 from app.modules.auth.dependencies import get_current_user_org
-from app.modules.tenders.schemas import TenderCreateRequest, TenderResponse
-from app.modules.tenders.service import publish_tender_with_documents
+from app.modules.tenders.schemas import TenderCreateRequest, TenderResponse, TenderListItem
+from app.modules.tenders.service import publish_tender_with_documents, get_buyer_tenders, get_all_published_tenders
 
 router = APIRouter(prefix="/tenders", tags=["Tenders"])
 
@@ -147,6 +147,40 @@ async def publish_with_documents(
                 files_data=files_data
             )
             return new_tender
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
+@router.get("/buyer/my-tenders", response_model=List[TenderListItem])
+async def list_buyer_tenders(
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    List all tenders owned by the current user's buyer organization.
+    """
+    buyer_org_id = current_user.get("organization_id")
+    if not buyer_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            tenders = await get_buyer_tenders(connection, buyer_org_id)
+            return tenders
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
+@router.get("/seller/all-tenders", response_model=List[TenderListItem])
+async def list_all_tenders_for_seller(
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    List all published tenders for seller browsing.
+    """
+    try:
+        async with get_db_connection() as connection:
+            tenders = await get_all_published_tenders(connection)
+            return tenders
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
 

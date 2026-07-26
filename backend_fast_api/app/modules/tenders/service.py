@@ -73,3 +73,52 @@ async def publish_tender_with_documents(
         upload_tender_documents_to_supabase.delay(tender_id, files_data)
 
     return dict(row)
+
+
+async def get_buyer_tenders(
+    connection: asyncpg.Connection,
+    buyer_org_id: int,
+) -> list[dict]:
+    """
+    Fetch all tenders created by the given buyer organization.
+    """
+    query = """
+        SELECT
+            t.tender_id,
+            t.title,
+            t.description,
+            t.status,
+            o.organization_name AS buyer_org_name,
+            t.submission_deadline,
+            t.created_at
+        FROM tenders t
+        JOIN organizations o ON t.buyer_id = o.organization_id
+        WHERE t.buyer_id = $1
+        ORDER BY t.created_at DESC;
+    """
+    rows = await connection.fetch(query, buyer_org_id)
+    return [dict(row) for row in rows]
+
+
+async def get_all_published_tenders(
+    connection: asyncpg.Connection,
+) -> list[dict]:
+    """
+    Fetch all published tenders (for seller browsing).
+    """
+    query = """
+        SELECT
+            t.tender_id,
+            t.title,
+            t.description,
+            t.status,
+            o.organization_name AS buyer_org_name,
+            t.submission_deadline,
+            t.created_at
+        FROM tenders t
+        JOIN organizations o ON t.buyer_id = o.organization_id
+        WHERE t.status = 'Published'
+        ORDER BY t.created_at DESC;
+    """
+    rows = await connection.fetch(query)
+    return [dict(row) for row in rows]
