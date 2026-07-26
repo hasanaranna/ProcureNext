@@ -86,7 +86,7 @@ from app.modules.tenders.service import publish_tender_with_documents, get_buyer
 
 router = APIRouter(prefix="/tenders", tags=["Tenders"])
 
-TEMP_UPLOAD_DIR = "/app/uploads"
+TEMP_UPLOAD_DIR = os.getenv("UPLOAD_DIR", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../uploads")))
 os.makedirs(TEMP_UPLOAD_DIR, exist_ok=True)
 
 @router.post("/buyer/publish-with-documents", response_model=TenderResponse, status_code=status.HTTP_201_CREATED)
@@ -203,3 +203,34 @@ async def get_tender_details(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
+@router.get("/documents/{doc_id}/view")
+async def view_tender_document(
+    doc_id: int,
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    Generate a signed URL for a tender document and return it.
+    """
+    from app.services.supabase_storage import generate_signed_url
+
+    try:
+        async with get_db_connection() as connection:
+            row = await connection.fetchrow(
+                "SELECT file_name, file_path FROM tender_documents WHERE tender_doc_id = $1",
+                doc_id
+            )
+            if row is None:
+                raise HTTPException(status_code=404, detail="Document not found")
+
+            file_path = row["file_path"]
+            if not file_path:
+                raise HTTPException(status_code=404, detail="Document file path is missing")
+
+            signed_url = await generate_signed_url(file_path, expires_in=3600)
+            return {"url": signed_url, "file_name": row["file_name"]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating document URL: {e}")

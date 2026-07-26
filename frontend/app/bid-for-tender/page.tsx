@@ -306,7 +306,21 @@ export default function BidForTenderPage() {
                     >
                       {doc.file_name || "Document"}
                     </span>
-                    <button className="text-blue-600 hover:text-blue-800 text-sm font-semibold transition">
+                    <button
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        try {
+                          const res = await fetch(`/api/tenders/documents/${doc.tender_doc_id}/view`);
+                          if (res.ok) {
+                            const data = await res.json();
+                            window.open(data.url, '_blank');
+                          }
+                        } catch (err) {
+                          console.error('Failed to open document:', err);
+                        }
+                      }}
+                      className="text-blue-600 hover:text-blue-800 text-sm font-semibold transition"
+                    >
                       View
                     </button>
                   </div>
