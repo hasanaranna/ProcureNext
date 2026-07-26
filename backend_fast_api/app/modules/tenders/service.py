@@ -60,10 +60,10 @@ async def publish_tender_with_documents(
         tender_data.budget_min,
         tender_data.budget_max,
         "Published",
-        tender_data.submission_deadline,
-        tender_data.tender_public_date,
-        tender_data.pre_bid_meeting,
-        tender_data.tender_opening_date
+        tender_data.submission_deadline.replace(tzinfo=None) if tender_data.submission_deadline else None,
+        tender_data.tender_public_date.replace(tzinfo=None) if tender_data.tender_public_date else None,
+        tender_data.pre_bid_meeting.replace(tzinfo=None) if tender_data.pre_bid_meeting else None,
+        tender_data.tender_opening_date.replace(tzinfo=None) if tender_data.tender_opening_date else None
     )
     
     tender_id = row['tender_id']
