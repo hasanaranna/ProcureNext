@@ -11,7 +11,13 @@ from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, s
 from app.core.db import get_db_connection
 from app.modules.auth.dependencies import get_current_user_org
 from app.modules.bids.schemas import BidResponse
-from app.modules.bids.service import submit_bid_with_documents, get_bid_by_tender_and_vendor, get_bid_document_by_id
+from app.modules.bids.service import (
+    submit_bid_with_documents, 
+    get_bid_by_tender_and_vendor, 
+    get_bid_document_by_id,
+    get_bids_for_buyer_tender,
+    accept_bid_for_tender
+)
 from app.services.supabase_storage import generate_signed_url
 
 router = APIRouter(prefix="/bids", tags=["Bids"])
@@ -134,5 +140,48 @@ async def view_bid_document(
             return {"url": url}
     except HTTPException:
         raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+@router.get("/buyer/tender/{tender_id}")
+async def get_buyer_bids_for_tender(
+    tender_id: int,
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    Fetch all bids for a specific tender. Buyer only.
+    """
+    buyer_org_id = current_user.get("organization_id")
+    if not buyer_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            bids = await get_bids_for_buyer_tender(connection, tender_id, buyer_org_id)
+            return bids
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+@router.post("/buyer/{bid_id}/accept")
+async def accept_bid(
+    bid_id: int,
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    Accept a specific bid and reject other pending bids for the same tender.
+    """
+    buyer_org_id = current_user.get("organization_id")
+    user_id = current_user.get("org_user_id")
+    if not buyer_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            accepted_bid = await accept_bid_for_tender(connection, bid_id, buyer_org_id, user_id)
+            return {"message": "Bid accepted successfully.", "bid": accepted_bid}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
