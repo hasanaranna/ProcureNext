@@ -1,1 +1,4 @@
 backend_fast_api/uploads/*
+.DS_Store
+**/.DS_Store
+frontend/.next/

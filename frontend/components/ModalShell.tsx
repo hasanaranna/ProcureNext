@@ -65,16 +65,16 @@ export default function ModalShell({
 
   return (
     <div
-      className={`fixed inset-0 flex items-center justify-center z-50 p-4 transition-opacity duration-300 ${
+      className={`fixed inset-0 flex items-center justify-center z-50 p-4 transition-all duration-300 ${
         animating ? "opacity-100" : "opacity-0"
       }`}
-      style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+      style={{ backgroundColor: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(4px)" }}
       onClick={handleClose}
     >
       <div
-        className={`relative flex flex-col rounded-xl shadow-2xl overflow-y-auto transition-all duration-300 ${
+        className={`relative flex flex-col rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 ${
           maxWidth !== "none" ? maxWidth : ""
-        } w-full max-h-[calc(100vh-2rem)] ${animating ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-10"}`}
+        } w-full max-h-[90vh] ${animating ? "opacity-100 translate-y-0 scale-100" : "opacity-0 -translate-y-4 scale-[0.98]"}`}
         style={{
           ...(width ? { width } : {}),
           ...(height ? { height } : {}),

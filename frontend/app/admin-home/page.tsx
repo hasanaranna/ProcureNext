@@ -8,132 +8,24 @@ import PendingRequestDetailModal, {
 
 
 const stats = [
-  {
-    label: "Total Tokens Sold",
-    value: "48,320",
-    sub: "+1,240 this month",
-    icon: (
-      <svg
-        className="w-7 h-7 text-yellow-400"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-        />
-      </svg>
-    ),
-    color: "from-yellow-500 to-yellow-600",
-  },
-  {
-    label: "Approved Owners",
-    value: "312",
-    sub: "+14 this month",
-    icon: (
-      <svg
-        className="w-7 h-7"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-        />
-      </svg>
-    ),
-    color: "from-blue-500 to-blue-700",
-  },
-  {
-    label: "Pending Approvals",
-    value: "5",
-    sub: "Awaiting review",
-    icon: (
-      <svg
-        className="w-7 h-7"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-        />
-      </svg>
-    ),
-    color: "from-amber-500 to-amber-700",
-  },
-  {
-    label: "Active Tenders",
-    value: "87",
-    sub: "Across all companies",
-    icon: (
-      <svg
-        className="w-7 h-7"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-        />
-      </svg>
-    ),
-    color: "from-purple-500 to-purple-700",
-  },
-  {
-    label: "Total Bids Placed",
-    value: "2,641",
-    sub: "+318 this month",
-    icon: (
-      <svg
-        className="w-7 h-7"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"
-        />
-      </svg>
-    ),
-    color: "from-rose-500 to-rose-700",
-  },
-  {
-    label: "Revenue (BDT)",
-    value: "৳ 24,16,000",
-    sub: "From token purchases",
-    icon: (
-      <svg
-        className="w-7 h-7"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-        />
-      </svg>
-    ),
-    color: "from-teal-500 to-teal-700",
-  },
+  { label: "Total Tokens Sold", value: "48,320", sub: "+1,240 this month",
+    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>),
+    color: "from-amber-400 to-amber-500" },
+  { label: "Approved Owners", value: "312", sub: "+14 this month",
+    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>),
+    color: "from-accent-500 to-accent-600" },
+  { label: "Pending Approvals", value: "5", sub: "Awaiting review",
+    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>),
+    color: "from-orange-400 to-orange-500" },
+  { label: "Active Tenders", value: "87", sub: "Across all companies",
+    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>),
+    color: "from-violet-500 to-violet-600" },
+  { label: "Total Bids Placed", value: "2,641", sub: "+318 this month",
+    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" /></svg>),
+    color: "from-rose-400 to-rose-500" },
+  { label: "Revenue (BDT)", value: "৳ 24,16,000", sub: "From token purchases",
+    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>),
+    color: "from-emerald-400 to-emerald-500" },
 ];
 
 export default function AdminHomePage() {
@@ -296,104 +188,63 @@ export default function AdminHomePage() {
     setPricingSaved(true);
   };
 
+  const inputClass = "w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl bg-white text-navy-900 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent transition text-sm";
+
   return (
-    <main className="min-h-screen bg-gray-100">
+    <main className="min-h-screen bg-slate-50">
       {/* Top Bar */}
-      <header className="bg-gradient-to-r from-gray-800 to-gray-900 text-white px-8 py-4 flex items-center justify-between shadow-lg">
+      <header className="bg-gradient-to-r from-navy-950 to-navy-900 text-white px-6 md:px-8 py-4 flex items-center justify-between shadow-2xl sticky top-0 z-30">
         <div className="flex flex-col gap-0.5">
-          <div className="flex items-center gap-3">
-            <svg
-              className="w-8 h-8 text-gray-300"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
-              />
-            </svg>
-            <span className="text-xl font-bold tracking-wide">ProcureNext</span>
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent-400 to-accent-600 flex items-center justify-center shadow-lg">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <span className="text-xl font-bold tracking-tight">ProcureNext</span>
           </div>
-          <span className="ml-11 px-2 py-0.5 bg-gray-600 text-gray-200 text-xs rounded-full font-medium w-fit">
-            Admin Panel
+          <span className="ml-12 px-2.5 py-0.5 bg-accent-500/20 text-accent-300 text-xs rounded-full font-bold w-fit border border-accent-500/30">
+            ADMIN
           </span>
         </div>
 
-        {/* Right side: user name + logout stacked */}
         <div className="flex flex-col items-end gap-1.5">
-          <div className="flex items-center gap-2 text-sm text-gray-300">
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z"
-              />
+          <div className="flex items-center gap-2 text-sm text-slate-300">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-            <span>{adminName}</span>
+            <span className="font-medium">{adminName}</span>
           </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 px-4 py-1.5 text-sm font-medium text-gray-300 hover:text-white bg-white/10 hover:bg-white/20 rounded-lg border border-white/10 hover:border-white/20 transition-all duration-200 cursor-pointer"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-              />
+          <button onClick={handleLogout}
+            className="flex items-center gap-2 px-4 py-1.5 text-sm font-medium text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 hover:border-white/20 transition-all duration-200 cursor-pointer">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
             Logout
           </button>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-6 py-10 space-y-10">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8 space-y-8 animate-fade-in">
         {/* Page Title */}
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">
-            Dashboard Overview
-          </h1>
-          <p className="text-gray-500 mt-1 text-sm">
-            Monitor platform activity and manage registrations.
-          </p>
+          <h1 className="text-3xl font-black text-navy-900">Dashboard Overview</h1>
+          <p className="text-slate-500 mt-1 text-sm">Monitor platform activity and manage registrations.</p>
         </div>
 
         {/* Stats Grid */}
         <section>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {stats.map((stat, i) => (
-              <div
-                key={i}
-                className="bg-white rounded-xl shadow-sm border border-gray-200 flex items-center gap-5 px-6 py-5 hover:shadow-md transition"
-              >
-                <div
-                  className={`bg-gradient-to-br ${stat.color} text-white rounded-lg p-3 flex-shrink-0`}
-                >
+              <div key={i}
+                className="bg-white rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4 px-5 py-5 hover:shadow-lg hover:scale-[1.01] transition-all duration-300">
+                <div className={`bg-gradient-to-br ${stat.color} text-white rounded-xl p-3 flex-shrink-0 shadow-md`}>
                   {stat.icon}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">
-                    {stat.label}
-                  </p>
-                  <p className="text-2xl font-bold text-gray-800 mt-0.5">
-                    {stat.value}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-0.5">{stat.sub}</p>
+                  <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">{stat.label}</p>
+                  <p className="text-2xl font-black text-navy-900 mt-0.5">{stat.value}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{stat.sub}</p>
                 </div>
               </div>
             ))}
@@ -401,51 +252,26 @@ export default function AdminHomePage() {
         </section>
 
         {/* Pending Approvals */}
-        <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-6 py-5 border-b border-gray-200 flex items-center justify-between">
+        <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="px-6 py-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-bold text-gray-800">
-                Pending Master Account Approvals
-              </h2>
-              <p className="text-sm text-gray-500 mt-0.5">
-                Review and approve or reject company owner registrations.
-              </p>
+              <h2 className="text-lg font-bold text-navy-900">Pending Master Account Approvals</h2>
+              <p className="text-sm text-slate-500 mt-0.5">Review and approve or reject company owner registrations.</p>
             </div>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100 text-amber-700 text-sm font-semibold rounded-full">
-              <span className="w-2 h-2 bg-amber-500 rounded-full inline-block"></span>
-              {
-                pending.filter(
-                  (r) =>
-                    !approvedIds.includes(r.id) && !rejectedIds.includes(r.id),
-                ).length
-              }{" "}
-              Pending
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 text-sm font-bold rounded-full border border-amber-200">
+              <span className="w-2 h-2 bg-amber-500 rounded-full inline-block animate-pulse"></span>
+              {pending.filter((r) => !approvedIds.includes(r.id) && !rejectedIds.includes(r.id)).length} Pending
             </span>
           </div>
 
           <div className="overflow-x-auto">
             {loadingPending ? (
               <div className="flex flex-col items-center justify-center py-16">
-                <svg
-                  className="animate-spin h-8 w-8 text-gray-500 mb-3"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                  />
+                <svg className="animate-spin h-8 w-8 text-accent-500 mb-3" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                <p className="text-sm text-gray-400">Loading pending accounts…</p>
+                <p className="text-sm text-slate-400">Loading pending accounts…</p>
               </div>
             ) : pendingError ? (
               <div className="py-12 text-center">
@@ -453,68 +279,49 @@ export default function AdminHomePage() {
               </div>
             ) : pending.length === 0 ? (
               <div className="py-12 text-center">
-                <p className="text-sm text-gray-400">No pending accounts to review.</p>
+                <svg className="w-10 h-10 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-sm text-slate-400">No pending accounts to review.</p>
               </div>
             ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 text-gray-500 uppercase text-xs tracking-wider">
+                <tr className="bg-slate-50 text-slate-400 uppercase text-xs tracking-wider">
                   <th className="px-6 py-3 text-left font-semibold">#</th>
-                  <th className="px-6 py-3 text-left font-semibold">
-                    Full Name
-                  </th>
-                  <th className="px-6 py-3 text-left font-semibold">
-                    Company Name
-                  </th>
-                  <th className="px-6 py-3 text-left font-semibold">
-                    Email Address
-                  </th>
-                  <th className="px-6 py-3 text-left font-semibold">
-                    Submitted
-                  </th>
+                  <th className="px-6 py-3 text-left font-semibold">Full Name</th>
+                  <th className="px-6 py-3 text-left font-semibold">Company Name</th>
+                  <th className="px-6 py-3 text-left font-semibold">Email Address</th>
+                  <th className="px-6 py-3 text-left font-semibold">Submitted</th>
                   <th className="px-6 py-3 text-left font-semibold">Status</th>
+                  <th className="px-6 py-3 text-left font-semibold"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-slate-100">
                 {pending.map((reg, idx) => {
                   const isApproved = approvedIds.includes(reg.id);
                   const isRejected = rejectedIds.includes(reg.id);
                   const isActioned = isApproved || isRejected;
 
                   return (
-                    <tr
-                      key={reg.id}
-                      className={`transition ${isActioned ? "opacity-50" : "hover:bg-gray-50"}`}
-                    >
-                      <td className="px-6 py-4 text-gray-400">{idx + 1}</td>
-                      <td className="px-6 py-4 font-medium text-gray-800">
-                        {reg.name}
-                      </td>
-                      <td className="px-6 py-4 text-gray-600">{reg.company}</td>
-                      <td className="px-6 py-4 text-gray-600">{reg.email}</td>
-                      <td className="px-6 py-4 text-gray-400">
-                        {reg.submittedAt}
-                      </td>
+                    <tr key={reg.id} className={`transition ${isActioned ? "opacity-40" : "hover:bg-slate-50"}`}>
+                      <td className="px-6 py-4 text-slate-400 font-medium">{idx + 1}</td>
+                      <td className="px-6 py-4 font-semibold text-navy-900">{reg.name}</td>
+                      <td className="px-6 py-4 text-slate-600">{reg.company}</td>
+                      <td className="px-6 py-4 text-slate-500">{reg.email}</td>
+                      <td className="px-6 py-4 text-slate-400">{reg.submittedAt}</td>
                       <td className="px-6 py-4">
                         {isApproved ? (
-                          <span className="px-2.5 py-1 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-full">
-                            Approved
-                          </span>
+                          <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200">Approved</span>
                         ) : isRejected ? (
-                          <span className="px-2.5 py-1 bg-red-100 text-red-600 text-xs font-semibold rounded-full">
-                            Rejected
-                          </span>
+                          <span className="px-2.5 py-1 bg-red-50 text-red-600 text-xs font-bold rounded-full border border-red-200">Rejected</span>
                         ) : (
-                          <span className="px-2.5 py-1 bg-amber-100 text-amber-700 text-xs font-semibold rounded-full">
-                            Pending
-                          </span>
+                          <span className="px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-full border border-amber-200">Pending</span>
                         )}
                       </td>
                       <td className="px-6 py-4">
-                        <button
-                          onClick={() => handleViewDetails(reg)}
-                          className="px-3 py-1.5 text-white text-xs font-semibold rounded-lg transition shadow-sm bg-gray-700 hover:bg-gray-800 cursor-pointer"
-                        >
+                        <button onClick={() => handleViewDetails(reg)}
+                          className="px-4 py-1.5 text-white text-xs font-semibold rounded-lg transition shadow-sm bg-navy-900 hover:bg-navy-800 cursor-pointer">
                           View Details
                         </button>
                       </td>
@@ -537,160 +344,72 @@ export default function AdminHomePage() {
         />
 
         {/* Token & Rate Settings */}
-        <section className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-6 py-5 border-b border-gray-200">
-            <h2 className="text-lg font-bold text-gray-800">
-              Token & Rate Configuration
-            </h2>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Set platform-wide token pricing and activity rates (in BDT
-              tokens).
-            </p>
+        <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="px-6 py-5 border-b border-slate-200">
+            <h2 className="text-lg font-bold text-navy-900">Token & Rate Configuration</h2>
+            <p className="text-sm text-slate-500 mt-0.5">Set platform-wide token pricing and activity rates (in BDT tokens).</p>
           </div>
 
           <form onSubmit={handlePricingSave} className="px-6 py-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Token Price in BDT */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Token Price (BDT per token)
-                </label>
-                <p className="text-xs text-gray-400 mb-2">
-                  How much a user pays in BDT to purchase one token.
-                </p>
+                <label className="block text-sm font-semibold text-navy-900 mb-1">Token Price (BDT per token)</label>
+                <p className="text-xs text-slate-400 mb-2">How much a user pays in BDT to purchase one token.</p>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium text-sm">
-                    ৳
-                  </span>
-                  <input
-                    type="number"
-                    name="pricePerToken"
-                    min="0.01"
-                    step="any"
-                    value={tokenPricing.pricePerToken}
-                    onChange={handlePricingChange}
-                    className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-600 focus:border-transparent transition text-sm"
-                    placeholder="e.g. 1.50"
-                  />
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-semibold text-sm">৳</span>
+                  <input type="number" name="pricePerToken" min="0.01" step="any" value={tokenPricing.pricePerToken}
+                    onChange={handlePricingChange} className={inputClass} placeholder="e.g. 1.50" />
                 </div>
               </div>
 
-              {/* Tender Submission Rate */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Tender Submission Rate (tokens)
-                </label>
-                <p className="text-xs text-gray-400 mb-2">
-                  Number of tokens deducted when a company submits a new tender.
-                </p>
+                <label className="block text-sm font-semibold text-navy-900 mb-1">Tender Submission Rate (tokens)</label>
+                <p className="text-xs text-slate-400 mb-2">Tokens deducted when a company submits a new tender.</p>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-yellow-400">
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-yellow-500">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </span>
-                  <input
-                    type="number"
-                    name="tenderSubmitRate"
-                    min="0"
-                    value={tokenPricing.tenderSubmitRate}
-                    onChange={handlePricingChange}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-600 focus:border-transparent transition text-sm"
-                    placeholder="e.g. 10"
-                  />
+                  <input type="number" name="tenderSubmitRate" min="0" value={tokenPricing.tenderSubmitRate}
+                    onChange={handlePricingChange} className={inputClass} placeholder="e.g. 10" />
                 </div>
               </div>
 
-              {/* Bid Rate */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Bid Submission Rate (tokens)
-                </label>
-                <p className="text-xs text-gray-400 mb-2">
-                  Number of tokens deducted each time a user places a bid on a
-                  tender.
-                </p>
+                <label className="block text-sm font-semibold text-navy-900 mb-1">Bid Submission Rate (tokens)</label>
+                <p className="text-xs text-slate-400 mb-2">Tokens deducted each time a user places a bid on a tender.</p>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-yellow-400">
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-yellow-500">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </span>
-                  <input
-                    type="number"
-                    name="bidRate"
-                    min="0"
-                    value={tokenPricing.bidRate}
-                    onChange={handlePricingChange}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-600 focus:border-transparent transition text-sm"
-                    placeholder="e.g. 5"
-                  />
+                  <input type="number" name="bidRate" min="0" value={tokenPricing.bidRate}
+                    onChange={handlePricingChange} className={inputClass} placeholder="e.g. 5" />
                 </div>
               </div>
             </div>
 
             {/* Summary preview */}
-            <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                Current Rate Summary
-              </p>
+            <div className="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Current Rate Summary</p>
               <div className="flex flex-wrap gap-3">
-                {[
-                  { label: "1 Token", val: `৳ ${tokenPricing.pricePerToken}` },
-                ].map((item, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm shadow-sm"
-                  >
-                    <span className="text-gray-500">{item.label}:</span>
-                    <span className="font-bold text-gray-800">{item.val}</span>
+                {[{ label: "1 Token", val: `৳ ${tokenPricing.pricePerToken}` }].map((item, i) => (
+                  <div key={i} className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm shadow-sm">
+                    <span className="text-slate-500">{item.label}:</span>
+                    <span className="font-bold text-navy-900">{item.val}</span>
                   </div>
                 ))}
                 {[
-                  {
-                    label: "Submit Tender",
-                    val: tokenPricing.tenderSubmitRate,
-                  },
+                  { label: "Submit Tender", val: tokenPricing.tenderSubmitRate },
                   { label: "Place Bid", val: tokenPricing.bidRate },
                 ].map((item, i) => (
-                  <div
-                    key={`tkn-${i}`}
-                    className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm shadow-sm"
-                  >
-                    <span className="text-gray-500">{item.label}:</span>
-                    <span className="font-bold text-gray-800">{item.val}</span>
-                    <svg
-                      className="w-4 h-4 text-yellow-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
+                  <div key={`tkn-${i}`} className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm shadow-sm">
+                    <span className="text-slate-500">{item.label}:</span>
+                    <span className="font-bold text-navy-900">{item.val}</span>
+                    <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
                 ))}
@@ -699,26 +418,14 @@ export default function AdminHomePage() {
 
             {/* Save Button */}
             <div className="mt-6 flex items-center gap-4">
-              <button
-                type="submit"
-                className="px-6 py-2.5 bg-gradient-to-br from-gray-700 to-gray-900 text-white text-sm font-semibold rounded-lg hover:from-gray-800 hover:to-black transition-all duration-200 shadow-md hover:shadow-lg"
-              >
+              <button type="submit"
+                className="px-6 py-2.5 bg-gradient-to-r from-navy-900 to-navy-800 text-white text-sm font-bold rounded-xl hover:from-navy-800 hover:to-navy-700 transition-all duration-200 shadow-lg hover:shadow-xl">
                 Save Changes
               </button>
               {pricingSaved && (
-                <span className="flex items-center gap-1.5 text-emerald-600 text-sm font-medium">
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 13l4 4L19 7"
-                    />
+                <span className="flex items-center gap-1.5 text-emerald-600 text-sm font-semibold animate-fade-in">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                   Changes saved successfully!
                 </span>

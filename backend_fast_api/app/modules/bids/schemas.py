@@ -22,6 +22,7 @@ class BidResponse(BaseModel):
     submitted_by: int
     tender_id: int
     financial_amount: Optional[float] = None
+    description: Optional[str] = None
     status: BidStatus
     submitted_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -36,6 +37,7 @@ class BidListItem(BaseModel):
     tender_id: int
     tender_title: Optional[str] = None
     financial_amount: Optional[float] = None
+    description: Optional[str] = None
     status: BidStatus
     submitted_at: Optional[datetime] = None
 
