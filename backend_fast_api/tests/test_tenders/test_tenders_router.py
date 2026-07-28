@@ -7,6 +7,7 @@
 #   GET /tenders/{tender_id}/detail
 #   GET /tenders/documents/{doc_id}/view
 # ============================================================
+import json
 
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
@@ -15,6 +16,69 @@ from contextlib import asynccontextmanager
 
 from app.main import app
 from app.modules.auth.dependencies import get_current_user_org
+
+class TestPublishTender:
+    """Tests for publishing a new tender."""
+
+    @pytest.mark.asyncio
+    @patch("app.modules.tenders.router.get_db_connection")
+    @patch("app.modules.tenders.router.publish_tender_with_documents")
+    async def test_publish_tender_success(self, mock_publish, mock_db, client, auth_headers):
+        app.dependency_overrides[get_current_user_org] = lambda: {"organization_id": 10, "org_user_id": 2}
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+
+        from datetime import datetime, timezone
+        mock_publish.return_value = {
+            "tender_id": 1,
+            "buyer_id": 10,
+            "created_by": 2,
+            "title": "New Tender",
+            "description": "Description",
+            "status": "Published",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+
+        tender_data = {
+            "title": "New Tender",
+            "description": "Description",
+            "category": "IT",
+            "procurement_nature": "Goods",
+            "procurement_method": "OTM",
+            "visibility": "Public",
+            "budget_min": 1000.0,
+            "budget_max": 5000.0,
+            "budget_type": "Fixed",
+            "submission_deadline": "2026-12-31T23:59:59Z"
+        }
+
+        form_data = {
+            "tender_data": json.dumps(tender_data),
+            "file_names": json.dumps(["doc1.pdf"])
+        }
+        
+        files = [
+            ("files", ("doc1.pdf", b"dummy content", "application/pdf")),
+        ]
+
+        resp = await client.post(
+            "/tenders/buyer/publish-with-documents",
+            headers=auth_headers,
+            data=form_data,
+            files=files
+        )
+        
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["tender_id"] == 1
+        assert data["title"] == "New Tender"
+        
+        mock_publish.assert_called_once()
+        kwargs = mock_publish.call_args.kwargs
+        assert kwargs["buyer_id"] == 10
+        assert kwargs["user_id"] == 2
+
+
 
 
 # ---------------------------------------------------------------------------
