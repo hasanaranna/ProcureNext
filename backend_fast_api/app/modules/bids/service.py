@@ -13,6 +13,7 @@ async def submit_bid_with_documents(
     tender_id: int,
     financial_amount: float,
     files_data: list[dict],
+    description: str | None = None,
 ) -> dict:
     """
     Creates a bid in Submitted state and queues background file upload.
@@ -21,9 +22,9 @@ async def submit_bid_with_documents(
 
     query = """
         INSERT INTO bids (
-            vendor_org_id, submitted_by, tender_id, financial_amount, status
+            vendor_org_id, submitted_by, tender_id, financial_amount, description, status
         )
-        VALUES ($1, $2, $3, $4, $5)
+        VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *;
     """
 
@@ -33,6 +34,7 @@ async def submit_bid_with_documents(
         submitted_by,
         tender_id,
         financial_amount,
+        description,
         "Submitted",
     )
 

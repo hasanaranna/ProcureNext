@@ -194,7 +194,7 @@ class TestSellerAllTenders:
         # All returned tenders should be Published
         for tender in data:
             assert tender["status"] == "Published"
-        mock_get_tenders.assert_called_once_with(mock_conn)
+        mock_get_tenders.assert_called_once_with(mock_conn, vendor_org_id=mock_user_org["organization_id"])
 
     @pytest.mark.asyncio
     @patch("app.modules.tenders.router.get_db_connection")

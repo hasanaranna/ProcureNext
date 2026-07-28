@@ -46,6 +46,7 @@ interface ExistingBid {
   bid_id: number;
   tender_id: number;
   financial_amount: number | null;
+  description: string | null;
   status: string;
   submitted_at: string | null;
   documents: BidDocument[];
@@ -149,6 +150,7 @@ function BidForTenderContent() {
         JSON.stringify({
           tender_id: parseInt(tenderId),
           financial_amount: parseFloat(formData.bidAmount),
+          description: formData.description,
         })
       );
 
@@ -320,6 +322,14 @@ function BidForTenderContent() {
                     <span className="text-3xl font-black text-navy-900">Tk {existingBid.financial_amount?.toLocaleString() || "0"}</span>
                   </div>
                 </div>
+                {existingBid.description && (
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Proposal Description</h3>
+                    <p className="text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-200 whitespace-pre-wrap leading-relaxed text-sm">
+                      {existingBid.description}
+                    </p>
+                  </div>
+                )}
                 <div>
                   <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Submitted On</h3>
                   <p className="text-navy-900 text-lg font-semibold">{formatDate(existingBid.submitted_at)}</p>
@@ -385,6 +395,16 @@ function BidForTenderContent() {
                       required min="0" step="0.01" placeholder="e.g. 25000.00"
                       className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl bg-white text-navy-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent transition font-medium" />
                   </div>
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label htmlFor="description" className="block text-sm font-semibold text-navy-900 mb-2">
+                    Proposal Description <span className="text-red-500">*</span>
+                  </label>
+                  <textarea id="description" name="description" value={formData.description} onChange={handleChange}
+                    required rows={4} placeholder="Describe your bid approach, timelines, or additional details..."
+                    className="w-full px-4 py-3 border border-slate-300 rounded-xl bg-white text-navy-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent transition font-medium resize-none"></textarea>
                 </div>
 
                 {/* Supporting Documents */}

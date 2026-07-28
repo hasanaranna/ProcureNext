@@ -21,6 +21,7 @@ interface Bid {
   submitted_at: string;
   updated_at: string;
   vendor_name: string;
+  description: string | null;
   documents: BidDocument[];
 }
 
@@ -278,6 +279,14 @@ export default function ViewMyTenderPage() {
                             {bid.status}
                           </span>
                         </div>
+
+                        {/* Description */}
+                        {bid.description && (
+                          <div className="mb-4 bg-slate-50 border border-slate-200 rounded-xl p-4">
+                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Proposal Description</h4>
+                            <p className="text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">{bid.description}</p>
+                          </div>
+                        )}
 
                         {/* Files Capsules */}
                         {bid.documents && bid.documents.length > 0 && (

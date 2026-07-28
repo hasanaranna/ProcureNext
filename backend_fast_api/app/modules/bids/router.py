@@ -46,6 +46,7 @@ async def submit_bid(
         bid_dict = json.loads(bid_data)
         tender_id = int(bid_dict["tender_id"])
         financial_amount = float(bid_dict["financial_amount"])
+        description = bid_dict.get("description")
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid bid_data JSON: {e}")
 
@@ -91,6 +92,7 @@ async def submit_bid(
                 tender_id=tender_id,
                 financial_amount=financial_amount,
                 files_data=files_data,
+                description=description,
             )
             return new_bid
     except Exception as e:
