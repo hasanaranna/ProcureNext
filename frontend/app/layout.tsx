@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'ProcureNext',
-  description: 'A procurement management application',
+  title: 'ProcureNext — Enterprise Procurement Platform',
+  description: 'Streamline your procurement processes with ProcureNext. Manage tenders, bids, and vendor relationships on a secure, enterprise-grade platform.',
 };
 
 export default function RootLayout({
@@ -13,7 +13,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      </head>
+      <body className="bg-slate-50 text-slate-900 antialiased">
         {children}
       </body>
     </html>

@@ -50,7 +50,7 @@
         "x-next-revalidate-tag-token"
       ]
     },
-    "/home-buyer": {
+    "/admin-home": {
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -63,8 +63,8 @@
         }
       ],
       "initialRevalidateSeconds": false,
-      "srcRoute": "/home-buyer",
-      "dataRoute": "/home-buyer.rsc",
+      "srcRoute": "/admin-home",
+      "dataRoute": "/admin-home.rsc",
       "allowHeader": [
         "host",
         "x-matched-path",
@@ -74,7 +74,7 @@
         "x-next-revalidate-tag-token"
       ]
     },
-    "/home-seller": {
+    "/admin-login": {
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -87,8 +87,56 @@
         }
       ],
       "initialRevalidateSeconds": false,
-      "srcRoute": "/home-seller",
-      "dataRoute": "/home-seller.rsc",
+      "srcRoute": "/admin-login",
+      "dataRoute": "/admin-login.rsc",
+      "allowHeader": [
+        "host",
+        "x-matched-path",
+        "x-prerender-revalidate",
+        "x-prerender-revalidate-if-generated",
+        "x-next-revalidated-tags",
+        "x-next-revalidate-tag-token"
+      ]
+    },
+    "/bid-for-tender": {
+      "experimentalBypassFor": [
+        {
+          "type": "header",
+          "key": "next-action"
+        },
+        {
+          "type": "header",
+          "key": "content-type",
+          "value": "multipart/form-data;.*"
+        }
+      ],
+      "initialRevalidateSeconds": false,
+      "srcRoute": "/bid-for-tender",
+      "dataRoute": "/bid-for-tender.rsc",
+      "allowHeader": [
+        "host",
+        "x-matched-path",
+        "x-prerender-revalidate",
+        "x-prerender-revalidate-if-generated",
+        "x-next-revalidated-tags",
+        "x-next-revalidate-tag-token"
+      ]
+    },
+    "/home": {
+      "experimentalBypassFor": [
+        {
+          "type": "header",
+          "key": "next-action"
+        },
+        {
+          "type": "header",
+          "key": "content-type",
+          "value": "multipart/form-data;.*"
+        }
+      ],
+      "initialRevalidateSeconds": false,
+      "srcRoute": "/home",
+      "dataRoute": "/home.rsc",
       "allowHeader": [
         "host",
         "x-matched-path",
@@ -122,6 +170,30 @@
         "x-next-revalidate-tag-token"
       ]
     },
+    "/new-tender": {
+      "experimentalBypassFor": [
+        {
+          "type": "header",
+          "key": "next-action"
+        },
+        {
+          "type": "header",
+          "key": "content-type",
+          "value": "multipart/form-data;.*"
+        }
+      ],
+      "initialRevalidateSeconds": false,
+      "srcRoute": "/new-tender",
+      "dataRoute": "/new-tender.rsc",
+      "allowHeader": [
+        "host",
+        "x-matched-path",
+        "x-prerender-revalidate",
+        "x-prerender-revalidate-if-generated",
+        "x-next-revalidated-tags",
+        "x-next-revalidate-tag-token"
+      ]
+    },
     "/": {
       "experimentalBypassFor": [
         {
@@ -146,7 +218,7 @@
         "x-next-revalidate-tag-token"
       ]
     },
-    "/signup-buyer": {
+    "/signup-master": {
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -159,8 +231,8 @@
         }
       ],
       "initialRevalidateSeconds": false,
-      "srcRoute": "/signup-buyer",
-      "dataRoute": "/signup-buyer.rsc",
+      "srcRoute": "/signup-master",
+      "dataRoute": "/signup-master.rsc",
       "allowHeader": [
         "host",
         "x-matched-path",
@@ -170,7 +242,7 @@
         "x-next-revalidate-tag-token"
       ]
     },
-    "/signup-seller": {
+    "/signup-user": {
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -183,8 +255,8 @@
         }
       ],
       "initialRevalidateSeconds": false,
-      "srcRoute": "/signup-seller",
-      "dataRoute": "/signup-seller.rsc",
+      "srcRoute": "/signup-user",
+      "dataRoute": "/signup-user.rsc",
       "allowHeader": [
         "host",
         "x-matched-path",
@@ -198,8 +270,8 @@
   "dynamicRoutes": {},
   "notFoundRoutes": [],
   "preview": {
-    "previewModeId": "8e2c5c0565c536af973326a51719408d",
-    "previewModeSigningKey": "78d26fc3dd8fa61afa1ea97fd841a7f9c44349ab01b7e30b1d015fd36f2738be",
-    "previewModeEncryptionKey": "4ac041a3371c4fad0d6eee3b3f9c8ae8ae3b6f689b38100b7acc198f053baf94"
+    "previewModeId": "f64b6b6a308916e8b8d95df3efaca88b",
+    "previewModeSigningKey": "1fa1b6f1b1155a9deb20663c268de981e9af9a82996198c56986b3937a07bbd0",
+    "previewModeEncryptionKey": "363c8fbabf48030d317069cd26b2bc8b3264149cbccbf3ac07d0bb1f02ee5928"
   }
 }

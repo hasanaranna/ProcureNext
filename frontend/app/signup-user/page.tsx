@@ -2,7 +2,6 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { SIGNUP_BACKGROUND_IMAGE } from "@/lib/constants";
 
 interface FileFields {
   nidFront: File | null;
@@ -144,16 +143,13 @@ function SignupUserContent() {
   // ─── Loading ──────────────────────────────────────────────
   if (loading) {
     return (
-      <main
-        className="w-full min-h-screen flex items-center justify-center"
-        style={{ backgroundColor: "#374151" }}
-      >
+      <main className="w-full min-h-screen flex items-center justify-center bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
         <div className="text-center">
-          <svg className="animate-spin h-10 w-10 text-white mx-auto mb-4" fill="none" viewBox="0 0 24 24">
+          <svg className="animate-spin h-10 w-10 text-accent-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          <p className="text-gray-300 text-lg">Validating invitation...</p>
+          <p className="text-slate-300 text-lg font-medium">Validating invitation...</p>
         </div>
       </main>
     );
@@ -162,21 +158,10 @@ function SignupUserContent() {
   // ─── No Token / Invalid Token ─────────────────────────────
   if (tokenError) {
     return (
-      <main
-        className="w-full min-h-screen flex items-center justify-center py-20 px-4"
-        style={{
-          backgroundImage: `url("${SIGNUP_BACKGROUND_IMAGE}")`,
-          backgroundAttachment: "fixed",
-          backgroundPosition: "center",
-          backgroundSize: "cover",
-          backgroundRepeat: "no-repeat",
-          backgroundColor: "#374151",
-        }}
-      >
-        <div className="relative z-10 max-w-lg mx-auto w-full">
-          <div className="bg-white/80 backdrop-blur-md rounded-xl shadow-2xl p-8 md:p-12 border border-white/30 text-center">
-            <div className="w-16 h-16 mx-auto mb-6 rounded-full flex items-center justify-center"
-              style={{ backgroundColor: '#fee2e2' }}>
+      <main className="w-full min-h-screen flex items-center justify-center py-20 px-4 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
+        <div className="relative z-10 max-w-lg mx-auto w-full animate-scale-in">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 md:p-12 text-center">
+            <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-red-50 flex items-center justify-center">
               <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                   d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
@@ -185,36 +170,24 @@ function SignupUserContent() {
 
             {tokenError === "no-token" ? (
               <>
-                <h1 className="text-2xl font-bold text-gray-900 mb-3">
-                  Invitation Required
-                </h1>
-                <p className="text-gray-600 mb-2">
-                  Employee accounts can only be created through an invitation from your company owner.
-                </p>
-                <p className="text-gray-500 text-sm mb-8">
-                  Please ask your organization&apos;s master account holder to send you an invitation link.
-                </p>
+                <h1 className="text-2xl font-black text-navy-900 mb-3">Invitation Required</h1>
+                <p className="text-slate-600 mb-2">Employee accounts can only be created through an invitation from your company owner.</p>
+                <p className="text-slate-400 text-sm mb-8">Please ask your organization&apos;s master account holder to send you an invitation link.</p>
               </>
             ) : (
               <>
-                <h1 className="text-2xl font-bold text-gray-900 mb-3">
-                  Invalid Invitation
-                </h1>
-                <p className="text-gray-600 mb-8">{tokenError}</p>
+                <h1 className="text-2xl font-black text-navy-900 mb-3">Invalid Invitation</h1>
+                <p className="text-slate-600 mb-8">{tokenError}</p>
               </>
             )}
 
             <div className="flex gap-3 justify-center">
-              <button
-                onClick={() => router.push("/login")}
-                className="px-6 py-2.5 bg-gradient-to-br from-gray-600 to-gray-800 text-white font-semibold rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all shadow-lg"
-              >
+              <button onClick={() => router.push("/login")}
+                className="px-6 py-2.5 bg-gradient-to-r from-navy-900 to-navy-800 text-white font-bold rounded-xl hover:from-navy-800 hover:to-navy-700 transition-all shadow-lg">
                 Go to Login
               </button>
-              <button
-                onClick={() => router.push("/")}
-                className="px-6 py-2.5 bg-white text-gray-700 font-semibold rounded-lg border-2 border-gray-300 hover:bg-gray-50 transition-all"
-              >
+              <button onClick={() => router.push("/")}
+                className="px-6 py-2.5 bg-white text-navy-900 font-semibold rounded-xl border-2 border-slate-200 hover:bg-slate-50 transition-all">
                 Home
               </button>
             </div>
@@ -227,35 +200,18 @@ function SignupUserContent() {
   // ─── Success ──────────────────────────────────────────────
   if (submitSuccess) {
     return (
-      <main
-        className="w-full min-h-screen flex items-center justify-center py-20 px-4"
-        style={{
-          backgroundImage: `url("${SIGNUP_BACKGROUND_IMAGE}")`,
-          backgroundAttachment: "fixed",
-          backgroundPosition: "center",
-          backgroundSize: "cover",
-          backgroundRepeat: "no-repeat",
-          backgroundColor: "#374151",
-        }}
-      >
-        <div className="relative z-10 max-w-xl mx-auto w-full">
-          <div className="bg-white/80 backdrop-blur-md rounded-xl shadow-2xl p-8 md:p-12 border border-white/30 text-center">
-            <div className="w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center"
-              style={{ backgroundColor: '#d1fae5' }}>
-              <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <main className="w-full min-h-screen flex items-center justify-center py-20 px-4 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
+        <div className="relative z-10 max-w-xl mx-auto w-full animate-scale-in">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 md:p-12 text-center">
+            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-emerald-50 flex items-center justify-center">
+              <svg className="w-10 h-10 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-3">
-              Welcome to {invitation?.organization_name}!
-            </h1>
-            <p className="text-gray-600 mb-8">
-              Your account has been created successfully. You can now log in and start using ProcureNext.
-            </p>
-            <button
-              onClick={() => router.push("/home")}
-              className="px-8 py-3 bg-gradient-to-br from-gray-600 to-gray-800 text-white font-semibold rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all shadow-lg"
-            >
+            <h1 className="text-3xl font-black text-navy-900 mb-3">Welcome to {invitation?.organization_name}!</h1>
+            <p className="text-slate-600 mb-8">Your account has been created successfully. You can now log in and start using ProcureNext.</p>
+            <button onClick={() => router.push("/home")}
+              className="px-8 py-3 bg-gradient-to-r from-navy-900 to-navy-800 text-white font-bold rounded-xl hover:from-navy-800 hover:to-navy-700 transition-all shadow-lg">
               Go to Dashboard
             </button>
           </div>
@@ -266,214 +222,119 @@ function SignupUserContent() {
 
   // ─── Registration Form ────────────────────────────────────
   return (
-    <main
-      className="w-full min-h-screen flex items-center justify-center py-20 px-4 relative overflow-x-hidden"
-      style={{
-        backgroundImage: `url("${SIGNUP_BACKGROUND_IMAGE}")`,
-        backgroundAttachment: "fixed",
-        backgroundPosition: "center",
-        backgroundSize: "cover",
-        backgroundRepeat: "no-repeat",
-        backgroundColor: "#374151",
-      }}
-    >
-      <div className="relative z-10 max-w-2xl mx-auto w-full">
-        <div className="bg-white/60 backdrop-blur-md rounded-xl shadow-2xl p-8 md:p-12 border border-white/30">
+    <main className="w-full min-h-screen flex items-center justify-center py-12 px-4 relative overflow-x-hidden bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
+      <div className="absolute top-1/4 right-1/4 w-72 h-72 bg-accent-500/5 rounded-full blur-3xl" />
+
+      <div className="relative z-10 max-w-2xl mx-auto w-full animate-fade-in">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 md:p-10 border border-slate-200">
           {/* Header */}
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-2 text-center">
-            Create Your Account
-          </h1>
-          <p className="text-lg text-gray-700 mb-2 text-center">
-            Register as a member of{" "}
-            <span className="font-bold text-gray-900">{invitation?.organization_name}</span>
-          </p>
-          <p className="text-sm text-gray-500 mb-8 text-center">
-            Invitation sent to: <span className="font-medium">{invitation?.email}</span>
-          </p>
+          <div className="text-center mb-8">
+            <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-accent-500 to-accent-600 flex items-center justify-center shadow-lg">
+              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+              </svg>
+            </div>
+            <h1 className="text-3xl font-black text-navy-900 mb-1">Create Your Account</h1>
+            <p className="text-slate-500">
+              Register as a member of <span className="font-bold text-navy-900">{invitation?.organization_name}</span>
+            </p>
+            <p className="text-sm text-slate-400 mt-2">
+              Invitation sent to: <span className="font-medium">{invitation?.email}</span>
+            </p>
+          </div>
 
           {/* Error Message */}
           {submitError && (
-            <div className="mb-6 p-4 bg-red-500/20 border border-red-500 rounded-lg text-red-700 text-sm">
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm flex items-start gap-3">
+              <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
               {submitError}
             </div>
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Full Name */}
-            <div>
-              <label htmlFor="name" className="block text-sm font-semibold text-gray-800 mb-2">
-                Full Name
-              </label>
-              <input
-                type="text"
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                placeholder="Enter your full name"
-                className="w-full px-4 py-3 border border-gray-400 rounded-lg bg-white/90 text-gray-900 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent transition backdrop-blur-sm"
-              />
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="name" className="block text-sm font-semibold text-navy-900 mb-1.5">Full Name</label>
+                <input type="text" id="name" name="name" value={formData.name} onChange={handleChange} placeholder="Enter your full name"
+                  className="w-full px-4 py-3 border border-slate-300 rounded-xl bg-white text-navy-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent transition" />
+              </div>
+              <div>
+                <label htmlFor="email" className="block text-sm font-semibold text-navy-900 mb-1.5">Email Address <span className="text-red-500">*</span></label>
+                <input type="email" id="email" name="email" value={formData.email} readOnly
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" />
+                <p className="text-xs text-slate-400 mt-1">This email was specified in the invitation and cannot be changed.</p>
+              </div>
             </div>
 
-            {/* Email (pre-filled, read-only) */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-semibold text-gray-800 mb-2">
-                Email Address <span className="text-red-600">*</span>
-              </label>
-              <input
-                type="email"
-                id="email"
-                name="email"
-                value={formData.email}
-                readOnly
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-700 cursor-not-allowed"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                This email was specified in the invitation and cannot be changed.
-              </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="phone" className="block text-sm font-semibold text-navy-900 mb-1.5">Mobile Phone <span className="text-red-500">*</span></label>
+                <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleChange} placeholder="Enter your mobile phone number" required
+                  className="w-full px-4 py-3 border border-slate-300 rounded-xl bg-white text-navy-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent transition" />
+              </div>
+              <div>
+                <label htmlFor="nid" className="block text-sm font-semibold text-navy-900 mb-1.5">National ID Number <span className="text-red-500">*</span></label>
+                <input type="number" id="nid" name="nid" value={formData.nid} onChange={handleChange} placeholder="Enter your NID number" required
+                  className="w-full px-4 py-3 border border-slate-300 rounded-xl bg-white text-navy-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent transition" />
+              </div>
             </div>
 
-            {/* Mobile Phone */}
-            <div>
-              <label htmlFor="phone" className="block text-sm font-semibold text-gray-800 mb-2">
-                Mobile Phone <span className="text-red-600">*</span>
-              </label>
-              <input
-                type="tel"
-                id="phone"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                placeholder="Enter your mobile phone number"
-                required
-                className="w-full px-4 py-3 border border-gray-400 rounded-lg bg-white/90 text-gray-900 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent transition backdrop-blur-sm"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="date_of_birth" className="block text-sm font-semibold text-navy-900 mb-1.5">Date of Birth <span className="text-red-500">*</span></label>
+                <input type="date" id="date_of_birth" name="date_of_birth" value={formData.date_of_birth} onChange={handleChange} required
+                  className="w-full px-4 py-3 border border-slate-300 rounded-xl bg-white text-navy-900 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent transition" />
+              </div>
+              <div>
+                <label htmlFor="password" className="block text-sm font-semibold text-navy-900 mb-1.5">Password <span className="text-red-500">*</span></label>
+                <input type="password" id="password" name="password" value={formData.password} onChange={handleChange} placeholder="Min 8 characters" required minLength={8}
+                  className="w-full px-4 py-3 border border-slate-300 rounded-xl bg-white text-navy-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent transition" />
+              </div>
             </div>
 
-            {/* NID Number */}
+            {/* NID — Front & Back */}
             <div>
-              <label htmlFor="nid" className="block text-sm font-semibold text-gray-800 mb-2">
-                National ID Number <span className="text-red-600">*</span>
-              </label>
-              <input
-                type="number"
-                id="nid"
-                name="nid"
-                value={formData.nid}
-                onChange={handleChange}
-                placeholder="Enter your NID number"
-                required
-                className="w-full px-4 py-3 border border-gray-400 rounded-lg bg-white/90 text-gray-900 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent transition backdrop-blur-sm"
-              />
-            </div>
-
-            {/* Date of Birth */}
-            <div>
-              <label htmlFor="date_of_birth" className="block text-sm font-semibold text-gray-800 mb-2">
-                Date of Birth <span className="text-red-600">*</span>
-              </label>
-              <input
-                type="date"
-                id="date_of_birth"
-                name="date_of_birth"
-                value={formData.date_of_birth}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-3 border border-gray-400 rounded-lg bg-white/90 text-gray-900 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent transition backdrop-blur-sm"
-              />
-            </div>
-
-            {/* Password */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-semibold text-gray-800 mb-2">
-                Password <span className="text-red-600">*</span>
-              </label>
-              <input
-                type="password"
-                id="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="Create a strong password (min 8 characters)"
-                required
-                minLength={8}
-                className="w-full px-4 py-3 border border-gray-400 rounded-lg bg-white/90 text-gray-900 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-700 focus:border-transparent transition backdrop-blur-sm"
-              />
-            </div>
-
-            {/* NID — Front & Back side by side */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-800 mb-2">
-                National ID (NID)
-              </label>
+              <label className="block text-sm font-semibold text-navy-900 mb-2">National ID (NID)</label>
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-gray-600 mb-1 font-medium">Front Side</p>
-                  <label
-                    htmlFor="nidFront"
-                    className="flex flex-col items-center justify-center gap-1 px-3 py-4 border-2 border-dashed border-gray-400 rounded-lg bg-white/80 cursor-pointer hover:border-gray-600 transition"
-                  >
-                    {files.nidFront ? (
-                      <>
-                        <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        <span className="text-xs text-gray-700 text-center truncate w-full">
-                          {files.nidFront.name}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        <span className="text-xs text-gray-500">Upload image</span>
-                      </>
-                    )}
-                    <input id="nidFront" type="file" accept="image/*" className="hidden"
-                      onChange={(e) => handleNidFile("nidFront", e)} />
-                  </label>
-                </div>
-
-                <div>
-                  <p className="text-xs text-gray-600 mb-1 font-medium">Back Side</p>
-                  <label
-                    htmlFor="nidBack"
-                    className="flex flex-col items-center justify-center gap-1 px-3 py-4 border-2 border-dashed border-gray-400 rounded-lg bg-white/80 cursor-pointer hover:border-gray-600 transition"
-                  >
-                    {files.nidBack ? (
-                      <>
-                        <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        <span className="text-xs text-gray-700 text-center truncate w-full">
-                          {files.nidBack.name}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        <span className="text-xs text-gray-500">Upload image</span>
-                      </>
-                    )}
-                    <input id="nidBack" type="file" accept="image/*" className="hidden"
-                      onChange={(e) => handleNidFile("nidBack", e)} />
-                  </label>
-                </div>
+                {(['nidFront', 'nidBack'] as const).map((field) => (
+                  <div key={field}>
+                    <p className="text-xs text-slate-500 mb-1.5 font-medium">{field === 'nidFront' ? 'Front Side' : 'Back Side'}</p>
+                    <label htmlFor={field}
+                      className={`flex flex-col items-center justify-center gap-2 px-3 py-5 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-300 ${
+                        files[field] ? 'border-emerald-300 bg-emerald-50' : 'border-slate-300 bg-slate-50 hover:border-accent-400 hover:bg-accent-50'
+                      }`}>
+                      {files[field] ? (
+                        <>
+                          <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                            <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                          <span className="text-xs text-slate-600 text-center truncate w-full font-medium">{files[field]!.name}</span>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center">
+                            <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                          </div>
+                          <span className="text-xs text-slate-500">Upload image</span>
+                        </>
+                      )}
+                      <input id={field} type="file" accept="image/*" className="hidden" onChange={(e) => handleNidFile(field, e)} />
+                    </label>
+                  </div>
+                ))}
               </div>
             </div>
 
             {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full py-3 mt-4 bg-gradient-to-br from-gray-600 to-gray-800 text-white font-semibold rounded-lg hover:from-gray-700 hover:to-gray-900 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
+            <button type="submit" disabled={isSubmitting}
+              className="w-full py-3.5 bg-gradient-to-r from-navy-900 to-navy-800 text-white font-bold rounded-xl hover:from-navy-800 hover:to-navy-700 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
               {isSubmitting ? (
                 <>
                   <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
@@ -487,12 +348,9 @@ function SignupUserContent() {
               )}
             </button>
 
-            {/* Login Link */}
-            <p className="text-center text-gray-700 text-sm mt-4">
+            <p className="text-center text-slate-500 text-sm">
               Already have an account?{" "}
-              <a href="/login" className="text-gray-800 font-semibold hover:text-gray-900 transition">
-                Login here
-              </a>
+              <a href="/login" className="text-accent-600 font-semibold hover:text-accent-700 transition">Login here</a>
             </p>
           </form>
         </div>
@@ -504,13 +362,13 @@ function SignupUserContent() {
 export default function SignupUserPage() {
   return (
     <Suspense fallback={
-      <main className="w-full min-h-screen flex items-center justify-center" style={{ backgroundColor: "#374151" }}>
+      <main className="w-full min-h-screen flex items-center justify-center bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
         <div className="text-center">
-          <svg className="animate-spin h-10 w-10 text-white mx-auto mb-4" fill="none" viewBox="0 0 24 24">
+          <svg className="animate-spin h-10 w-10 text-accent-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          <p className="text-gray-300 text-lg">Loading...</p>
+          <p className="text-slate-300 text-lg">Loading...</p>
         </div>
       </main>
     }>

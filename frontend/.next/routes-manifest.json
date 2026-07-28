@@ -20,7 +20,56 @@
     "afterFiles": [],
     "fallback": []
   },
-  "dynamicRoutes": [],
+  "dynamicRoutes": [
+    {
+      "page": "/api/auth/[...path]",
+      "regex": "^/api/auth/(.+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPpath": "nxtPpath"
+      },
+      "namedRegex": "^/api/auth/(?<nxtPpath>.+?)(?:/)?$"
+    },
+    {
+      "page": "/api/bids/[...path]",
+      "regex": "^/api/bids/(.+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPpath": "nxtPpath"
+      },
+      "namedRegex": "^/api/bids/(?<nxtPpath>.+?)(?:/)?$"
+    },
+    {
+      "page": "/api/messages/[...path]",
+      "regex": "^/api/messages/(.+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPpath": "nxtPpath"
+      },
+      "namedRegex": "^/api/messages/(?<nxtPpath>.+?)(?:/)?$"
+    },
+    {
+      "page": "/api/org/[...path]",
+      "regex": "^/api/org/(.+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPpath": "nxtPpath"
+      },
+      "namedRegex": "^/api/org/(?<nxtPpath>.+?)(?:/)?$"
+    },
+    {
+      "page": "/api/tenders/[...path]",
+      "regex": "^/api/tenders/(.+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPpath": "nxtPpath"
+      },
+      "namedRegex": "^/api/tenders/(?<nxtPpath>.+?)(?:/)?$"
+    },
+    {
+      "page": "/view-my-tender/[id]",
+      "regex": "^/view\\-my\\-tender/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/view\\-my\\-tender/(?<nxtPid>[^/]+?)(?:/)?$"
+    }
+  ],
   "staticRoutes": [
     {
       "page": "/",
@@ -41,16 +90,34 @@
       "namedRegex": "^/_not\\-found(?:/)?$"
     },
     {
-      "page": "/home-buyer",
-      "regex": "^/home\\-buyer(?:/)?$",
+      "page": "/admin-home",
+      "regex": "^/admin\\-home(?:/)?$",
       "routeKeys": {},
-      "namedRegex": "^/home\\-buyer(?:/)?$"
+      "namedRegex": "^/admin\\-home(?:/)?$"
     },
     {
-      "page": "/home-seller",
-      "regex": "^/home\\-seller(?:/)?$",
+      "page": "/admin-login",
+      "regex": "^/admin\\-login(?:/)?$",
       "routeKeys": {},
-      "namedRegex": "^/home\\-seller(?:/)?$"
+      "namedRegex": "^/admin\\-login(?:/)?$"
+    },
+    {
+      "page": "/api/auth/ws-token",
+      "regex": "^/api/auth/ws\\-token(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/auth/ws\\-token(?:/)?$"
+    },
+    {
+      "page": "/bid-for-tender",
+      "regex": "^/bid\\-for\\-tender(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/bid\\-for\\-tender(?:/)?$"
+    },
+    {
+      "page": "/home",
+      "regex": "^/home(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/home(?:/)?$"
     },
     {
       "page": "/login",
@@ -59,16 +126,22 @@
       "namedRegex": "^/login(?:/)?$"
     },
     {
-      "page": "/signup-buyer",
-      "regex": "^/signup\\-buyer(?:/)?$",
+      "page": "/new-tender",
+      "regex": "^/new\\-tender(?:/)?$",
       "routeKeys": {},
-      "namedRegex": "^/signup\\-buyer(?:/)?$"
+      "namedRegex": "^/new\\-tender(?:/)?$"
     },
     {
-      "page": "/signup-seller",
-      "regex": "^/signup\\-seller(?:/)?$",
+      "page": "/signup-master",
+      "regex": "^/signup\\-master(?:/)?$",
       "routeKeys": {},
-      "namedRegex": "^/signup\\-seller(?:/)?$"
+      "namedRegex": "^/signup\\-master(?:/)?$"
+    },
+    {
+      "page": "/signup-user",
+      "regex": "^/signup\\-user(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/signup\\-user(?:/)?$"
     }
   ],
   "dataRoutes": [],

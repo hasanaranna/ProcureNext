@@ -100,7 +100,7 @@
         "transform": "lodash/{{member}}"
       }
     },
-    "outputFileTracingRoot": "/home/nitaf/Desktop/Academics/3-2/450/ProcureNext/frontend",
+    "outputFileTracingRoot": "/home/tawhidumar/codes/ProcureNext/frontend",
     "cacheComponents": false,
     "cacheLife": {
       "default": {
@@ -293,11 +293,11 @@
     "bundlePagesRouterDependencies": false,
     "configFileName": "next.config.ts",
     "turbopack": {
-      "root": "/home/nitaf/Desktop/Academics/3-2/450/ProcureNext/frontend"
+      "root": "/home/tawhidumar/codes/ProcureNext/frontend"
     },
     "distDirRoot": ".next"
   },
-  "appDir": "/home/nitaf/Desktop/Academics/3-2/450/ProcureNext/frontend",
+  "appDir": "/home/tawhidumar/codes/ProcureNext/frontend",
   "relativeAppDir": "",
   "files": [
     ".next/routes-manifest.json",

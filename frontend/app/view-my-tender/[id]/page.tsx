@@ -56,13 +56,11 @@ export default function ViewMyTenderPage() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        // Fetch tender details (assuming this endpoint exists based on other pages)
         const tenderRes = await fetch(`/api/tenders/${tenderId}/detail`);
         if (!tenderRes.ok) throw new Error('Failed to fetch tender details');
         const tenderData = await tenderRes.json();
         setTender(tenderData);
 
-        // Fetch bids
         const bidsRes = await fetch(`/api/bids/buyer/tender/${tenderId}`);
         if (!bidsRes.ok) throw new Error('Failed to fetch bids');
         const bidsData = await bidsRes.json();
@@ -118,7 +116,6 @@ export default function ViewMyTenderPage() {
         throw new Error(errorData.detail || 'Failed to accept bid');
       }
       
-      // Update local state to reflect changes
       setBids(prevBids => 
         prevBids.map(b => 
           b.bid_id === selectedBid.bid_id 
@@ -142,72 +139,80 @@ export default function ViewMyTenderPage() {
 
   if (loading) {
     return (
-      <main className="w-full min-h-screen py-10 px-4 flex items-center justify-center" style={{ backgroundColor: '#3a4556' }}>
-        <div className="text-white text-xl">Loading tender details...</div>
+      <main className="w-full min-h-screen py-10 px-4 flex items-center justify-center bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
+        <div className="text-center">
+          <svg className="animate-spin h-10 w-10 text-accent-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <p className="text-slate-300 text-lg font-medium">Loading tender details...</p>
+        </div>
       </main>
     );
   }
 
   if (error) {
     return (
-      <main className="w-full min-h-screen py-10 px-4 flex flex-col items-center justify-center gap-4" style={{ backgroundColor: '#3a4556' }}>
-        <div className="text-red-400 text-xl">{error}</div>
-        <button onClick={() => router.push('/home')} className="text-white underline">Back to Dashboard</button>
+      <main className="w-full min-h-screen py-10 px-4 flex flex-col items-center justify-center gap-4 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
+        <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-2">
+          <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <p className="text-red-400 text-lg font-medium">{error}</p>
+        <button onClick={() => router.push('/home')} className="px-6 py-2.5 bg-white text-navy-900 font-semibold rounded-xl hover:bg-slate-100 transition shadow-lg">
+          Back to Dashboard
+        </button>
       </main>
     );
   }
 
   return (
-    <main
-      className="w-full min-h-screen py-10 px-4"
-      style={{ backgroundColor: '#3a4556' }}
-    >
-      <div className="max-w-4xl mx-auto">
+    <main className="w-full min-h-screen py-10 px-4 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
+      <div className="max-w-4xl mx-auto animate-fade-in">
         {/* Back Button */}
-        <button
-          onClick={() => router.push('/home')}
-          className="mb-6 flex items-center gap-2 text-gray-300 hover:text-white transition"
-        >
+        <button onClick={() => router.push('/home')}
+          className="mb-6 flex items-center gap-2 text-slate-400 hover:text-white transition-colors duration-200">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-          <span className="font-medium">Back to Dashboard</span>
+          <span className="font-medium text-sm">Back to Dashboard</span>
         </button>
 
         {/* Tender Details Card */}
-        <div className="bg-white rounded-2xl shadow-2xl p-8 border border-gray-200 mb-8">
-          <div className="flex justify-between items-start mb-2">
-            <h1 style={{ color: '#111827' }} className="text-3xl font-bold">{tender?.title}</h1>
-            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-              tender?.status === 'Awarded' ? 'bg-green-100 text-green-800' : 
-              tender?.status === 'Published' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
-            }`}>
-              {tender?.status}
-            </span>
+        <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden mb-8">
+          <div className="bg-gradient-to-r from-navy-900 to-navy-800 px-8 py-6">
+            <div className="flex justify-between items-start">
+              <h1 className="text-2xl font-black text-white">{tender?.title}</h1>
+              <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                tender?.status === 'Awarded' ? 'bg-emerald-400/20 text-emerald-300' : 
+                tender?.status === 'Published' ? 'bg-accent-400/20 text-accent-300' : 'bg-white/10 text-white'
+              }`}>
+                {tender?.status}
+              </span>
+            </div>
           </div>
-          <p style={{ color: '#6b7280' }} className="text-lg mb-6">{tender?.description}</p>
+          <div className="px-8 py-5">
+            <p className="text-slate-600 text-sm leading-relaxed">{tender?.description}</p>
+          </div>
         </div>
 
         {/* Toggle Capsule */}
         <div className="mb-6 flex justify-center">
-          <div style={{ backgroundColor: '#3a4556', border: '2px solid #4a5668' }} className="rounded-full p-1 flex items-center gap-1">
+          <div className="rounded-full p-1 flex items-center gap-1 bg-navy-900/80 border border-white/10 shadow-lg">
             <button
               onClick={() => handleTabSwitch('bids')}
-              className="px-6 py-2 rounded-full text-sm font-semibold transition-all duration-200"
-              style={{
-                backgroundColor: activeTab === 'bids' ? '#ffffff' : 'transparent',
-                color: activeTab === 'bids' ? '#1f2937' : '#d1d5db',
-              }}
+              className={`px-6 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${
+                activeTab === 'bids' ? 'bg-white text-navy-900 shadow-md' : 'text-slate-400 hover:text-white'
+              }`}
             >
               View Bids from Sellers
             </button>
             <button
               onClick={() => handleTabSwitch('recommended')}
-              className="px-6 py-2 rounded-full text-sm font-semibold transition-all duration-200"
-              style={{
-                backgroundColor: activeTab === 'recommended' ? '#ffffff' : 'transparent',
-                color: activeTab === 'recommended' ? '#1f2937' : '#d1d5db',
-              }}
+              className={`px-6 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${
+                activeTab === 'recommended' ? 'bg-white text-navy-900 shadow-md' : 'text-slate-400 hover:text-white'
+              }`}
             >
               Recommended Sellers
             </button>
@@ -215,108 +220,105 @@ export default function ViewMyTenderPage() {
         </div>
 
         {/* Tab Content with Fade */}
-        <div
-          className="transition-opacity duration-200"
-          style={{ opacity: fadeIn ? 1 : 0 }}
-        >
+        <div className="transition-opacity duration-200" style={{ opacity: fadeIn ? 1 : 0 }}>
           {activeTab === 'bids' ? (
-            /* Bids Section */
             <div className="mb-6">
               <div className="flex justify-between items-start mb-6">
                 <div>
                   <h2 className="text-2xl font-bold text-white mb-1">Vendor Bids</h2>
-                  <p className="text-gray-300 text-sm">{bids.length} vendors have placed bids on this tender</p>
+                  <p className="text-slate-400 text-sm">{bids.length} vendors have placed bids on this tender</p>
                 </div>
               </div>
 
               {bids.length === 0 ? (
-                <div className="bg-white/10 rounded-xl p-8 text-center text-gray-300">
-                  No bids have been submitted yet.
+                <div className="bg-white/5 rounded-2xl p-10 text-center border border-white/10">
+                  <svg className="w-12 h-12 text-slate-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                  </svg>
+                  <p className="text-slate-400 font-medium">No bids have been submitted yet.</p>
                 </div>
               ) : (
                 <div className="flex flex-col gap-5">
                   {bids.map((bid) => (
                     <div
                       key={bid.bid_id}
-                      className={`bg-white rounded-2xl shadow-lg p-6 border ${
-                        bid.status === 'Accepted' ? 'border-green-500 border-2' : 'border-gray-200'
-                      } hover:shadow-xl transition relative overflow-hidden`}
+                      className={`bg-white rounded-2xl shadow-lg border-2 transition-all duration-300 hover:shadow-xl relative overflow-hidden ${
+                        bid.status === 'Accepted' ? 'border-emerald-400' : 'border-slate-200 hover:border-accent-200'
+                      }`}
                     >
                       {bid.status === 'Accepted' && (
-                        <div className="absolute top-0 right-0 bg-green-500 text-white text-xs font-bold px-4 py-1 rounded-bl-lg">
-                          Winning Bid
+                        <div className="absolute top-0 right-0 bg-gradient-to-l from-emerald-500 to-emerald-600 text-white text-xs font-bold px-5 py-1.5 rounded-bl-xl shadow-md">
+                          ✓ Winning Bid
                         </div>
                       )}
                       
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="flex items-center gap-3">
-                          <div style={{ backgroundColor: '#d1d5db' }} className="w-10 h-10 rounded-full flex items-center justify-center text-lg flex-shrink-0">
-                            🏢
-                          </div>
-                          <div>
-                            <h3 style={{ color: '#111827' }} className="text-lg font-bold">{bid.vendor_name}</h3>
-                            <p className="text-xs text-gray-500">Submitted: {new Date(bid.submitted_at).toLocaleString()}</p>
-                          </div>
-                        </div>
-                        <div style={{ backgroundColor: '#374151' }} className="rounded-full px-4 py-1 mt-1">
-                          <span className="text-white font-bold text-sm">৳ {parseFloat(bid.financial_amount).toLocaleString()}</span>
-                        </div>
-                      </div>
-
-                      {/* Status Badge */}
-                      <div className="mb-4">
-                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                           bid.status === 'Accepted' ? 'bg-green-100 text-green-700' :
-                           bid.status === 'Rejected' ? 'bg-red-100 text-red-700' :
-                           'bg-blue-100 text-blue-700'
-                         }`}>
-                           {bid.status}
-                         </span>
-                      </div>
-
-                      {/* Files Capsules */}
-                      {bid.documents && bid.documents.length > 0 && (
-                        <div className="mb-4 flex flex-wrap gap-2">
-                          {bid.documents.map((doc) => (
-                            <div key={doc.bid_doc_id} style={{ backgroundColor: '#f3f4f6' }} className="rounded-full px-3 py-1 flex items-center gap-2 border border-gray-300">
-                              <svg className="w-4 h-4 text-red-600" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
-                              </svg>
-                              <span style={{ color: '#374151' }} className="text-xs font-medium">{doc.document_type}</span>
-                              <button 
-                                onClick={() => handleViewDocument(doc.bid_doc_id)}
-                                className="ml-1 text-blue-600 hover:text-blue-800 text-xs font-semibold"
-                              >
-                                View
-                              </button>
+                      <div className="p-6">
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-accent-500 to-accent-600 flex items-center justify-center text-white text-lg flex-shrink-0 shadow-md">
+                              🏢
                             </div>
-                          ))}
+                            <div>
+                              <h3 className="text-lg font-bold text-navy-900">{bid.vendor_name}</h3>
+                              <p className="text-xs text-slate-400">Submitted: {new Date(bid.submitted_at).toLocaleString()}</p>
+                            </div>
+                          </div>
+                          <div className="bg-navy-900 rounded-xl px-4 py-2 mt-1">
+                            <span className="text-white font-bold text-sm">৳ {parseFloat(bid.financial_amount).toLocaleString()}</span>
+                          </div>
                         </div>
-                      )}
 
-                      <div className="flex gap-3 justify-end mt-4 pt-4 border-t border-gray-100">
-                        {bid.status === 'Accepted' ? (
-                          <div className="text-green-600 font-semibold text-sm flex items-center gap-1">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                            Accepted
+                        {/* Status Badge */}
+                        <div className="mb-4">
+                          <span className={`px-3 py-1 text-xs font-bold rounded-full ${
+                            bid.status === 'Accepted' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                            bid.status === 'Rejected' ? 'bg-red-50 text-red-700 border border-red-200' :
+                            'bg-accent-50 text-accent-700 border border-accent-200'
+                          }`}>
+                            {bid.status}
+                          </span>
+                        </div>
+
+                        {/* Files Capsules */}
+                        {bid.documents && bid.documents.length > 0 && (
+                          <div className="mb-4 flex flex-wrap gap-2">
+                            {bid.documents.map((doc) => (
+                              <div key={doc.bid_doc_id} className="rounded-full px-3 py-1.5 flex items-center gap-2 border border-slate-200 bg-slate-50">
+                                <svg className="w-4 h-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+                                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
+                                </svg>
+                                <span className="text-xs font-medium text-navy-900">{doc.document_type}</span>
+                                <button onClick={() => handleViewDocument(doc.bid_doc_id)}
+                                  className="ml-1 text-accent-600 hover:text-accent-700 text-xs font-semibold transition">
+                                  View
+                                </button>
+                              </div>
+                            ))}
                           </div>
-                        ) : bid.status === 'Rejected' ? (
-                          <div className="text-red-500 font-semibold text-sm">
-                            Rejected
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => openAcceptModal(bid)}
-                            disabled={hasAcceptedBid || isTenderClosed}
-                            style={{ 
-                              background: (hasAcceptedBid || isTenderClosed) ? '#9ca3af' : 'linear-gradient(135deg, #4a5668 0%, #3a4556 100%)',
-                              cursor: (hasAcceptedBid || isTenderClosed) ? 'not-allowed' : 'pointer'
-                            }}
-                            className="px-6 py-2 rounded-full text-white font-semibold text-sm hover:opacity-90 transition"
-                          >
-                            Accept Bid
-                          </button>
                         )}
+
+                        <div className="flex gap-3 justify-end mt-4 pt-4 border-t border-slate-100">
+                          {bid.status === 'Accepted' ? (
+                            <div className="text-emerald-600 font-semibold text-sm flex items-center gap-1">
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                              Accepted
+                            </div>
+                          ) : bid.status === 'Rejected' ? (
+                            <div className="text-red-500 font-semibold text-sm">Rejected</div>
+                          ) : (
+                            <button
+                              onClick={() => openAcceptModal(bid)}
+                              disabled={hasAcceptedBid || isTenderClosed}
+                              className={`px-6 py-2 rounded-xl text-white font-semibold text-sm transition-all duration-300 ${
+                                hasAcceptedBid || isTenderClosed
+                                  ? 'bg-slate-300 cursor-not-allowed'
+                                  : 'bg-gradient-to-r from-navy-900 to-navy-800 hover:from-navy-800 hover:to-navy-700 shadow-lg hover:shadow-xl hover:scale-[1.02]'
+                              }`}
+                            >
+                              Accept Bid
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -324,13 +326,15 @@ export default function ViewMyTenderPage() {
               )}
             </div>
           ) : (
-            /* Recommended Sellers Section - Kept static for now */
             <div className="mb-6">
-              <p className="text-gray-400 text-xs text-center mb-6 italic">
+              <p className="text-slate-500 text-xs text-center mb-6 italic">
                 These are our smart recommendations for your current tender. They have performed similar works before or are related to your tender.
               </p>
-              <div className="bg-white/10 rounded-xl p-8 text-center text-gray-300">
-                AI recommendations will appear here based on tender requirements.
+              <div className="bg-white/5 rounded-2xl p-10 text-center border border-white/10">
+                <svg className="w-12 h-12 text-slate-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+                <p className="text-slate-400 font-medium">AI recommendations will appear here based on tender requirements.</p>
               </div>
             </div>
           )}
@@ -343,27 +347,37 @@ export default function ViewMyTenderPage() {
         onClose={() => !accepting && setIsModalOpen(false)}
         maxWidth="max-w-md"
       >
-        <div className="p-6">
-          <h3 className="text-xl font-bold text-gray-900 mb-4">Confirm Bid Acceptance</h3>
-          <p className="text-gray-600 mb-6">
-            Are you sure you want to award this tender to <strong>{selectedBid?.vendor_name}</strong> for <strong>৳ {selectedBid ? parseFloat(selectedBid.financial_amount).toLocaleString() : ''}</strong>?
+        <div className="p-8">
+          <div className="w-14 h-14 mx-auto mb-5 rounded-2xl bg-accent-50 flex items-center justify-center">
+            <svg className="w-7 h-7 text-accent-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-black text-navy-900 mb-2 text-center">Confirm Bid Acceptance</h3>
+          <p className="text-slate-600 mb-6 text-center text-sm">
+            Are you sure you want to award this tender to <strong className="text-navy-900">{selectedBid?.vendor_name}</strong> for <strong className="text-navy-900">৳ {selectedBid ? parseFloat(selectedBid.financial_amount).toLocaleString() : ''}</strong>?
           </p>
-          <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-4 rounded-lg text-sm mb-6">
-            <strong>Warning:</strong> Accepting this bid will automatically reject all other pending bids for this tender. This action cannot be undone.
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl text-sm mb-6 flex items-start gap-3">
+            <svg className="w-5 h-5 flex-shrink-0 mt-0.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            <div>
+              <strong>Warning:</strong> Accepting this bid will automatically reject all other pending bids for this tender. This action cannot be undone.
+            </div>
           </div>
           
           <div className="flex justify-end gap-3">
             <button
               onClick={() => setIsModalOpen(false)}
               disabled={accepting}
-              className="px-4 py-2 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition disabled:opacity-50"
+              className="px-5 py-2.5 rounded-xl text-navy-900 font-semibold hover:bg-slate-100 transition disabled:opacity-50 border border-slate-200"
             >
               Cancel
             </button>
             <button
               onClick={handleAcceptBid}
               disabled={accepting}
-              className="px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition disabled:opacity-50 flex items-center gap-2"
+              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-accent-600 to-accent-500 text-white font-bold hover:from-accent-700 hover:to-accent-600 transition-all shadow-lg disabled:opacity-50 flex items-center gap-2"
             >
               {accepting ? (
                 <>

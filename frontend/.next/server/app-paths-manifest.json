@@ -1,10 +1,20 @@
 {
   "/_global-error/page": "app/_global-error/page.js",
   "/_not-found/page": "app/_not-found/page.js",
-  "/home-buyer/page": "app/home-buyer/page.js",
-  "/home-seller/page": "app/home-seller/page.js",
+  "/admin-home/page": "app/admin-home/page.js",
+  "/admin-login/page": "app/admin-login/page.js",
+  "/api/auth/[...path]/route": "app/api/auth/[...path]/route.js",
+  "/api/auth/ws-token/route": "app/api/auth/ws-token/route.js",
+  "/api/bids/[...path]/route": "app/api/bids/[...path]/route.js",
+  "/api/messages/[...path]/route": "app/api/messages/[...path]/route.js",
+  "/api/org/[...path]/route": "app/api/org/[...path]/route.js",
+  "/api/tenders/[...path]/route": "app/api/tenders/[...path]/route.js",
+  "/bid-for-tender/page": "app/bid-for-tender/page.js",
+  "/home/page": "app/home/page.js",
   "/login/page": "app/login/page.js",
+  "/new-tender/page": "app/new-tender/page.js",
   "/page": "app/page.js",
-  "/signup-buyer/page": "app/signup-buyer/page.js",
-  "/signup-seller/page": "app/signup-seller/page.js"
+  "/signup-master/page": "app/signup-master/page.js",
+  "/signup-user/page": "app/signup-user/page.js",
+  "/view-my-tender/[id]/page": "app/view-my-tender/[id]/page.js"
 }
