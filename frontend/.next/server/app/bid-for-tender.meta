@@ -1,0 +1,15 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/bid-for-tender/layout,_N_T_/bid-for-tender/page,_N_T_/bid-for-tender"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/bid-for-tender/__PAGE__",
+    "/bid-for-tender",
+    "/_index",
+    "/_head"
+  ]
+}

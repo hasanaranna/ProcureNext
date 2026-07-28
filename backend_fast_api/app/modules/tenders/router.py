@@ -178,8 +178,9 @@ async def list_all_tenders_for_seller(
     List all published tenders for seller browsing.
     """
     try:
+        vendor_org_id = current_user.get("organization_id")
         async with get_db_connection() as connection:
-            tenders = await get_all_published_tenders(connection)
+            tenders = await get_all_published_tenders(connection, vendor_org_id=vendor_org_id)
             return tenders
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")

@@ -10,6 +10,7 @@ import OrgManagementModal from '@/components/OrgManagementModal';
 export default function HomePage() {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
   const [upperCollapsed, setUpperCollapsed] = useState(false);
   const [mode, setMode] = useState<'buyer' | 'seller'>('buyer');
@@ -101,7 +102,7 @@ export default function HomePage() {
   const user = {
     name: userData.full_name || 'User',
     email: userData.email || 'user@example.com',
-    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.full_name || 'User')}&background=0D8ABC&color=fff`,
+    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.full_name || 'User')}&background=0d9488&color=fff&bold=true`,
     orgName: userData.organization_name || 'Organization',
     role: userData.role_in_org || 'Owner',
   };
@@ -118,164 +119,124 @@ export default function HomePage() {
     window.location.href = '/login';
   };
 
+  // Sidebar nav items
+  const navItems = [
+    { label: 'Update Credentials', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) },
+    { label: 'Change Password', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>) },
+    { label: 'Payment Methods', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10a1 1 0 011-1h16a1 1 0 011 1v7a1 1 0 01-1 1H4a1 1 0 01-1-1v-7z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 6V4a2 2 0 012-2h6a2 2 0 012 2v2" /></svg>) },
+    { label: 'Manage Tokens', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) },
+  ];
+
+  const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
+    <div className="flex flex-col h-full">
+      {/* Toggle / Close */}
+      <div className="p-4 flex items-center justify-between">
+        {(sidebarOpen || isMobile) && <h2 className="text-lg font-bold text-white">Menu</h2>}
+        <button
+          onClick={() => isMobile ? setMobileSidebarOpen(false) : setSidebarOpen(!sidebarOpen)}
+          className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all"
+          title={sidebarOpen ? 'Collapse' : 'Expand'}
+        >
+          <svg className={`w-5 h-5 transition-transform ${!isMobile && sidebarOpen ? '' : 'rotate-180'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+      </div>
+
+      {/* User Profile */}
+      <div className="px-4 py-5 border-b border-white/10 bg-white/5">
+        <div className="flex flex-col items-center text-center">
+          <div className="w-16 h-16 flex-shrink-0 mb-3 ring-2 ring-accent-400/50 rounded-full overflow-hidden shadow-lg">
+            <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+          </div>
+          {(sidebarOpen || isMobile) && (
+            <>
+              <h3 className="font-bold text-white text-base">{user.name}</h3>
+              <p className="text-slate-400 text-xs mt-0.5 break-words">{user.email}</p>
+              <p className="text-slate-500 text-xs mt-2 font-medium">{user.orgName}</p>
+              {isOwner ? (
+                <span className="inline-block mt-1.5 px-3 py-0.5 rounded-full text-xs font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30">Owner</span>
+              ) : user.role ? (
+                <span className="inline-block mt-1.5 px-3 py-0.5 rounded-full text-xs font-bold bg-accent-400/20 text-accent-300 border border-accent-400/30">
+                  {user.role.replace(/([a-z])([A-Z])/g, '$1 $2')}
+                </span>
+              ) : null}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Nav Links */}
+      <nav className="flex-1 px-3 py-4">
+        <ul className="space-y-1">
+          {navItems.map((item, i) => (
+            <li key={i}>
+              <a href="#" className="flex items-center gap-3 p-3 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-all duration-200">
+                {item.icon}
+                {(sidebarOpen || isMobile) && <span className="text-sm font-medium">{item.label}</span>}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+
+      {/* Logout */}
+      <div className="p-3 border-t border-white/10">
+        <button onClick={handleLogout}
+          className="w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 font-semibold text-sm">
+          <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+          {(sidebarOpen || isMobile) && <span>Logout</span>}
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <>
-      <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-        {/* Sidebar */}
-        <div
-          style={{ background: 'linear-gradient(135deg, #3a4556 0%, #4a5668 100%)' }}
-          className={`${sidebarOpen ? 'w-64' : 'w-20'
-            } text-gray-50 transition-all duration-300 flex flex-col overflow-y-auto shadow-lg`}
-        >
-          {/* Toggle Button */}
-          <div className="p-4 flex items-center justify-between">
-            {sidebarOpen && <h2 className="text-xl font-bold">Menu</h2>}
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 rounded-lg transition"
-              style={{ color: 'inherit', backgroundColor: 'rgba(74, 86, 104, 0.5)' }}
-              title={sidebarOpen ? 'Collapse' : 'Expand'}
-            >
-              <svg
-                className={`w-6 h-6 transition-transform ${sidebarOpen ? '' : 'rotate-180'}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-          </div>
-
-          {/* User Profile Section */}
-          <div className="px-4 py-6 border-b border-gray-500" style={{ backgroundColor: '#4a5668' }}>
-            <div className="flex flex-col items-center justify-center text-center">
-              <div className="w-16 h-16 flex-shrink-0 mb-4 ring-2 ring-gray-400 rounded-full overflow-hidden">
-                <img
-                  src={user.avatar}
-                  alt={user.name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              {sidebarOpen && (
-                <>
-                  <h3 className="font-semibold text-lg text-gray-50">{user.name}</h3>
-                  <p className="text-gray-300 text-sm break-words">{user.email}</p>
-                  <p className="text-gray-400 text-xs mt-2 font-medium">{user.orgName}</p>
-                  {isOwner ? (
-                    <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-400/20 text-yellow-300">
-                      Owner
-                    </span>
-                  ) : user.role ? (
-                    <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-400/20 text-blue-300">
-                      {user.role.replace(/([a-z])([A-Z])/g, '$1 $2')}
-                    </span>
-                  ) : null}
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Navigation Links */}
-          <nav className="flex-1 px-4 py-6">
-            <ul className="space-y-2">
-              <li>
-                <a
-                  href="#"
-                  className="flex items-center p-3 rounded-lg transition group text-gray-200"
-                  style={{ color: 'inherit' }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#4a5668')}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                >
-                  <svg className="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  {sidebarOpen && <span className="ml-3">Update Credentials</span>}
-                </a>
-              </li>
-
-              <li>
-                <a
-                  href="#"
-                  className="flex items-center p-3 rounded-lg transition group text-gray-200"
-                  style={{ color: 'inherit' }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#4a5668')}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                >
-                  <svg className="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                  </svg>
-                  {sidebarOpen && <span className="ml-3">Change Password</span>}
-                </a>
-              </li>
-
-              <li>
-                <a
-                  href="#"
-                  className="flex items-center p-3 rounded-lg transition group text-gray-200"
-                  style={{ color: 'inherit' }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#4a5668')}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                >
-                  <svg className="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10a1 1 0 011-1h16a1 1 0 011 1v7a1 1 0 01-1 1H4a1 1 0 01-1-1v-7z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 6V4a2 2 0 012-2h6a2 2 0 012 2v2" />
-                  </svg>
-                  {sidebarOpen && <span className="ml-3">Payment Methods</span>}
-                </a>
-              </li>
-
-              <li>
-                <a
-                  href="#"
-                  className="flex items-center p-3 rounded-lg transition group text-gray-200"
-                  style={{ color: 'inherit' }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#4a5668')}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                >
-                  <svg className="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  {sidebarOpen && <span className="ml-3">Manage Tokens</span>}
-                </a>
-              </li>
-            </ul>
-          </nav>
-
-          {/* Logout Button */}
-          <div className="p-4 border-t border-gray-500">
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center p-3 hover:bg-red-600 rounded-lg transition bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 font-semibold text-white"
-            >
-              <svg className="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-              {sidebarOpen && <span className="ml-3">Logout</span>}
-            </button>
-          </div>
+      <div className="flex h-screen bg-slate-50">
+        {/* ── Desktop Sidebar ──────────────────────── */}
+        <div className={`hidden md:flex bg-gradient-to-b from-navy-950 to-navy-900 ${sidebarOpen ? 'w-64' : 'w-20'} transition-all duration-300 flex-col overflow-y-auto shadow-2xl flex-shrink-0`}>
+          <SidebarContent />
         </div>
 
-        {/* Main Content */}
-        <div className="flex-1 overflow-auto flex flex-col">
-          {/* Upper Section - Dark Background */}
-          <div style={{ backgroundColor: '#2a3548' }} className="flex flex-col justify-center flex-shrink-0 relative">
-            <div className="p-6 pb-4 flex gap-4 items-center">
-              {/* Left Column - Title and Subtitle */}
+        {/* ── Mobile Sidebar Overlay ───────────────── */}
+        {mobileSidebarOpen && (
+          <div className="md:hidden fixed inset-0 z-50">
+            <div className="absolute inset-0 bg-navy-950/60 backdrop-blur-sm" onClick={() => setMobileSidebarOpen(false)} />
+            <div className="absolute left-0 top-0 bottom-0 w-72 bg-gradient-to-b from-navy-950 to-navy-900 shadow-2xl animate-slide-up" style={{ animationName: 'none', transform: 'none' }}>
+              <SidebarContent isMobile />
+            </div>
+          </div>
+        )}
+
+        {/* ── Main Content ─────────────────────────── */}
+        <div className="flex-1 overflow-auto flex flex-col min-w-0">
+          {/* Upper Section */}
+          <div className="bg-gradient-to-r from-navy-900 to-navy-800 flex flex-col justify-center flex-shrink-0 relative">
+            <div className="p-4 md:p-6 pb-4 flex flex-col md:flex-row gap-4 items-start md:items-center">
+              {/* Mobile hamburger */}
+              <button onClick={() => setMobileSidebarOpen(true)} className="md:hidden p-2 rounded-xl bg-white/10 text-white">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+
+              {/* Title */}
               <div className="flex-1">
-                <h1 className="text-3xl font-bold text-white mb-1">
+                <h1 className="text-2xl md:text-3xl font-black text-white mb-0.5">
                   {mode === 'buyer' ? 'Buyer Dashboard' : 'Seller Dashboard'}
                 </h1>
-                <p className="text-gray-300 text-sm">
+                <p className="text-slate-400 text-sm">
                   {mode === 'buyer'
                     ? 'Welcome back! Manage your procurement activities here.'
                     : 'Welcome back! Manage your vendor activities here.'}
                 </p>
               </div>
 
-              {/* Right Column - Mode Selector, Search and Token Capsule */}
-              <div className="flex items-center gap-3">
-                {/* Mode Selector */}
+              {/* Right Controls */}
+              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                 <SlidingToggle
                   options={[
                     { value: 'buyer', label: '🛒 Buyer' },
@@ -285,129 +246,93 @@ export default function HomePage() {
                   onChange={(v) => handleModeSwitch(v as 'buyer' | 'seller')}
                 />
 
-                {/* Search Bar */}
-                <div className="flex-1" style={{ minWidth: '200px' }}>
-                  <input
-                    type="text"
-                    placeholder="Search tenders..."
-                    style={{ backgroundColor: '#ffffff', borderColor: '#d1d5db' }}
-                    className="w-full px-4 py-2 rounded-full border-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-gray-300"
-                  />
+                {/* Search */}
+                <div className="flex-1 md:flex-initial" style={{ minWidth: '180px' }}>
+                  <input type="text" placeholder="Search tenders..."
+                    className="w-full px-4 py-2 rounded-xl border border-white/20 bg-white/10 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:bg-white/15 transition text-sm" />
                 </div>
 
-                {/* Available Tokens Capsule */}
-                <div style={{ backgroundColor: '#3a4556' }} className="rounded-full px-6 py-2 flex items-center gap-2 whitespace-nowrap">
-                  <span className="text-gray-300 text-sm font-medium">Available Tokens:</span>
-                  <span className="text-white text-lg font-bold">250</span>
+                {/* Token capsule */}
+                <div className="rounded-xl px-4 py-2 flex items-center gap-2 whitespace-nowrap bg-white/10 border border-white/10">
+                  <span className="text-slate-400 text-sm font-medium">Tokens:</span>
+                  <span className="text-white text-lg font-black">250</span>
                   <svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
 
-                {/* Organization Management Button — only for Owner */}
                 {isOwner && (
-                  <button
-                    onClick={() => setShowOrgManagement(true)}
-                    className="rounded-full px-5 py-2 flex items-center gap-2 whitespace-nowrap font-semibold text-sm transition-all duration-200 hover:opacity-90"
-                    style={{ background: 'linear-gradient(135deg, #4a5668 0%, #3a4556 100%)', color: '#e5e7eb', border: '1px solid #6b7280' }}
-                  >
+                  <button onClick={() => setShowOrgManagement(true)}
+                    className="rounded-xl px-4 py-2 flex items-center gap-2 whitespace-nowrap font-semibold text-sm transition-all duration-200 bg-accent-500/20 text-accent-300 border border-accent-500/30 hover:bg-accent-500/30">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
-                    Organization Management
+                    <span className="hidden sm:inline">Org Management</span>
                   </button>
                 )}
-
               </div>
             </div>
 
-            {/* Stats & Enlisted - Collapsible with smooth height transition */}
-            <div
-              className="overflow-hidden transition-all duration-300 ease-in-out"
-              style={{
-                maxHeight: upperCollapsed ? '0px' : '500px',
-                opacity: upperCollapsed ? 0 : (modeFadeIn ? 1 : 0),
-              }}
-            >
-              <div className="px-6 pb-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {/* Stats Cards */}
+            {/* Stats - Collapsible */}
+            <div className="overflow-hidden transition-all duration-300 ease-in-out"
+              style={{ maxHeight: upperCollapsed ? '0px' : '500px', opacity: upperCollapsed ? 0 : (modeFadeIn ? 1 : 0) }}>
+              <div className="px-4 md:px-6 pb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
                   {mode === 'buyer' ? (
                     <>
-                      <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-200">
+                      <div className="bg-white/10 rounded-2xl p-4 border border-white/10 backdrop-blur-sm">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-gray-600 text-xs font-semibold">Total Published Tenders</p>
-                            <p className="text-2xl font-bold text-gray-900 mt-1">12</p>
+                            <p className="text-slate-400 text-xs font-semibold">Total Published Tenders</p>
+                            <p className="text-2xl font-black text-white mt-1">12</p>
                           </div>
-                          <div className="w-10 h-10 bg-gradient-to-br from-gray-600 to-gray-800 rounded-lg flex items-center justify-center text-white text-lg">
-                            📊
-                          </div>
+                          <div className="w-10 h-10 bg-gradient-to-br from-accent-500 to-accent-600 rounded-xl flex items-center justify-center text-white text-lg shadow-lg">📊</div>
                         </div>
                       </div>
-
-                      <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-200">
+                      <div className="bg-white/10 rounded-2xl p-4 border border-white/10 backdrop-blur-sm">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-gray-600 text-xs font-semibold">Accepted Tenders</p>
-                            <p className="text-2xl font-bold text-gray-900 mt-1">8</p>
+                            <p className="text-slate-400 text-xs font-semibold">Accepted Tenders</p>
+                            <p className="text-2xl font-black text-white mt-1">8</p>
                           </div>
-                          <div className="w-10 h-10 bg-gradient-to-br from-gray-600 to-gray-800 rounded-lg flex items-center justify-center text-white text-lg">
-                            📦
-                          </div>
+                          <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-xl flex items-center justify-center text-white text-lg shadow-lg">📦</div>
                         </div>
                       </div>
-
-                      {/* Enlisted Vendors Card */}
-                      <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-200 lg:col-span-2">
-                        <div>
-                          <p className="text-gray-600 text-xs font-semibold mb-2">Enlisted Vendors (5)</p>
-                          <div className="flex flex-wrap gap-2">
-                            <span style={{ backgroundColor: '#e5e7eb' }} className="px-3 py-1 rounded-full text-xs text-gray-800">Global Supplies Co.</span>
-                            <span style={{ backgroundColor: '#e5e7eb' }} className="px-3 py-1 rounded-full text-xs text-gray-800">Tech Solutions Ltd.</span>
-                            <span style={{ backgroundColor: '#e5e7eb' }} className="px-3 py-1 rounded-full text-xs text-gray-800">Modern Furnishings</span>
-                            <span style={{ backgroundColor: '#e5e7eb' }} className="px-3 py-1 rounded-full text-xs text-gray-800">CleanPro Services</span>
-                            <span style={{ backgroundColor: '#e5e7eb' }} className="px-3 py-1 rounded-full text-xs text-gray-800">Enterprise Software</span>
-                          </div>
+                      <div className="bg-white/10 rounded-2xl p-4 border border-white/10 backdrop-blur-sm sm:col-span-2">
+                        <p className="text-slate-400 text-xs font-semibold mb-2">Enlisted Vendors (5)</p>
+                        <div className="flex flex-wrap gap-2">
+                          {['Global Supplies Co.', 'Tech Solutions Ltd.', 'Modern Furnishings', 'CleanPro Services', 'Enterprise Software'].map(v => (
+                            <span key={v} className="px-3 py-1 rounded-full text-xs text-white bg-white/10 border border-white/10 font-medium">{v}</span>
+                          ))}
                         </div>
                       </div>
                     </>
                   ) : (
                     <>
-                      <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-200">
+                      <div className="bg-white/10 rounded-2xl p-4 border border-white/10 backdrop-blur-sm">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-gray-600 text-xs font-semibold">Tenders Bid On</p>
-                            <p className="text-2xl font-bold text-gray-900 mt-1">15</p>
+                            <p className="text-slate-400 text-xs font-semibold">Tenders Bid On</p>
+                            <p className="text-2xl font-black text-white mt-1">15</p>
                           </div>
-                          <div className="w-10 h-10 bg-gradient-to-br from-gray-600 to-gray-800 rounded-lg flex items-center justify-center text-white text-lg">
-                            📊
-                          </div>
+                          <div className="w-10 h-10 bg-gradient-to-br from-accent-500 to-accent-600 rounded-xl flex items-center justify-center text-white text-lg shadow-lg">📊</div>
                         </div>
                       </div>
-
-                      <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-200">
+                      <div className="bg-white/10 rounded-2xl p-4 border border-white/10 backdrop-blur-sm">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-gray-600 text-xs font-semibold">Accepted Bids</p>
-                            <p className="text-2xl font-bold text-gray-900 mt-1">6</p>
+                            <p className="text-slate-400 text-xs font-semibold">Accepted Bids</p>
+                            <p className="text-2xl font-black text-white mt-1">6</p>
                           </div>
-                          <div className="w-10 h-10 bg-gradient-to-br from-gray-600 to-gray-800 rounded-lg flex items-center justify-center text-white text-lg">
-                            ✅
-                          </div>
+                          <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-xl flex items-center justify-center text-white text-lg shadow-lg">✅</div>
                         </div>
                       </div>
-
-                      {/* Enlisted Buyers Card */}
-                      <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-200 lg:col-span-2">
-                        <div>
-                          <p className="text-gray-600 text-xs font-semibold mb-2">Enlisted Buyers (4)</p>
-                          <div className="flex flex-wrap gap-2">
-                            <span style={{ backgroundColor: '#e5e7eb' }} className="px-3 py-1 rounded-full text-xs text-gray-800">Acme Corporation</span>
-                            <span style={{ backgroundColor: '#e5e7eb' }} className="px-3 py-1 rounded-full text-xs text-gray-800">BuildRight Inc.</span>
-                            <span style={{ backgroundColor: '#e5e7eb' }} className="px-3 py-1 rounded-full text-xs text-gray-800">Metro Industries</span>
-                            <span style={{ backgroundColor: '#e5e7eb' }} className="px-3 py-1 rounded-full text-xs text-gray-800">Summit Holdings</span>
-                          </div>
+                      <div className="bg-white/10 rounded-2xl p-4 border border-white/10 backdrop-blur-sm sm:col-span-2">
+                        <p className="text-slate-400 text-xs font-semibold mb-2">Enlisted Buyers (4)</p>
+                        <div className="flex flex-wrap gap-2">
+                          {['Acme Corporation', 'BuildRight Inc.', 'Metro Industries', 'Summit Holdings'].map(v => (
+                            <span key={v} className="px-3 py-1 rounded-full text-xs text-white bg-white/10 border border-white/10 font-medium">{v}</span>
+                          ))}
                         </div>
                       </div>
                     </>
@@ -417,36 +342,21 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Chevron toggle button - centered on the border between sections */}
+          {/* Collapse chevron */}
           <div className="flex justify-center flex-shrink-0" style={{ marginTop: '-14px', marginBottom: '-14px', position: 'relative', zIndex: 10 }}>
-            <button
-              onClick={() => setUpperCollapsed(!upperCollapsed)}
-              className="rounded-full shadow-md transition-all duration-200 flex items-center justify-center"
-              style={{
-                width: '28px',
-                height: '28px',
-                backgroundColor: '#4a5668',
-                border: '2px solid #d1d5db',
-                color: '#d1d5db',
-              }}
-              title={upperCollapsed ? 'Expand details' : 'Collapse details'}
-            >
-              <svg
-                className={`w-4 h-4 transition-transform duration-300 ${upperCollapsed ? 'rotate-180' : ''}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
+            <button onClick={() => setUpperCollapsed(!upperCollapsed)}
+              className="w-7 h-7 rounded-full shadow-lg flex items-center justify-center bg-navy-800 border-2 border-slate-300 text-slate-300 hover:bg-navy-700 transition-all duration-200"
+              title={upperCollapsed ? 'Expand details' : 'Collapse details'}>
+              <svg className={`w-4 h-4 transition-transform duration-300 ${upperCollapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
               </svg>
             </button>
           </div>
 
-          {/* Lower Section - White Background */}
+          {/* Lower Section */}
           <div className="flex-1 bg-white overflow-y-auto">
-            {/* Seller tab toggle - outside fade wrapper so it doesn't fade */}
             {mode === 'seller' && (
-              <div className="pt-8 px-8 flex justify-center">
+              <div className="pt-8 px-4 md:px-8 flex justify-center">
                 <SlidingToggle
                   options={[
                     { value: 'recommended', label: 'Recommended For You' },
@@ -454,59 +364,47 @@ export default function HomePage() {
                   ]}
                   value={activeTab}
                   onChange={(v) => handleTabSwitch(v as 'recommended' | 'enlisted')}
-                  background="linear-gradient(135deg, #3a4556 0%, #4a5668 100%)"
-                  boxShadow="none"
-                  activeTextColor="#1f2937"
-                  inactiveTextColor="#d1d5db"
-                  paddingX="px-6"
-                  paddingY="py-2"
                 />
               </div>
             )}
 
-            <div
-              className="transition-opacity duration-200 p-8 pt-6"
-              style={{ opacity: tabFadeIn ? 1 : 0 }}
-            >
+            <div className="transition-opacity duration-200 p-4 md:p-8 pt-6" style={{ opacity: tabFadeIn ? 1 : 0 }}>
               {mode === 'buyer' ? (
                 <>
-                  {/* Buyer Lower: Tenders Grid */}
-                  <div className="rounded-xl p-8">
-                    <div className="flex justify-between items-center mb-6">
-                      <h2 className="text-2xl font-bold text-gray-900">Your Tenders</h2>
-                      <div className="flex items-center gap-3">
-                        <div style={{ backgroundColor: '#3a4556' }} className="rounded-full px-5 py-2 flex items-center gap-3">
-                          <label htmlFor="filter-dropdown" className="text-gray-100 font-medium text-sm">
-                            Filter:
-                          </label>
-                          <select
-                            id="filter-dropdown"
-                            style={{ backgroundColor: '#e5e7eb', textAlign: 'center' }}
-                            className="text-gray-900 font-medium text-sm outline-none cursor-pointer rounded-full px-3 py-1"
-                          >
-                            <option value="all" style={{ textAlign: 'center' }}>Show All</option>
-                            <option value="published" style={{ textAlign: 'center' }}>Published</option>
-                            <option value="accepted" style={{ textAlign: 'center' }}>Accepted</option>
+                  <div className="rounded-xl p-4 md:p-8">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                      <h2 className="text-2xl font-black text-navy-900">Your Tenders</h2>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <div className="bg-navy-900 rounded-xl px-4 py-2 flex items-center gap-2">
+                          <label htmlFor="filter-dropdown" className="text-slate-300 font-medium text-sm">Filter:</label>
+                          <select id="filter-dropdown"
+                            className="bg-white text-navy-900 font-medium text-sm outline-none cursor-pointer rounded-lg px-2 py-1">
+                            <option value="all">Show All</option>
+                            <option value="published">Published</option>
+                            <option value="accepted">Accepted</option>
                           </select>
                         </div>
-                        <button
-                          onClick={() => router.push('/new-tender')}
-                          style={{ background: 'linear-gradient(135deg, #4a5668 0%, #3a4556 100%)' }}
-                          className="px-8 py-2 rounded-full text-white font-semibold hover:opacity-90 transition"
-                        >
-                          Create Tender
+                        <button onClick={() => router.push('/new-tender')}
+                          className="px-6 py-2 rounded-xl bg-gradient-to-r from-accent-500 to-accent-600 text-white font-bold hover:from-accent-600 hover:to-accent-700 transition-all shadow-lg hover:shadow-xl hover:scale-[1.02] text-sm">
+                          + Create Tender
                         </button>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                       {tendersLoading ? (
                         <div className="col-span-full flex justify-center py-12">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: '#4a5668' }} />
+                          <svg className="animate-spin h-8 w-8 text-accent-500" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
                         </div>
                       ) : buyerTenders.length === 0 ? (
-                        <div className="col-span-full text-center py-12">
-                          <p className="text-gray-400 text-lg">No tenders yet. Create your first tender!</p>
+                        <div className="col-span-full text-center py-16">
+                          <svg className="w-12 h-12 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                          </svg>
+                          <p className="text-slate-400 text-lg font-medium">No tenders yet. Create your first tender!</p>
                         </div>
                       ) : (
                         buyerTenders.map((tender) => (
@@ -523,71 +421,62 @@ export default function HomePage() {
                   </div>
                 </>
               ) : (
-                <>
-                  {/* Seller Lower: Tender Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="rounded-xl p-4 md:p-8">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                    <h2 className="text-2xl font-black text-navy-900">Available Tenders</h2>
+                    <button onClick={() => router.push('/view-my-bids')}
+                      className="px-6 py-2 rounded-xl bg-gradient-to-r from-accent-500 to-accent-600 text-white font-bold hover:from-accent-600 hover:to-accent-700 transition-all shadow-lg hover:shadow-xl hover:scale-[1.02] text-sm">
+                      View My Bids
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {tendersLoading ? (
                       <div className="col-span-full flex justify-center py-12">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: '#4a5668' }} />
+                        <svg className="animate-spin h-8 w-8 text-accent-500" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
                       </div>
                     ) : sellerTenders.length === 0 ? (
-                      <div className="col-span-full text-center py-12">
-                        <p className="text-gray-400 text-lg">No tenders available at the moment.</p>
+                      <div className="col-span-full text-center py-16">
+                        <svg className="w-12 h-12 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                        </svg>
+                        <p className="text-slate-400 text-lg font-medium">No tenders available at the moment.</p>
                       </div>
                     ) : (
                       sellerTenders.map((tender) => (
-                        <div
+                        <TenderCard
                           key={tender.tender_id}
+                          title={tender.title}
+                          subtitle={tender.description}
+                          vendor={tender.buyer_org_name}
                           onClick={() => router.push(`/bid-for-tender?id=${tender.tender_id}`)}
-                          className="rounded-2xl p-5 cursor-pointer transition-shadow duration-200 hover:shadow-lg"
-                          style={{ backgroundColor: '#f9fafb', border: '3px solid #9ca3af' }}
-                        >
-                          <div className="flex items-start gap-4">
-                            <div
-                              className="w-10 h-10 rounded-lg flex items-center justify-center text-lg flex-shrink-0 mt-1"
-                              style={{ backgroundColor: '#d1d5db' }}
-                            >
-                              📋
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h3 className="text-lg font-bold text-gray-900">{tender.title}</h3>
-                              <p className="text-gray-500 text-sm mt-1">{tender.description}</p>
-                            </div>
-                          </div>
-                          <div
-                            className="mt-3 rounded-b-xl -mx-5 -mb-5 px-5 py-3"
-                            style={{ backgroundColor: '#374151' }}
-                          >
-                            <p className="text-gray-300 text-xs font-medium">
-                              🏢 <span className="text-gray-100 ml-1">{tender.buyer_org_name}</span>
-                            </p>
-                          </div>
-                        </div>
+                        />
                       ))
                     )}
                   </div>
-                </>
+                </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* Right Sidebar Toggle Button */}
-        <button
-          onClick={() => setRightSidebarOpen(true)}
-          className="absolute right-0 top-1/2 transform -translate-y-1/2 z-40 rounded-l-xl shadow-lg transition-all duration-300 flex items-center justify-center"
+        {/* Right Sidebar Toggle */}
+        <button onClick={() => setRightSidebarOpen(true)}
+          className="hidden md:flex fixed right-0 top-1/2 -translate-y-1/2 z-40 rounded-l-2xl shadow-2xl items-center justify-center transition-all duration-300"
           style={{
-            background: 'linear-gradient(135deg, #5b6abf 0%, #3b82f6 50%, #6366f1 100%)',
-            boxShadow: '0 0 12px rgba(99, 102, 241, 0.35)',
+            background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+            border: '1px solid rgba(20, 184, 166, 0.3)',
             color: '#ffffff',
-            width: '48px',
-            height: '120px',
+            width: '44px',
+            height: '110px',
             opacity: rightSidebarOpen ? 0 : 1,
             pointerEvents: rightSidebarOpen ? 'none' : 'auto',
           }}
           title="Open sidebar"
         >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
@@ -600,7 +489,6 @@ export default function HomePage() {
         isOpen={showOrgManagement}
         onClose={() => setShowOrgManagement(false)}
       />
-
     </>
   );
 }

@@ -25,11 +25,11 @@ export default function SlidingToggle<T extends string>({
   options,
   value,
   onChange,
-  background = 'linear-gradient(135deg, #5b6abf 0%, #3b82f6 50%, #6366f1 100%)',
-  boxShadow = '0 0 12px rgba(99, 102, 241, 0.35)',
+  background = 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+  boxShadow = '0 4px 15px rgba(15, 23, 42, 0.25)',
   pillColor = '#ffffff',
-  activeTextColor = '#4f46e5',
-  inactiveTextColor = '#e0e7ff',
+  activeTextColor = '#0f172a',
+  inactiveTextColor = '#94a3b8',
   paddingX = 'px-5',
   paddingY = 'py-1.5',
   fontSize = 'text-sm',
@@ -60,13 +60,14 @@ export default function SlidingToggle<T extends string>({
     >
       {/* Sliding pill */}
       <div
-        className="absolute rounded-full transition-all duration-300 ease-in-out"
+        className="absolute rounded-full transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
         style={{
           backgroundColor: pillColor,
           height: 'calc(100% - 8px)',
           top: '4px',
           left: `${pillStyle.left}px`,
           width: `${pillStyle.width}px`,
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
         }}
       />
       {[btn0Ref, btn1Ref].map((ref, i) => (
@@ -74,7 +75,7 @@ export default function SlidingToggle<T extends string>({
           key={options[i].value}
           ref={ref}
           onClick={() => onChange(options[i].value)}
-          className={`relative z-10 ${paddingX} ${paddingY} rounded-full ${fontSize} font-bold transition-colors duration-300`}
+          className={`relative z-10 ${paddingX} ${paddingY} rounded-full ${fontSize} font-semibold transition-colors duration-300 whitespace-nowrap`}
           style={{
             color: value === options[i].value ? activeTextColor : inactiveTextColor,
           }}

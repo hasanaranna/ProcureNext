@@ -1,10 +1,20 @@
 {
   "/_global-error/page": "/_global-error",
   "/_not-found/page": "/_not-found",
-  "/home-buyer/page": "/home-buyer",
-  "/home-seller/page": "/home-seller",
+  "/admin-home/page": "/admin-home",
+  "/admin-login/page": "/admin-login",
+  "/api/auth/[...path]/route": "/api/auth/[...path]",
+  "/api/auth/ws-token/route": "/api/auth/ws-token",
+  "/api/bids/[...path]/route": "/api/bids/[...path]",
+  "/api/messages/[...path]/route": "/api/messages/[...path]",
+  "/api/org/[...path]/route": "/api/org/[...path]",
+  "/api/tenders/[...path]/route": "/api/tenders/[...path]",
+  "/bid-for-tender/page": "/bid-for-tender",
+  "/home/page": "/home",
   "/login/page": "/login",
+  "/new-tender/page": "/new-tender",
   "/page": "/",
-  "/signup-buyer/page": "/signup-buyer",
-  "/signup-seller/page": "/signup-seller"
+  "/signup-master/page": "/signup-master",
+  "/signup-user/page": "/signup-user",
+  "/view-my-tender/[id]/page": "/view-my-tender/[id]"
 }

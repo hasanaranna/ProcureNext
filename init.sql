@@ -284,6 +284,7 @@ CREATE TABLE bids (
     submitted_by    INT         NOT NULL REFERENCES organization_employees(org_user_id),
     tender_id       INT         NOT NULL REFERENCES tenders(tender_id),
     financial_amount NUMERIC(18,2),
+    description     TEXT,
     status          bid_status  DEFAULT 'Draft',
     submitted_at    TIMESTAMP   DEFAULT NOW(),
     updated_at      TIMESTAMP   DEFAULT NOW(),

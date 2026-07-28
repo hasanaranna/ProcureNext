@@ -102,9 +102,11 @@ async def get_buyer_tenders(
 
 async def get_all_published_tenders(
     connection: asyncpg.Connection,
+    vendor_org_id: int | None = None
 ) -> list[dict]:
     """
     Fetch all published tenders (for seller browsing).
+    Optionally filter out tenders created by the vendor.
     """
     query = """
         SELECT
@@ -118,9 +120,16 @@ async def get_all_published_tenders(
         FROM tenders t
         JOIN organizations o ON t.buyer_id = o.organization_id
         WHERE t.status = 'Published'
-        ORDER BY t.created_at DESC;
     """
-    rows = await connection.fetch(query)
+    args = []
+    
+    if vendor_org_id is not None:
+        query += " AND t.buyer_id != $1"
+        args.append(vendor_org_id)
+        
+    query += " ORDER BY t.created_at DESC;"
+    
+    rows = await connection.fetch(query, *args)
     return [dict(row) for row in rows]
 
 
