@@ -515,7 +515,7 @@ export default function HomePage() {
                             title={tender.title}
                             subtitle={tender.description}
                             vendor={tender.buyer_org_name}
-                            onClick={() => router.push(`/view-my-tender?id=${tender.tender_id}`)}
+                            onClick={() => router.push(`/view-my-tender/${tender.tender_id}`)}
                           />
                         ))
                       )}
