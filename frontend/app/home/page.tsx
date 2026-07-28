@@ -421,7 +421,14 @@ export default function HomePage() {
                   </div>
                 </>
               ) : (
-                <>
+                <div className="rounded-xl p-4 md:p-8">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                    <h2 className="text-2xl font-black text-navy-900">Available Tenders</h2>
+                    <button onClick={() => router.push('/view-my-bids')}
+                      className="px-6 py-2 rounded-xl bg-gradient-to-r from-accent-500 to-accent-600 text-white font-bold hover:from-accent-600 hover:to-accent-700 transition-all shadow-lg hover:shadow-xl hover:scale-[1.02] text-sm">
+                      View My Bids
+                    </button>
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {tendersLoading ? (
                       <div className="col-span-full flex justify-center py-12">
@@ -449,7 +456,7 @@ export default function HomePage() {
                       ))
                     )}
                   </div>
-                </>
+                </div>
               )}
             </div>
           </div>

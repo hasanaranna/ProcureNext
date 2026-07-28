@@ -10,13 +10,14 @@ from typing import List
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
 from app.core.db import get_db_connection
 from app.modules.auth.dependencies import get_current_user_org
-from app.modules.bids.schemas import BidResponse
+from app.modules.bids.schemas import BidResponse, BidListItem
 from app.modules.bids.service import (
     submit_bid_with_documents, 
     get_bid_by_tender_and_vendor, 
     get_bid_document_by_id,
     get_bids_for_buyer_tender,
-    accept_bid_for_tender
+    accept_bid_for_tender,
+    get_vendor_submitted_bids
 )
 from app.services.supabase_storage import generate_signed_url
 
@@ -116,6 +117,24 @@ async def get_vendor_bid_for_tender(
             return bid
     except HTTPException:
         raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+@router.get("/vendor/my-bids", response_model=List[BidListItem])
+async def get_my_bids(
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    Fetch all bids submitted by the current vendor.
+    """
+    vendor_org_id = current_user.get("organization_id")
+    if not vendor_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            bids = await get_vendor_submitted_bids(connection, vendor_org_id)
+            return bids
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
 

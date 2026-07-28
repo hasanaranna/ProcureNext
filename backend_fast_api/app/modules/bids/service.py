@@ -196,3 +196,21 @@ async def accept_bid_for_tender(
         await connection.execute(insert_award_query, bid_id, user_id, tender_id)
 
         return accepted_bid
+
+async def get_vendor_submitted_bids(
+    connection: asyncpg.Connection,
+    vendor_org_id: int
+) -> list[dict]:
+    """
+    Fetch all bids submitted by a specific vendor.
+    Includes the associated tender title.
+    """
+    bids_query = """
+        SELECT b.*, t.title as tender_title
+        FROM bids b
+        JOIN tenders t ON b.tender_id = t.tender_id
+        WHERE b.vendor_org_id = $1
+        ORDER BY b.submitted_at DESC
+    """
+    bids_rows = await connection.fetch(bids_query, vendor_org_id)
+    return [dict(r) for r in bids_rows]
