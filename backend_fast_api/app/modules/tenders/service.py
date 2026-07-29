@@ -35,7 +35,8 @@ async def publish_tender_with_documents(
     buyer_id: int, 
     user_id: int, 
     tender_data: TenderCreateRequest, 
-    files_data: list[dict]
+    files_data: list[dict],
+    creator_role: str = "Owner"
 ) -> dict:
     """
     Creates a tender directly in Published state and queues background file upload.
@@ -67,6 +68,27 @@ async def publish_tender_with_documents(
     )
     
     tender_id = row['tender_id']
+
+    if tender_data.required_seller_docs:
+        # Build allowed_roles: always include Owner, plus the creator's role if different
+        allowed_roles = ['Owner']
+        if creator_role != 'Owner':
+            allowed_roles.append(creator_role)
+
+        insert_req_doc_query = """
+            INSERT INTO public.tender_required_documents (
+                tender_id, custom_doc_name, is_mandatory, allowed_roles
+            )
+            VALUES ($1, $2, $3, $4::public.role_in_org[]);
+        """
+        for doc_name in tender_data.required_seller_docs:
+            await connection.execute(
+                insert_req_doc_query,
+                tender_id,
+                doc_name,
+                True,
+                allowed_roles
+            )
 
     if files_data:
         # Dispatch Celery task to upload the local files to Supabase
@@ -173,5 +195,14 @@ async def get_tender_detail(
     """
     doc_rows = await connection.fetch(docs_query, tender_id)
     result["documents"] = [dict(d) for d in doc_rows]
+
+    req_docs_query = """
+        SELECT req_doc_id, custom_doc_name, is_mandatory
+        FROM public.tender_required_documents
+        WHERE tender_id = $1
+        ORDER BY req_doc_id;
+    """
+    req_doc_rows = await connection.fetch(req_docs_query, tender_id)
+    result["required_documents"] = [dict(r) for r in req_doc_rows]
 
     return result

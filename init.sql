@@ -264,6 +264,18 @@ CREATE TABLE tenders (
     updated_at          TIMESTAMP       DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS public.tender_required_documents (
+    req_doc_id      SERIAL          PRIMARY KEY,
+    tender_id       INT             NOT NULL REFERENCES public.tenders(tender_id) ON DELETE CASCADE,
+    doc_type_id     INT             REFERENCES public.document_types(type_id) ON DELETE SET NULL,
+    custom_doc_name VARCHAR(255),   -- For custom document names typed in the UI (e.g. "ISO 9001")
+    is_mandatory    BOOLEAN         DEFAULT TRUE,
+    allowed_roles   public.role_in_org[] NOT NULL, -- e.g. ARRAY['Owner', 'Finance']::role_in_org[]
+    created_at      TIMESTAMP       DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tender_req_docs_tender_id ON public.tender_required_documents(tender_id);
+
 CREATE TABLE tender_documents (
     tender_doc_id   SERIAL      PRIMARY KEY,
     tender_id       INT         NOT NULL REFERENCES tenders(tender_id) ON DELETE CASCADE,

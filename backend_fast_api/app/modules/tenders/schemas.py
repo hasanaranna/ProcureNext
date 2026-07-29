@@ -92,6 +92,14 @@ class TenderDocumentItem(BaseModel):
     class Config:
         from_attributes = True
 
+class RequiredDocumentItem(BaseModel):
+    req_doc_id: int
+    custom_doc_name: Optional[str] = None
+    is_mandatory: bool = True
+
+    class Config:
+        from_attributes = True
+
 class TenderDetailResponse(BaseModel):
     tender_id: int
     title: str
@@ -107,6 +115,7 @@ class TenderDetailResponse(BaseModel):
     security_required: bool = False
     created_at: datetime
     documents: List[TenderDocumentItem] = []
+    required_documents: List[RequiredDocumentItem] = []
 
     class Config:
         from_attributes = True

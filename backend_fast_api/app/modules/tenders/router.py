@@ -144,7 +144,8 @@ async def publish_with_documents(
                 buyer_id=buyer_id,
                 user_id=org_user_id,
                 tender_data=tender_req,
-                files_data=files_data
+                files_data=files_data,
+                creator_role=current_user.get("role_in_org", "Owner")
             )
             return new_tender
     except Exception as e:
