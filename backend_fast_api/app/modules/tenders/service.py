@@ -35,8 +35,7 @@ async def publish_tender_with_documents(
     buyer_id: int, 
     user_id: int, 
     tender_data: TenderCreateRequest, 
-    files_data: list[dict],
-    creator_role: str = "Owner"
+    files_data: list[dict]
 ) -> dict:
     """
     Creates a tender directly in Published state and queues background file upload.
@@ -70,24 +69,24 @@ async def publish_tender_with_documents(
     tender_id = row['tender_id']
 
     if tender_data.required_seller_docs:
-        # Build allowed_roles: always include Owner, plus the creator's role if different
-        allowed_roles = ['Owner']
-        if creator_role != 'Owner':
-            allowed_roles.append(creator_role)
-
         insert_req_doc_query = """
             INSERT INTO public.tender_required_documents (
                 tender_id, custom_doc_name, is_mandatory, allowed_roles
             )
             VALUES ($1, $2, $3, $4::public.role_in_org[]);
         """
-        for doc_name in tender_data.required_seller_docs:
+        for doc_entry in tender_data.required_seller_docs:
+            doc_name = doc_entry.get("name", "")
+            roles = doc_entry.get("allowed_roles", ["Owner"])
+            # Ensure Owner is always included
+            if "Owner" not in roles:
+                roles = ["Owner"] + roles
             await connection.execute(
                 insert_req_doc_query,
                 tender_id,
                 doc_name,
                 True,
-                allowed_roles
+                roles
             )
 
     if files_data:
@@ -197,7 +196,7 @@ async def get_tender_detail(
     result["documents"] = [dict(d) for d in doc_rows]
 
     req_docs_query = """
-        SELECT req_doc_id, custom_doc_name, is_mandatory
+        SELECT req_doc_id, custom_doc_name, is_mandatory, allowed_roles
         FROM public.tender_required_documents
         WHERE tender_id = $1
         ORDER BY req_doc_id;
@@ -206,3 +205,21 @@ async def get_tender_detail(
     result["required_documents"] = [dict(r) for r in req_doc_rows]
 
     return result
+
+
+async def update_tender_required_document_roles(
+    connection: asyncpg.Connection,
+    tender_id: int,
+    updates: list[dict]
+) -> None:
+    query = """
+        UPDATE public.tender_required_documents
+        SET allowed_roles = $1::public.role_in_org[]
+        WHERE req_doc_id = $2 AND tender_id = $3;
+    """
+    for item in updates:
+        roles = item["allowed_roles"]
+        if "Owner" not in roles:
+            roles = ["Owner"] + roles
+        await connection.execute(query, roles, item["req_doc_id"], tender_id)
+

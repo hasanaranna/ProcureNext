@@ -81,8 +81,8 @@ from typing import List
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
 from app.core.db import get_db_connection
 from app.modules.auth.dependencies import get_current_user_org
-from app.modules.tenders.schemas import TenderCreateRequest, TenderResponse, TenderListItem, TenderDetailResponse
-from app.modules.tenders.service import publish_tender_with_documents, get_buyer_tenders, get_all_published_tenders, get_tender_detail
+from app.modules.tenders.schemas import TenderCreateRequest, TenderResponse, TenderListItem, TenderDetailResponse, UpdateTenderReqDocAccessRequest
+from app.modules.tenders.service import publish_tender_with_documents, get_buyer_tenders, get_all_published_tenders, get_tender_detail, update_tender_required_document_roles
 
 router = APIRouter(prefix="/tenders", tags=["Tenders"])
 
@@ -144,8 +144,7 @@ async def publish_with_documents(
                 buyer_id=buyer_id,
                 user_id=org_user_id,
                 tender_data=tender_req,
-                files_data=files_data,
-                creator_role=current_user.get("role_in_org", "Owner")
+                files_data=files_data
             )
             return new_tender
     except Exception as e:
@@ -236,3 +235,22 @@ async def view_tender_document(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating document URL: {e}")
+
+
+@router.put("/{tender_id}/required-documents/access")
+async def update_required_document_access(
+    tender_id: int,
+    payload: UpdateTenderReqDocAccessRequest,
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    Update role-based access control for required documents of a tender.
+    """
+    try:
+        async with get_db_connection() as connection:
+            updates = [item.dict() for item in payload.documents]
+            await update_tender_required_document_roles(connection, tender_id, updates)
+            return {"message": "Document access updated successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+

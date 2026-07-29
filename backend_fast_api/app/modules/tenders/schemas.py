@@ -53,7 +53,7 @@ class TenderCreateRequest(BaseModel):
     tender_public_date: Optional[datetime] = None
     pre_bid_meeting: Optional[datetime] = None
     tender_opening_date: Optional[datetime] = None
-    required_seller_docs: Optional[List[str]] = None
+    required_seller_docs: Optional[List[dict]] = None  # [{name: str, allowed_roles: [str]}]
 
 class TenderResponse(BaseModel):
     tender_id: int
@@ -96,9 +96,17 @@ class RequiredDocumentItem(BaseModel):
     req_doc_id: int
     custom_doc_name: Optional[str] = None
     is_mandatory: bool = True
+    allowed_roles: List[str] = ["Owner"]
 
     class Config:
         from_attributes = True
+
+class UpdateReqDocAccessItem(BaseModel):
+    req_doc_id: int
+    allowed_roles: List[str]
+
+class UpdateTenderReqDocAccessRequest(BaseModel):
+    documents: List[UpdateReqDocAccessItem]
 
 class TenderDetailResponse(BaseModel):
     tender_id: int
