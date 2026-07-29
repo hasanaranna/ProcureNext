@@ -3,10 +3,25 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+const ALL_ROLES = ["Owner", "ProcurementOfficer", "Finance", "Viewer", "TenderReceiver"] as const;
+const ROLE_LABELS: Record<string, string> = {
+  Owner: "Owner",
+  ProcurementOfficer: "Procurement Officer",
+  Finance: "Finance",
+  Viewer: "Viewer",
+  TenderReceiver: "Tender Receiver",
+};
+
+interface SellerDoc {
+  name: string;
+  allowed_roles: string[];
+}
+
 export default function NewTenderPage() {
   const router = useRouter();
-  const [sellerDocs, setSellerDocs] = useState<string[]>([]);
+  const [sellerDocs, setSellerDocs] = useState<SellerDoc[]>([]);
   const [newSellerDoc, setNewSellerDoc] = useState("");
+  const [showAccessConfig, setShowAccessConfig] = useState(false);
   
   const [fileCount, setFileCount] = useState<number | "">("");
   const [customFiles, setCustomFiles] = useState<{name: string, file: File | null}[]>([]);
@@ -14,12 +29,27 @@ export default function NewTenderPage() {
   const addSellerDoc = () => {
     const trimmed = newSellerDoc.trim();
     if (!trimmed) return;
-    setSellerDocs((prev) => [...prev, trimmed]);
+    setSellerDocs((prev) => [...prev, { name: trimmed, allowed_roles: ["Owner"] }]);
     setNewSellerDoc("");
   };
 
   const removeSellerDoc = (index: number) => {
     setSellerDocs((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const toggleRole = (docIndex: number, role: string) => {
+    if (role === "Owner") return; // Owner is always checked
+    setSellerDocs((prev) => {
+      const updated = [...prev];
+      const doc = { ...updated[docIndex] };
+      if (doc.allowed_roles.includes(role)) {
+        doc.allowed_roles = doc.allowed_roles.filter((r) => r !== role);
+      } else {
+        doc.allowed_roles = [...doc.allowed_roles, role];
+      }
+      updated[docIndex] = doc;
+      return updated;
+    });
   };
 
   const [formData, setFormData] = useState({
@@ -264,24 +294,62 @@ export default function NewTenderPage() {
 
               {/* Documents Required from Seller */}
               <div>
-                <label className="block text-sm font-semibold text-navy-900 mb-2">Documents Required from Seller</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-semibold text-navy-900">Documents Required from Seller</label>
+                  {sellerDocs.length > 0 && (
+                    <button type="button" onClick={() => setShowAccessConfig(!showAccessConfig)}
+                      className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all duration-200 ${
+                        showAccessConfig
+                          ? 'bg-accent-50 text-accent-700 border-accent-200'
+                          : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+                      }`}>
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                      Document Access {showAccessConfig ? '' : '(default)'}
+                    </button>
+                  )}
+                </div>
 
                 {sellerDocs.length > 0 && (
                   <ul className="mb-3 space-y-2">
                     {sellerDocs.map((doc, index) => (
-                      <li key={index} className="flex items-center justify-between bg-slate-50 px-4 py-2.5 rounded-xl border border-slate-200">
-                        <div className="flex items-center gap-2.5">
-                          <svg className="w-4 h-4 text-accent-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          <span className="text-sm text-navy-900 font-medium">{doc}</span>
+                      <li key={index} className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+                        <div className="flex items-center justify-between px-4 py-2.5">
+                          <div className="flex items-center gap-2.5">
+                            <svg className="w-4 h-4 text-accent-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <span className="text-sm text-navy-900 font-medium">{doc.name}</span>
+                          </div>
+                          <button type="button" onClick={() => removeSellerDoc(index)}
+                            className="text-slate-400 hover:text-red-500 transition flex-shrink-0 ml-3" aria-label="Remove">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
                         </div>
-                        <button type="button" onClick={() => removeSellerDoc(index)}
-                          className="text-slate-400 hover:text-red-500 transition flex-shrink-0 ml-3" aria-label="Remove">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
+
+                        {/* Role checkboxes — visible when access config is toggled */}
+                        {showAccessConfig && (
+                          <div className="px-4 pb-3 pt-1 border-t border-slate-200 bg-white">
+                            <p className="text-xs text-slate-400 mb-2">Who can view this document:</p>
+                            <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                              {ALL_ROLES.map((role) => (
+                                <label key={role} className={`flex items-center gap-1.5 text-xs cursor-pointer select-none ${role === "Owner" ? "opacity-60" : ""}`}>
+                                  <input
+                                    type="checkbox"
+                                    checked={role === "Owner" || doc.allowed_roles.includes(role)}
+                                    disabled={role === "Owner"}
+                                    onChange={() => toggleRole(index, role)}
+                                    className="w-3.5 h-3.5 rounded border-slate-300 text-accent-600 focus:ring-accent-500 focus:ring-offset-0 disabled:opacity-60"
+                                  />
+                                  <span className="text-slate-600 font-medium">{ROLE_LABELS[role]}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </li>
                     ))}
                   </ul>

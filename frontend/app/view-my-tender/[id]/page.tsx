@@ -25,6 +25,22 @@ interface Bid {
   documents: BidDocument[];
 }
 
+const ALL_ROLES = ["Owner", "ProcurementOfficer", "Finance", "Viewer", "TenderReceiver"] as const;
+const ROLE_LABELS: Record<string, string> = {
+  Owner: "Owner",
+  ProcurementOfficer: "Procurement Officer",
+  Finance: "Finance",
+  Viewer: "Viewer",
+  TenderReceiver: "Tender Receiver",
+};
+
+interface RequiredDocument {
+  req_doc_id: number;
+  custom_doc_name: string | null;
+  is_mandatory: boolean;
+  allowed_roles: string[];
+}
+
 interface Tender {
   tender_id: number;
   title: string;
@@ -32,6 +48,7 @@ interface Tender {
   status: string;
   budget_min: string;
   budget_max: string;
+  required_documents?: RequiredDocument[];
 }
 
 export default function ViewMyTenderPage() {
@@ -51,6 +68,11 @@ export default function ViewMyTenderPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [accepting, setAccepting] = useState(false);
 
+  const [showManageAccess, setShowManageAccess] = useState(false);
+  const [reqDocs, setReqDocs] = useState<RequiredDocument[]>([]);
+  const [savingAccess, setSavingAccess] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+
   useEffect(() => {
     if (!tenderId) return;
 
@@ -61,6 +83,7 @@ export default function ViewMyTenderPage() {
         if (!tenderRes.ok) throw new Error('Failed to fetch tender details');
         const tenderData = await tenderRes.json();
         setTender(tenderData);
+        setReqDocs(tenderData.required_documents || []);
 
         const bidsRes = await fetch(`/api/bids/buyer/tender/${tenderId}`);
         if (!bidsRes.ok) throw new Error('Failed to fetch bids');
@@ -75,6 +98,55 @@ export default function ViewMyTenderPage() {
 
     fetchData();
   }, [tenderId]);
+
+  const toggleRole = (reqDocId: number, role: string) => {
+    if (role === "Owner") return;
+    setReqDocs((prev) =>
+      prev.map((doc) => {
+        if (doc.req_doc_id === reqDocId) {
+          const roles = doc.allowed_roles || ["Owner"];
+          const updatedRoles = roles.includes(role)
+            ? roles.filter((r) => r !== role)
+            : [...roles, role];
+          return { ...doc, allowed_roles: updatedRoles };
+        }
+        return doc;
+      })
+    );
+  };
+
+  const handleCancelAccess = () => {
+    setReqDocs(tender?.required_documents || []);
+    setShowManageAccess(false);
+  };
+
+  const handleSaveAccess = async () => {
+    setSavingAccess(true);
+    setSaveMessage(null);
+    try {
+      const res = await fetch(`/api/tenders/${tenderId}/required-documents/access`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          documents: reqDocs.map((doc) => ({
+            req_doc_id: doc.req_doc_id,
+            allowed_roles: doc.allowed_roles,
+          })),
+        }),
+      });
+      if (!res.ok) {
+        throw new Error("Failed to update document access");
+      }
+      if (tender) {
+        setTender({ ...tender, required_documents: reqDocs });
+      }
+      setShowManageAccess(false);
+    } catch (err: any) {
+      alert(err.message || "Failed to update document access");
+    } finally {
+      setSavingAccess(false);
+    }
+  };
 
   const handleTabSwitch = (tab: 'bids' | 'recommended') => {
     if (tab === activeTab) return;
@@ -181,7 +253,7 @@ export default function ViewMyTenderPage() {
         </button>
 
         {/* Tender Details Card */}
-        <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden mb-8">
+        <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden mb-3">
           <div className="bg-gradient-to-r from-navy-900 to-navy-800 px-8 py-6">
             <div className="flex justify-between items-start">
               <h1 className="text-2xl font-black text-white">{tender?.title}</h1>
@@ -197,6 +269,87 @@ export default function ViewMyTenderPage() {
             <p className="text-slate-600 text-sm leading-relaxed">{tender?.description}</p>
           </div>
         </div>
+
+        {/* Manage Document Access Button - OUTSIDE the white box */}
+        <div className="flex justify-end mb-6">
+          <button
+            type="button"
+            onClick={() => setShowManageAccess(!showManageAccess)}
+            className={`flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-xl border transition-all duration-200 shadow-md ${
+              showManageAccess
+                ? 'bg-accent-500/20 text-accent-300 border-accent-500/40'
+                : 'bg-navy-900/80 text-slate-300 border-white/10 hover:bg-navy-800 hover:text-white'
+            }`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            Manage Document Access {showManageAccess ? '▲' : '▼'}
+          </button>
+        </div>
+
+        {/* Expandable Document Access Panel - OUTSIDE the Tender Details Card */}
+        {showManageAccess && (
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-8 mb-8 animate-fade-in">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-200">
+              <h3 className="text-sm font-bold text-navy-900 uppercase tracking-wide">Required Document Permissions</h3>
+              {saveMessage && <span className="text-xs text-emerald-600 font-semibold">{saveMessage}</span>}
+            </div>
+
+            {reqDocs.length === 0 ? (
+              <p className="text-xs text-slate-400 italic">No required seller documents specified for this tender.</p>
+            ) : (
+              <div className="space-y-3">
+                {reqDocs.map((doc) => (
+                  <div key={doc.req_doc_id} className="bg-slate-50 rounded-xl border border-slate-200 p-3.5">
+                    <div className="flex items-center gap-2 mb-2">
+                      <svg className="w-4 h-4 text-accent-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <span className="text-sm text-navy-900 font-semibold">{doc.custom_doc_name || 'Document'}</span>
+                    </div>
+                    <p className="text-xs text-slate-400 mb-2">Who can view this document in seller organization:</p>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                      {ALL_ROLES.map((role) => {
+                        const isChecked = role === 'Owner' || (doc.allowed_roles || []).includes(role);
+                        return (
+                          <label key={role} className={`flex items-center gap-1.5 text-xs cursor-pointer select-none ${role === 'Owner' ? 'opacity-60' : ''}`}>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              disabled={role === 'Owner'}
+                              onChange={() => toggleRole(doc.req_doc_id, role)}
+                              className="w-3.5 h-3.5 rounded border-slate-300 text-accent-600 focus:ring-accent-500 focus:ring-offset-0 disabled:opacity-60"
+                            />
+                            <span className="text-slate-600 font-medium">{ROLE_LABELS[role]}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+
+                <div className="flex justify-end items-center gap-3 pt-3">
+                  <button
+                    type="button"
+                    onClick={handleSaveAccess}
+                    disabled={savingAccess}
+                    className="px-4 py-2 bg-navy-900 hover:bg-navy-800 text-white text-xs font-semibold rounded-xl transition flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    {savingAccess ? 'Saving...' : 'Save Access Settings'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelAccess}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-navy-900 text-xs font-semibold rounded-xl transition border border-slate-200"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Toggle Capsule */}
         <div className="mb-6 flex justify-center">

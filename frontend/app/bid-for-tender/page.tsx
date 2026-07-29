@@ -10,6 +10,12 @@ interface TenderDocument {
   uploaded_at: string | null;
 }
 
+interface RequiredDocument {
+  req_doc_id: number;
+  custom_doc_name: string | null;
+  is_mandatory: boolean;
+}
+
 interface TenderDetail {
   tender_id: number;
   title: string;
@@ -25,6 +31,7 @@ interface TenderDetail {
   security_required: boolean;
   created_at: string;
   documents: TenderDocument[];
+  required_documents: RequiredDocument[];
 }
 
 function formatDate(dateStr: string | null): string {
@@ -75,9 +82,8 @@ function BidForTenderContent() {
     description: "",
     bidAmount: "",
   });
-  const [taxCertificate, setTaxCertificate] = useState<File | null>(null);
-  const [businessId, setBusinessId] = useState<File | null>(null);
-  const [otherDoc, setOtherDoc] = useState<File | null>(null);
+  // Dynamic doc file state: keyed by req_doc_id
+  const [docFiles, setDocFiles] = useState<Record<number, File | null>>({});
 
   useEffect(() => {
     if (!tenderId) {
@@ -117,7 +123,7 @@ function BidForTenderContent() {
   };
 
   const handleSingleFile = (
-    setter: (f: File | null) => void,
+    reqDocId: number,
     inputId: string,
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
@@ -127,11 +133,11 @@ function BidForTenderContent() {
       e.target.value = "";
       return;
     }
-    setter(file);
+    setDocFiles(prev => ({ ...prev, [reqDocId]: file }));
   };
 
-  const clearFile = (setter: (f: File | null) => void, inputId: string) => {
-    setter(null);
+  const clearFile = (reqDocId: number, inputId: string) => {
+    setDocFiles(prev => ({ ...prev, [reqDocId]: null }));
     const input = document.getElementById(inputId) as HTMLInputElement | null;
     if (input) input.value = "";
   };
@@ -154,18 +160,27 @@ function BidForTenderContent() {
         })
       );
 
-      // Collect files and their document type names
-      const docFiles: { file: File; typeName: string }[] = [];
-      if (taxCertificate) docFiles.push({ file: taxCertificate, typeName: "TIN" });
-      if (businessId) docFiles.push({ file: businessId, typeName: "TradeLicense" });
-      if (otherDoc) docFiles.push({ file: otherDoc, typeName: "VAT" });
+      // Collect files and their document type names from dynamic required docs
+      const collectedDocs: { file: File; typeName: string }[] = [];
+      if (tender?.required_documents) {
+        for (const rd of tender.required_documents) {
+          const file = docFiles[rd.req_doc_id];
+          if (file) {
+            collectedDocs.push({ file, typeName: rd.custom_doc_name || `Document_${rd.req_doc_id}` });
+          } else if (rd.is_mandatory) {
+            alert(`Please upload the required document: ${rd.custom_doc_name || "Unnamed document"}`);
+            setSubmitting(false);
+            return;
+          }
+        }
+      }
 
       body.append(
         "doc_type_names",
-        JSON.stringify(docFiles.map((d) => d.typeName))
+        JSON.stringify(collectedDocs.map((d) => d.typeName))
       );
 
-      for (const { file } of docFiles) {
+      for (const { file } of collectedDocs) {
         body.append("files", file);
       }
 
@@ -412,53 +427,57 @@ function BidForTenderContent() {
                   <h3 className="text-lg font-bold text-navy-900 mb-2 pb-2 border-b border-slate-200">Required Documents</h3>
                   <p className="text-sm text-slate-500 mb-4">Upload necessary documents to support your bid. Only PDF files accepted.</p>
 
-                  <div className="space-y-3">
-                    {[
-                      { id: "file-tax", label: "Tax Certificate", required: true, file: taxCertificate, setter: setTaxCertificate },
-                      { id: "file-bizid", label: "Business Identification", required: true, file: businessId, setter: setBusinessId },
-                      { id: "file-other", label: "Other Documents", required: false, file: otherDoc, setter: setOtherDoc },
-                    ].map(({ id, label, required, file, setter }) => (
-                      <div key={id}
-                        className={`flex items-center gap-3 border-2 rounded-xl px-4 py-3 transition-all duration-300 ${
-                          file ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50 hover:border-accent-300'
-                        }`}>
-                        <svg className={`w-5 h-5 flex-shrink-0 ${file ? "text-emerald-500" : "text-slate-300"}`} fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
-                          <path d="M14 2v6h6" />
-                          <path d="M16 13H8" />
-                          <path d="M16 17H8" />
-                          <path d="M10 9H8" />
-                        </svg>
-
-                        <div className="flex-1 flex flex-col min-w-0">
-                          <span className="text-sm font-semibold text-navy-900 truncate">
-                            {label} {required && <span className="text-red-500">*</span>}
-                          </span>
-                          {file ? (
-                            <span className="text-xs text-slate-500 truncate">{file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
-                          ) : (
-                            <span className="text-xs text-slate-400">No file selected</span>
-                          )}
-                        </div>
-
-                        {file ? (
-                          <button type="button" onClick={() => clearFile(setter, id)}
-                            className="flex-shrink-0 text-slate-400 hover:text-red-500 p-1 rounded-full transition" title="Remove file">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  {tender.required_documents.length === 0 ? (
+                    <p className="text-sm text-slate-400 italic">No documents required by the buyer.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {tender.required_documents.map((rd) => {
+                        const inputId = `file-req-${rd.req_doc_id}`;
+                        const file = docFiles[rd.req_doc_id] ?? null;
+                        return (
+                          <div key={rd.req_doc_id}
+                            className={`flex items-center gap-3 border-2 rounded-xl px-4 py-3 transition-all duration-300 ${
+                              file ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50 hover:border-accent-300'
+                            }`}>
+                            <svg className={`w-5 h-5 flex-shrink-0 ${file ? "text-emerald-500" : "text-slate-300"}`} fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
+                              <path d="M14 2v6h6" />
+                              <path d="M16 13H8" />
+                              <path d="M16 17H8" />
+                              <path d="M10 9H8" />
                             </svg>
-                          </button>
-                        ) : (
-                          <label htmlFor={id}
-                            className="flex-shrink-0 cursor-pointer text-xs font-semibold text-accent-600 bg-white border border-accent-200 hover:bg-accent-50 rounded-lg px-3 py-1.5 transition">
-                            Choose file
-                            <input type="file" id={id} accept=".pdf" required={required} className="hidden"
-                              onChange={(e) => handleSingleFile(setter, id, e)} />
-                          </label>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+
+                            <div className="flex-1 flex flex-col min-w-0">
+                              <span className="text-sm font-semibold text-navy-900 truncate">
+                                {rd.custom_doc_name || "Document"} {rd.is_mandatory && <span className="text-red-500">*</span>}
+                              </span>
+                              {file ? (
+                                <span className="text-xs text-slate-500 truncate">{file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                              ) : (
+                                <span className="text-xs text-slate-400">No file selected</span>
+                              )}
+                            </div>
+
+                            {file ? (
+                              <button type="button" onClick={() => clearFile(rd.req_doc_id, inputId)}
+                                className="flex-shrink-0 text-slate-400 hover:text-red-500 p-1 rounded-full transition" title="Remove file">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            ) : (
+                              <label htmlFor={inputId}
+                                className="flex-shrink-0 cursor-pointer text-xs font-semibold text-accent-600 bg-white border border-accent-200 hover:bg-accent-50 rounded-lg px-3 py-1.5 transition">
+                                Choose file
+                                <input type="file" id={inputId} accept=".pdf" required={rd.is_mandatory} className="hidden"
+                                  onChange={(e) => handleSingleFile(rd.req_doc_id, inputId, e)} />
+                              </label>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 {/* Buttons */}
