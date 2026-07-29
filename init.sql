@@ -43,6 +43,7 @@ DROP TABLE IF EXISTS enlisted_vendors CASCADE;
 DROP TABLE IF EXISTS organization_documents CASCADE;
 DROP TABLE IF EXISTS document_types CASCADE;
 DROP TABLE IF EXISTS organization_employees CASCADE;
+DROP TABLE IF EXISTS user_invitations CASCADE;
 DROP TABLE IF EXISTS organizations CASCADE;
 DROP TABLE IF EXISTS user_verification CASCADE;
 DROP TABLE IF EXISTS admins CASCADE;
@@ -155,11 +156,26 @@ CREATE TABLE organizations (
 
 CREATE TABLE organization_employees (
     org_user_id     SERIAL          PRIMARY KEY,
-    organization_id INT             NOT NULL REFERENCES organizations(organization_id) ON DELETE CASCADE,
-    user_id         INT             NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-    role_in_org     role_in_org     NOT NULL,
-    joined_at       TIMESTAMP       DEFAULT NOW(),
+    organization_id     INT             NOT NULL REFERENCES organizations(organization_id) ON DELETE CASCADE,
+    user_id             INT             NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    role_in_org         role_in_org     NOT NULL,
+    joined_at           TIMESTAMP       DEFAULT NOW(),
     UNIQUE (organization_id, user_id)
+);
+
+-- ============================================================
+-- USER INVITATIONS (for employee signup flow)
+-- ============================================================
+CREATE TABLE user_invitations (
+    invitation_id       SERIAL              PRIMARY KEY,
+    organization_id     INT                 NOT NULL REFERENCES organizations(organization_id) ON DELETE CASCADE,
+    invited_by          INT                 NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    email               VARCHAR(255)        NOT NULL,
+    token               TEXT                UNIQUE NOT NULL,
+    status              invitation_status   DEFAULT 'Pending',
+    created_at          TIMESTAMP           DEFAULT NOW(),
+    expires_at          TIMESTAMP           DEFAULT NOW() + INTERVAL '7 days',
+    UNIQUE (organization_id, email)
 );
 
 CREATE TABLE document_types (
