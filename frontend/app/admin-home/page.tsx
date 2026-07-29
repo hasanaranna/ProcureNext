@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import PendingRequestDetailModal, {
   RegistrationDetail,
 } from "@/components/PendingRequestDetailModal";
+import { getAdminUser, clearAdminSession } from "@/lib/auth";
 
 
 const stats = [
@@ -41,14 +42,9 @@ export default function AdminHomePage() {
   const [adminName, setAdminName] = useState<string>("System Administrator");
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("user");
-      if (stored) {
-        const user = JSON.parse(stored);
-        if (user?.full_name) setAdminName(user.full_name);
-      }
-    } catch {
-      // localStorage unavailable or malformed — keep fallback
+    const adminUser = getAdminUser();
+    if (adminUser?.full_name) {
+      setAdminName(adminUser.full_name);
     }
   }, []);
 
@@ -105,11 +101,11 @@ export default function AdminHomePage() {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch('/api/auth/admin/logout', { method: 'POST' });
     } catch (e) {
       console.error(e);
     }
-    localStorage.removeItem('user');
+    clearAdminSession();
     window.location.href = '/admin-login';
   };
 

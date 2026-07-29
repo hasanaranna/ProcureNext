@@ -22,6 +22,13 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
     return response;
   }
 
+  if (endpoint === 'admin/logout' && request.method === 'POST') {
+    const response = NextResponse.json({ message: 'Admin logged out successfully' });
+    response.cookies.delete('admin_access_token');
+    response.cookies.delete('admin_refresh_token');
+    return response;
+  }
+
   // Preserve query string
   const url = new URL(request.url);
   const queryString = url.search;
@@ -65,12 +72,13 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
       });
     }
 
-    const isLoginOrRegister = endpoint === 'login' || endpoint === 'register-user';
-    
-    if (isLoginOrRegister) {
+    const isUserLoginOrRegister = endpoint === 'login' || endpoint === 'register-user';
+    const isAdminLogin = endpoint === 'admin/login';
+
+    if (isUserLoginOrRegister) {
       const data = await upstreamResponse.json();
       const response = NextResponse.json(data);
-      
+
       if (data.access_token) {
         response.cookies.set({
           name: 'access_token',
@@ -82,10 +90,42 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
           maxAge: 30 * 60, // 30 minutes
         });
       }
-      
+
       if (data.refresh_token) {
         response.cookies.set({
           name: 'refresh_token',
+          value: data.refresh_token,
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          maxAge: 7 * 24 * 60 * 60, // 7 days
+        });
+      }
+      return response;
+    }
+
+    // Admin login — set separate HttpOnly cookies so the middleware
+    // can distinguish admin sessions from regular user sessions.
+    if (isAdminLogin) {
+      const data = await upstreamResponse.json();
+      const response = NextResponse.json(data);
+
+      if (data.access_token) {
+        response.cookies.set({
+          name: 'admin_access_token',
+          value: data.access_token,
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          maxAge: 30 * 60, // 30 minutes
+        });
+      }
+
+      if (data.refresh_token) {
+        response.cookies.set({
+          name: 'admin_refresh_token',
           value: data.refresh_token,
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',

@@ -65,6 +65,8 @@ services:
       - ./frontend/app:/app/app:z
       - ./frontend/components:/app/components:z
       - ./frontend/public:/app/public:z
+      - ./frontend/lib:/app/lib:z
+      - ./frontend/proxy.ts:/app/proxy.ts:z
       - ./frontend/tsconfig.json:/app/tsconfig.json:z
       - ./frontend/next.config.ts:/app/next.config.ts:z
     environment:
