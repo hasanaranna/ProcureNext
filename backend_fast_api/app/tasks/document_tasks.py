@@ -24,7 +24,7 @@ async def _async_upload(tender_id: int, files_data: list[dict]):
     logger.info(f"Starting background upload for tender_id={tender_id} with {len(files_data)} files.")
     
     try:
-        conn = await asyncpg.connect(get_database_url(), ssl="require")
+        conn = await asyncpg.connect(get_database_url(), ssl="require", statement_cache_size=0)
     except Exception as e:
         logger.error(f"Failed to connect to DB in Celery: {e}")
         return
@@ -86,7 +86,7 @@ async def _async_bid_upload(bid_id: int, files_data: list[dict]):
     logger.info(f"Starting background upload for bid_id={bid_id} with {len(files_data)} files.")
 
     try:
-        conn = await asyncpg.connect(get_database_url(), ssl="require")
+        conn = await asyncpg.connect(get_database_url(), ssl="require", statement_cache_size=0)
     except Exception as e:
         logger.error(f"Failed to connect to DB in Celery (bid upload): {e}")
         return
@@ -101,15 +101,19 @@ async def _async_bid_upload(bid_id: int, files_data: list[dict]):
                 continue
 
             try:
-                # 1. Look up doc_type_id from document_types table
-                type_row = await conn.fetchrow(
-                    "SELECT type_id FROM document_types WHERE type_name = $1",
-                    doc_type_name
-                )
-                if type_row is None:
-                    logger.error(f"Unknown document type: {doc_type_name}")
+                # 1. Use req_doc_id directly if provided, fallback to document_types lookup
+                doc_type_id = file_info.get("req_doc_id")
+                if doc_type_id is None:
+                    type_row = await conn.fetchrow(
+                        "SELECT type_id FROM document_types WHERE type_name = $1",
+                        doc_type_name
+                    )
+                    if type_row:
+                        doc_type_id = type_row["type_id"]
+
+                if doc_type_id is None:
+                    logger.error(f"Could not determine req_doc_id for file: {doc_type_name}")
                     continue
-                doc_type_id = type_row["type_id"]
 
                 # 2. Upload to Supabase Storage
                 filename = os.path.basename(local_path)
@@ -124,7 +128,7 @@ async def _async_bid_upload(bid_id: int, files_data: list[dict]):
 
                 # 3. Insert into BID_DOCUMENTS table
                 await conn.execute("""
-                    INSERT INTO bid_documents (bid_id, doc_type_id, file_path)
+                    INSERT INTO bid_documents (bid_id, req_doc_id, file_path)
                     VALUES ($1, $2, $3)
                 """, bid_id, doc_type_id, object_path)
 

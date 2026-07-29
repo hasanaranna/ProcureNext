@@ -161,12 +161,16 @@ function BidForTenderContent() {
       );
 
       // Collect files and their document type names from dynamic required docs
-      const collectedDocs: { file: File; typeName: string }[] = [];
+      const collectedDocs: { file: File; reqDocId: number; typeName: string }[] = [];
       if (tender?.required_documents) {
         for (const rd of tender.required_documents) {
           const file = docFiles[rd.req_doc_id];
           if (file) {
-            collectedDocs.push({ file, typeName: rd.custom_doc_name || `Document_${rd.req_doc_id}` });
+            collectedDocs.push({
+              file,
+              reqDocId: rd.req_doc_id,
+              typeName: rd.custom_doc_name || `Document_${rd.req_doc_id}`
+            });
           } else if (rd.is_mandatory) {
             alert(`Please upload the required document: ${rd.custom_doc_name || "Unnamed document"}`);
             setSubmitting(false);
@@ -175,6 +179,10 @@ function BidForTenderContent() {
         }
       }
 
+      body.append(
+        "req_doc_ids",
+        JSON.stringify(collectedDocs.map((d) => d.reqDocId))
+      );
       body.append(
         "doc_type_names",
         JSON.stringify(collectedDocs.map((d) => d.typeName))

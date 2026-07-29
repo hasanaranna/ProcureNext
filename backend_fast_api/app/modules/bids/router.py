@@ -30,6 +30,7 @@ os.makedirs(TEMP_UPLOAD_DIR, exist_ok=True)
 @router.post("/vendor/submit-with-documents", response_model=BidResponse, status_code=status.HTTP_201_CREATED)
 async def submit_bid(
     bid_data: str = Form(...),
+    req_doc_ids: str = Form("[]"),
     doc_type_names: str = Form("[]"),
     files: List[UploadFile] = File(default=[]),
     current_user: dict = Depends(get_current_user_org)
@@ -37,8 +38,8 @@ async def submit_bid(
     """
     Submit a bid with documents.
     - bid_data: JSON string with keys: tender_id, financial_amount
+    - req_doc_ids: JSON string list of req_doc_id matching the files array
     - doc_type_names: JSON string list of document type names matching the files array
-      (e.g. ["TIN", "TradeLicense", "Other"])
     - files: Multiple PDF files to upload
     """
     # 1. Parse JSON inputs
@@ -51,6 +52,11 @@ async def submit_bid(
         raise HTTPException(status_code=400, detail=f"Invalid bid_data JSON: {e}")
 
     try:
+        req_ids = json.loads(req_doc_ids)
+    except Exception:
+        req_ids = []
+
+    try:
         type_names = json.loads(doc_type_names)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid doc_type_names JSON: {e}")
@@ -58,7 +64,7 @@ async def submit_bid(
     # Filter out empty file uploads (files with no filename)
     actual_files = [f for f in files if f.filename]
 
-    if len(type_names) != len(actual_files):
+    if type_names and len(type_names) != len(actual_files):
         raise HTTPException(
             status_code=400,
             detail=f"Number of doc_type_names ({len(type_names)}) must match number of files ({len(actual_files)})"
@@ -67,7 +73,8 @@ async def submit_bid(
     # 2. Save files locally to temp folder for Celery
     files_data = []
     for i, file_obj in enumerate(actual_files):
-        doc_type_name = type_names[i]
+        doc_type_name = type_names[i] if i < len(type_names) else ""
+        req_doc_id = req_ids[i] if i < len(req_ids) else None
         safe_filename = f"{uuid.uuid4().hex}_{file_obj.filename}"
         local_path = os.path.join(TEMP_UPLOAD_DIR, safe_filename)
 
@@ -76,6 +83,7 @@ async def submit_bid(
 
         files_data.append({
             "local_path": local_path,
+            "req_doc_id": req_doc_id,
             "doc_type_name": doc_type_name,
         })
 
@@ -183,6 +191,8 @@ async def get_buyer_bids_for_tender(
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
+        import logging
+        logging.getLogger("uvicorn.error").exception(f"Error fetching buyer bids for tender {tender_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
 
 @router.post("/buyer/{bid_id}/accept")
