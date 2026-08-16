@@ -38,7 +38,7 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
     const outboundHeaders = new Headers(request.headers);
     outboundHeaders.delete('host');
 
-    const token = request.cookies.get('access_token')?.value;
+    const token = request.cookies.get('admin_access_token')?.value || request.cookies.get('access_token')?.value;
     if (token) {
       outboundHeaders.set('Authorization', `Bearer ${token}`);
     }

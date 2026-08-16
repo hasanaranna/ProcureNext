@@ -4,21 +4,27 @@
 
 import asyncpg
 from app.tasks.document_tasks import upload_bid_documents_to_supabase
+from app.modules.payments.service import deduct_tokens_for_bid_submission
 
 
 async def submit_bid_with_documents(
     connection: asyncpg.Connection,
     vendor_org_id: int,
     submitted_by: int,
+    user_id: int,
     tender_id: int,
     financial_amount: float,
     files_data: list[dict],
     description: str | None = None,
 ) -> dict:
     """
-    Creates a bid in Submitted state and queues background file upload.
+    Creates a bid in Submitted state, deducts tokens, and queues background file upload.
     Mirrors the tender publishing flow exactly.
     """
+
+    # Fetch tender title for transaction description
+    tender_row = await connection.fetchrow("SELECT title FROM tenders WHERE tender_id = $1", tender_id)
+    tender_title = tender_row["title"] if tender_row else None
 
     query = """
         INSERT INTO bids (
@@ -28,17 +34,28 @@ async def submit_bid_with_documents(
         RETURNING *;
     """
 
-    row = await connection.fetchrow(
-        query,
-        vendor_org_id,
-        submitted_by,
-        tender_id,
-        financial_amount,
-        description,
-        "Submitted",
-    )
+    async with connection.transaction():
+        row = await connection.fetchrow(
+            query,
+            vendor_org_id,
+            submitted_by,
+            tender_id,
+            financial_amount,
+            description,
+            "Submitted",
+        )
 
-    bid_id = row["bid_id"]
+        bid_id = row["bid_id"]
+
+        # Deduct configured tokens from vendor organization
+        await deduct_tokens_for_bid_submission(
+            connection=connection,
+            organization_id=vendor_org_id,
+            user_id=user_id,
+            tender_id=tender_id,
+            bid_id=bid_id,
+            tender_title=tender_title,
+        )
 
     if files_data:
         # Dispatch Celery task to upload the local files to Supabase

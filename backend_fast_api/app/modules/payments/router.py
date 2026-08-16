@@ -1,57 +1,105 @@
 # ============================================================
 # payments/router.py - Payment & Credit System API Endpoints
 # ============================================================
-# COVERS: FR-18 (Credit Points & Payments), FR-19 (Bid-Bond),
-#         FR-20 (Tender Publishing Cost Config), FR-21 (Payment Gateway)
-#
-# BUSINESS MODEL:
-# - Platform uses a credit point system (1 point = 1 tender action)
-# - Users buy points with real money via SSLCommerz
-# - Publishing a tender costs points (buyer)
-# - Submitting a bid costs points (vendor)
-# - Points are refundable at the rate they were purchased
-# - Tender cancellation: no refund for buyer, refund for vendors
-# - Admin can configure point pricing (variable cost per point)
-#
-# ENDPOINTS:
-#
-# POST /finance/credits/initiate
-#   - Initiate credit point purchase
-#   - Accepts: amount (number of points), payment method
-#   - Calls SSLCommerz API to create payment session
-#   - Returns: SSLCommerz redirect URL for payment
-#
-# POST /finance/payment-callback
-#   - SSLCommerz webhook callback after payment completion
-#   - Validates payment authenticity (val_id, tran_id)
-#   - Credits points to organization's credit account
-#   - Creates payment and credit_transaction records
-#
-# POST /finance/payment-fail
-#   - SSLCommerz callback for failed payments
-#
-# POST /finance/payment-cancel
-#   - SSLCommerz callback for cancelled payments
-#
-# POST /finance/refund
-#   - Request refund of credit points
-#   - Refund at the rate at which points were originally purchased
-#   - Creates refund transaction record
-#
-# GET /finance/balance
-#   - View current credit point balance for the organization
-#
-# GET /finance/history
-#   - View complete transaction ledger for the organization
-#   - Shows: purchases, deductions (tender publish, bid submit),
-#     refunds, bid-bond holds/releases
-#   - Paginated with date range filter
-#
-# --- Admin Pricing ---
-#
-# POST /admin/update-price
-#   - Admin updates the price per credit point (in BDT)
-#   - Accepts: new_price_per_point
-#   - Rate is constant (1 point = 1 tender/bid action) but
-#     the BDT cost per point is variable
-# ============================================================
+# COVERS: FR-08 (Credit Points & Payments / Monetization)
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from app.core.db import get_db_connection
+from app.modules.auth.dependencies import get_current_user_org
+from typing import List
+from app.modules.payments.schemas import (
+    TokenBalanceResponse,
+    PricingConfigResponse,
+    TokenPurchaseRequest,
+    TokenPurchaseResponse,
+    TransactionHistoryResponse,
+    TokenPackageResponse,
+)
+from app.modules.payments.service import (
+    get_organization_token_balance,
+    get_platform_pricing,
+    purchase_organization_tokens,
+    get_organization_transactions,
+    list_active_token_packages,
+)
+
+router = APIRouter(prefix="/payments", tags=["Payments & Tokens"])
+
+
+@router.get("/packages", response_model=List[TokenPackageResponse])
+async def get_active_packages():
+    """
+    Get all active token packages and bundles with calculated savings percentage.
+    """
+    async with get_db_connection() as connection:
+        return await list_active_token_packages(connection)
+
+
+@router.get("/balance", response_model=TokenBalanceResponse)
+async def get_balance(
+    current_user: dict = Depends(get_current_user_org),
+):
+    """
+    Get current token/credit balance for the authenticated user's organization.
+    """
+    org_id = current_user.get("organization_id")
+    user_id = current_user.get("user_id")
+    if not org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    async with get_db_connection() as connection:
+        return await get_organization_token_balance(connection, org_id, user_id)
+
+
+@router.get("/pricing", response_model=PricingConfigResponse)
+async def get_pricing():
+    """
+    Get current platform token pricing and activity costs (cost to publish tender, cost to bid).
+    """
+    async with get_db_connection() as connection:
+        return await get_platform_pricing(connection)
+
+
+@router.post("/purchase", response_model=TokenPurchaseResponse, status_code=status.HTTP_200_OK)
+async def purchase_tokens(
+    payload: TokenPurchaseRequest,
+    current_user: dict = Depends(get_current_user_org),
+):
+    """
+    Purchase credit tokens for the organization via payment gateway (SSLCommerz integration).
+    Updates organization balance and registers transaction ledger entry.
+    """
+    org_id = current_user.get("organization_id")
+    user_id = current_user.get("user_id")
+    if not org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    async with get_db_connection() as connection:
+        return await purchase_organization_tokens(
+            connection=connection,
+            organization_id=org_id,
+            user_id=user_id,
+            payload=payload,
+        )
+
+
+@router.get("/transactions", response_model=TransactionHistoryResponse)
+async def list_transactions(
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: dict = Depends(get_current_user_org),
+):
+    """
+    Retrieve token transaction history for the authenticated user's organization.
+    """
+    org_id = current_user.get("organization_id")
+    if not org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    async with get_db_connection() as connection:
+        return await get_organization_transactions(
+            connection=connection,
+            organization_id=org_id,
+            limit=limit,
+            offset=offset,
+        )

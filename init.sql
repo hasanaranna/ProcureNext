@@ -148,7 +148,7 @@ CREATE TABLE organizations (
     verification_status  verification_status DEFAULT 'Pending',
     tin_number           TEXT,
     bin_number           TEXT,
-    credit_balance       INT                 DEFAULT 0,
+    credit_balance       INT                 DEFAULT 250,
     unique_join_code     VARCHAR(50)         UNIQUE,
     org_embedding        VECTOR(768),
     created_at           TIMESTAMP           DEFAULT NOW()
@@ -388,12 +388,35 @@ CREATE TABLE payments (
 CREATE TABLE credit_transactions (
     transaction_id      SERIAL              PRIMARY KEY,
     organization_id     INT                 NOT NULL REFERENCES organizations(organization_id),
+    user_id             INT                 REFERENCES users(user_id) ON DELETE SET NULL,
     payment_id          INT                 REFERENCES payments(transaction_id),
     amount              NUMERIC(18,2)       NOT NULL,
     transaction_type    transaction_type    NOT NULL,
     payment_reference   VARCHAR(255),
     balance_after       NUMERIC(18,2),
+    description         TEXT,
+    payment_method      VARCHAR(50),
     created_at          TIMESTAMP           DEFAULT NOW()
+);
+
+CREATE TABLE platform_pricing (
+    pricing_id          SERIAL              PRIMARY KEY,
+    price_per_token     NUMERIC(10, 2)      NOT NULL DEFAULT 1.00,
+    tender_publish_cost INT                 NOT NULL DEFAULT 50,
+    bid_cost            INT                 NOT NULL DEFAULT 20,
+    updated_by          INT                 REFERENCES users(user_id) ON DELETE SET NULL,
+    updated_at          TIMESTAMP           DEFAULT NOW()
+);
+
+CREATE TABLE token_packages (
+    package_id          SERIAL              PRIMARY KEY,
+    package_name        VARCHAR(100)        NOT NULL,
+    token_amount        INT                 NOT NULL CHECK (token_amount > 0),
+    price_bdt           NUMERIC(10, 2)      NOT NULL CHECK (price_bdt > 0),
+    badge               VARCHAR(50),
+    is_active           BOOLEAN             DEFAULT TRUE,
+    created_at          TIMESTAMP           DEFAULT NOW(),
+    updated_at          TIMESTAMP           DEFAULT NOW()
 );
 
 CREATE TABLE credit_discounts (

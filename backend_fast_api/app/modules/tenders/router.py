@@ -149,10 +149,9 @@ async def publish_with_documents(
             "custom_name": custom_name
         })
 
-    # Dummy organization_id retrieval for buyer (in a real app, this comes from current_user)
-    # Using 1 for simplicity since this is a POC. The real auth logic needs to fetch it.
     buyer_id = current_user.get("organization_id", 1)
     org_user_id = current_user.get("org_user_id", 1)
+    user_id = current_user.get("user_id", 1)
 
     # 3. Save to DB and Dispatch background task
     try:
@@ -160,7 +159,8 @@ async def publish_with_documents(
             new_tender = await publish_tender_with_documents(
                 connection=connection,
                 buyer_id=buyer_id,
-                user_id=org_user_id,
+                org_user_id=org_user_id,
+                user_id=user_id,
                 tender_data=tender_req,
                 files_data=files_data
             )

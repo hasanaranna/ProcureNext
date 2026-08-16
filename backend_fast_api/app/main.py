@@ -41,6 +41,7 @@ from app.modules.admin.router import router as admin_router
 from app.modules.tenders.router import router as tenders_router
 from app.modules.bids.router import router as bids_router
 from app.modules.messaging.router import router as messaging_router
+from app.modules.payments.router import router as payments_router
 from app.modules.messaging.websocket import websocket_endpoint
 
 logger = logging.getLogger("app.main")
@@ -78,6 +79,7 @@ app.include_router(admin_router)
 app.include_router(tenders_router)
 app.include_router(bids_router)
 app.include_router(messaging_router)
+app.include_router(payments_router)
 
 app.add_api_websocket_route("/ws/messages", websocket_endpoint)
 

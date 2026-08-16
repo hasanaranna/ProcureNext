@@ -140,6 +140,19 @@ async def create_master_organization(
             user_id,
         )
 
+        # Record advance grant of 250 tokens in transaction history
+        await connection.execute(
+            """
+            INSERT INTO credit_transactions (
+                organization_id, user_id, amount, transaction_type,
+                payment_reference, balance_after, description, payment_method
+            )
+            VALUES ($1, $2, 250, 'Purchase', 'ADVANCE-GRANT', 250, 'Advance Platform Grant: 250 Free Tokens', 'Welcome Bonus')
+            """,
+            organization_id,
+            user_id,
+        )
+
         document_urls = {
             "TradeLicense": payload.trade_license_url,
             "TIN": payload.tin_certificate_url,
