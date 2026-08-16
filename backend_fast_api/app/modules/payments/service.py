@@ -87,7 +87,7 @@ async def get_platform_pricing(
         price_per_token=float(row["price_per_token"]),
         tender_publish_cost=int(row["tender_publish_cost"]),
         bid_cost=int(row["bid_cost"]),
-        updated_at=row["updated_at"],
+        updated_at=row.get("updated_at") if isinstance(row, dict) else (row["updated_at"] if "updated_at" in row else None),
     )
 
 
