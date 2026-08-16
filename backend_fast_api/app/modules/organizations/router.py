@@ -71,7 +71,14 @@ from pydantic import BaseModel
 
 from app.core.db import get_db_connection
 from app.modules.auth.dependencies import get_current_user_org
-from app.modules.organizations.schemas import OrgCreateRequest, OrgCreateResponse, OrgInvitationCreateRequest
+from app.modules.organizations.schemas import (
+    OrgCreateRequest,
+    OrgCreateResponse,
+    OrgInvitationCreateRequest,
+    OrgSearchItem,
+    EnlistedOrgItem,
+    OrgProfileResponse
+)
 from app.modules.organizations.service import (
     create_master_organization,
     create_or_update_invitation,
@@ -79,7 +86,12 @@ from app.modules.organizations.service import (
     get_organization_members,
     update_member_role,
     get_organization_invitations,
-    delete_organization_invitation
+    delete_organization_invitation,
+    search_organizations,
+    enlist_organization,
+    delist_organization,
+    get_enlisted_organizations,
+    get_organization_profile
 )
 from app.services.supabase_storage import build_registration_prefix, upload_optional_file, upload_optional_files
 
@@ -245,6 +257,118 @@ async def update_member_role_endpoint(
                 new_role=payload.role,
                 current_user_role=current_user["role_in_org"]
             )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
+@router.get("/search", response_model=list[OrgSearchItem])
+async def search_orgs(
+    q: str | None = None,
+    type: str | None = None,
+    limit: int = 50,
+    current_user: dict = Depends(get_current_user_org)
+) -> list[dict]:
+    """
+    Search organizations by keyword (name, description, address) and optional type filter.
+    Returns whether each organization is currently enlisted by the caller's organization.
+    """
+    current_org_id = current_user.get("organization_id")
+    try:
+        async with get_db_connection() as connection:
+            return await search_organizations(
+                connection=connection,
+                query=q,
+                org_type=type,
+                current_org_id=current_org_id,
+                limit=limit
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
+@router.get("/profile/{org_id}", response_model=OrgProfileResponse)
+async def get_org_profile(
+    org_id: int,
+    current_user: dict = Depends(get_current_user_org)
+) -> dict:
+    """
+    Get the full public profile of an organization, including verified documents from Supabase,
+    published tenders, and performance rating.
+    """
+    current_org_id = current_user.get("organization_id")
+    try:
+        async with get_db_connection() as connection:
+            profile = await get_organization_profile(connection, org_id, current_org_id)
+            if not profile:
+                raise HTTPException(status_code=404, detail="Organization not found.")
+            return profile
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
+@router.get("/enlisted", response_model=list[EnlistedOrgItem])
+async def list_enlisted(
+    current_user: dict = Depends(get_current_user_org)
+) -> list[dict]:
+    """
+    List all organizations currently enlisted by the caller's organization.
+    """
+    current_org_id = current_user.get("organization_id")
+    if not current_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            return await get_enlisted_organizations(connection, current_org_id)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
+@router.post("/enlist/{target_org_id}")
+async def enlist_org_endpoint(
+    target_org_id: int,
+    current_user: dict = Depends(get_current_user_org)
+) -> dict:
+    """
+    Enlist target organization as a vendor or buyer counterpart.
+    """
+    current_org_id = current_user.get("organization_id")
+    org_user_id = current_user.get("org_user_id")
+    if not current_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            return await enlist_organization(connection, current_org_id, target_org_id, org_user_id)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
+@router.delete("/enlist/{target_org_id}")
+async def delist_org_endpoint(
+    target_org_id: int,
+    current_user: dict = Depends(get_current_user_org)
+) -> dict:
+    """
+    Delist / remove target organization from caller organization's enlisted list.
+    """
+    current_org_id = current_user.get("organization_id")
+    if not current_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            return await delist_organization(connection, current_org_id, target_org_id)
     except HTTPException:
         raise
     except Exception as exc:

@@ -81,8 +81,24 @@ from typing import List
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
 from app.core.db import get_db_connection
 from app.modules.auth.dependencies import get_current_user_org
-from app.modules.tenders.schemas import TenderCreateRequest, TenderResponse, TenderListItem, TenderDetailResponse, UpdateTenderReqDocAccessRequest
-from app.modules.tenders.service import publish_tender_with_documents, get_buyer_tenders, get_all_published_tenders, get_tender_detail, update_tender_required_document_roles
+from app.modules.tenders.schemas import (
+    TenderCreateRequest,
+    TenderResponse,
+    TenderListItem,
+    TenderDetailResponse,
+    UpdateTenderReqDocAccessRequest,
+    OngoingTenderListItem,
+    OngoingTenderDetail
+)
+from app.modules.tenders.service import (
+    publish_tender_with_documents,
+    get_buyer_tenders,
+    get_all_published_tenders,
+    get_tender_detail,
+    update_tender_required_document_roles,
+    get_ongoing_tenders,
+    get_ongoing_tender_detail
+)
 
 router = APIRouter(prefix="/tenders", tags=["Tenders"])
 
@@ -172,15 +188,20 @@ async def list_buyer_tenders(
 
 @router.get("/seller/all-tenders", response_model=List[TenderListItem])
 async def list_all_tenders_for_seller(
+    enlisted_only: bool = False,
     current_user: dict = Depends(get_current_user_org)
 ):
     """
-    List all published tenders for seller browsing.
+    List all published tenders for seller browsing, optionally filtered by enlisted buyers.
     """
     try:
         vendor_org_id = current_user.get("organization_id")
         async with get_db_connection() as connection:
-            tenders = await get_all_published_tenders(connection, vendor_org_id=vendor_org_id)
+            tenders = await get_all_published_tenders(
+                connection,
+                vendor_org_id=vendor_org_id,
+                enlisted_only=enlisted_only
+            )
             return tenders
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
@@ -251,6 +272,51 @@ async def update_required_document_access(
             updates = [item.dict() for item in payload.documents]
             await update_tender_required_document_roles(connection, tender_id, updates)
             return {"message": "Document access updated successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
+@router.get("/ongoing", response_model=List[OngoingTenderListItem])
+async def list_ongoing_tenders(
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    List all ongoing (awarded) tenders for the current user's organization.
+    Supports both Buyer and Vendor organizations.
+    """
+    org_id = current_user.get("organization_id")
+    if not org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            tenders = await get_ongoing_tenders(connection, org_id)
+            return tenders
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
+@router.get("/ongoing/{tender_id}", response_model=OngoingTenderDetail)
+async def get_ongoing_tender(
+    tender_id: int,
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    Get full details for a specific ongoing (awarded) tender.
+    Accessible only if the caller's organization is the buyer or the winning vendor.
+    """
+    org_id = current_user.get("organization_id")
+    if not org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            tender = await get_ongoing_tender_detail(connection, tender_id, org_id)
+            if not tender:
+                raise HTTPException(status_code=404, detail="Ongoing tender not found or access denied.")
+            return tender
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
 

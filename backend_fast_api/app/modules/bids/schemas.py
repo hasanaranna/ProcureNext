@@ -2,21 +2,22 @@
 # bids/schemas.py - Bid Pydantic Schemas
 # ============================================================
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from datetime import datetime
 from app.modules.bids.models import BidStatus
 
 
 class BidDocumentInfo(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     bid_doc_id: int
     file_path: Optional[str] = None
     document_type: str
 
-    class Config:
-        from_attributes = True
-
 class BidResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     bid_id: int
     vendor_org_id: int
     submitted_by: int
@@ -28,11 +29,10 @@ class BidResponse(BaseModel):
     updated_at: Optional[datetime] = None
     documents: Optional[list[BidDocumentInfo]] = None
 
-    class Config:
-        from_attributes = True
-
 
 class BidListItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     bid_id: int
     tender_id: int
     tender_title: Optional[str] = None
@@ -40,6 +40,3 @@ class BidListItem(BaseModel):
     description: Optional[str] = None
     status: BidStatus
     submitted_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True

@@ -33,6 +33,8 @@ const USER_PROTECTED_ROUTES = [
   '/bid-for-tender',
   '/view-my-bids',
   '/view-my-tender',
+  '/ongoing-tenders',
+  '/organizations',
 ];
 
 /** Pages that require an admin session. */

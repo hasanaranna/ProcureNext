@@ -123,12 +123,33 @@ async def get_buyer_tenders(
 
 async def get_all_published_tenders(
     connection: asyncpg.Connection,
-    vendor_org_id: int | None = None
+    vendor_org_id: int | None = None,
+    enlisted_only: bool = False
 ) -> list[dict]:
     """
     Fetch all published tenders (for seller browsing).
-    Optionally filter out tenders created by the vendor.
+    If enlisted_only=True and vendor_org_id is provided, only return tenders published
+    by buyers that the vendor organization has enlisted (via enlisted_vendors table).
     """
+    if enlisted_only and vendor_org_id is not None:
+        query = """
+            SELECT
+                t.tender_id,
+                t.title,
+                t.description,
+                t.status,
+                o.organization_name AS buyer_org_name,
+                t.submission_deadline,
+                t.created_at
+            FROM tenders t
+            JOIN organizations o ON t.buyer_id = o.organization_id
+            JOIN enlisted_vendors ev ON ev.enlisted_org_id = t.buyer_id AND ev.org_id = $1
+            WHERE t.status = 'Published'
+            ORDER BY t.created_at DESC;
+        """
+        rows = await connection.fetch(query, vendor_org_id)
+        return [dict(row) for row in rows]
+
     query = """
         SELECT
             t.tender_id,
@@ -222,4 +243,130 @@ async def update_tender_required_document_roles(
         if "Owner" not in roles:
             roles = ["Owner"] + roles
         await connection.execute(query, roles, item["req_doc_id"], tender_id)
+
+
+async def get_ongoing_tenders(
+    connection: asyncpg.Connection,
+    org_id: int
+) -> list[dict]:
+    """
+    Fetch all ongoing (awarded) tenders where the caller's organization is
+    either the buyer or the winning vendor.
+    """
+    query = """
+        SELECT
+            a.award_id,
+            a.awarded_at,
+            a.remarks,
+            t.tender_id,
+            t.title AS tender_title,
+            t.description AS tender_description,
+            t.status AS tender_status,
+            t.budget_min,
+            t.budget_max,
+            t.submission_deadline,
+            t.created_at AS tender_created_at,
+            b.bid_id AS winning_bid_id,
+            b.financial_amount AS winning_bid_amount,
+            b.description AS winning_bid_description,
+            b.submitted_at AS winning_bid_submitted_at,
+            buyer_org.organization_id AS buyer_org_id,
+            buyer_org.organization_name AS buyer_org_name,
+            vendor_org.organization_id AS vendor_org_id,
+            vendor_org.organization_name AS vendor_org_name,
+            CASE
+                WHEN t.buyer_id = $1 THEN 'buyer'
+                ELSE 'vendor'
+            END AS role_in_tender
+        FROM awards a
+        JOIN tenders t ON a.tender_id = t.tender_id
+        JOIN bids b ON a.winning_bid_id = b.bid_id
+        JOIN organizations buyer_org ON t.buyer_id = buyer_org.organization_id
+        JOIN organizations vendor_org ON b.vendor_org_id = vendor_org.organization_id
+        WHERE t.buyer_id = $1 OR b.vendor_org_id = $1
+        ORDER BY a.awarded_at DESC;
+    """
+    rows = await connection.fetch(query, org_id)
+    return [dict(row) for row in rows]
+
+
+async def get_ongoing_tender_detail(
+    connection: asyncpg.Connection,
+    tender_id: int,
+    org_id: int
+) -> dict | None:
+    """
+    Fetch full detail of a specific ongoing (awarded) tender if the caller's
+    organization is either the buyer or the winning vendor.
+    """
+    query = """
+        SELECT
+            a.award_id,
+            a.awarded_at,
+            a.remarks,
+            t.tender_id,
+            t.title AS tender_title,
+            t.description AS tender_description,
+            t.status AS tender_status,
+            t.budget_min,
+            t.budget_max,
+            t.submission_deadline,
+            t.tender_public_date,
+            t.pre_bid_meeting,
+            t.tender_opening_date,
+            t.created_at AS tender_created_at,
+            b.bid_id AS winning_bid_id,
+            b.financial_amount AS winning_bid_amount,
+            b.description AS winning_bid_description,
+            b.submitted_at AS winning_bid_submitted_at,
+            buyer_org.organization_id AS buyer_org_id,
+            buyer_org.organization_name AS buyer_org_name,
+            buyer_org.address AS buyer_org_address,
+            buyer_org.website AS buyer_org_website,
+            vendor_org.organization_id AS vendor_org_id,
+            vendor_org.organization_name AS vendor_org_name,
+            vendor_org.address AS vendor_org_address,
+            vendor_org.website AS vendor_org_website,
+            CASE
+                WHEN t.buyer_id = $2 THEN 'buyer'
+                ELSE 'vendor'
+            END AS role_in_tender
+        FROM awards a
+        JOIN tenders t ON a.tender_id = t.tender_id
+        JOIN bids b ON a.winning_bid_id = b.bid_id
+        JOIN organizations buyer_org ON t.buyer_id = buyer_org.organization_id
+        JOIN organizations vendor_org ON b.vendor_org_id = vendor_org.organization_id
+        WHERE t.tender_id = $1 AND (t.buyer_id = $2 OR b.vendor_org_id = $2);
+    """
+    row = await connection.fetchrow(query, tender_id, org_id)
+    if row is None:
+        return None
+
+    result = dict(row)
+
+    # Tender documents
+    docs_query = """
+        SELECT tender_doc_id, file_name, file_path, uploaded_at
+        FROM tender_documents
+        WHERE tender_id = $1
+        ORDER BY uploaded_at;
+    """
+    doc_rows = await connection.fetch(docs_query, tender_id)
+    result["tender_documents"] = [dict(d) for d in doc_rows]
+
+    # Winning Bid documents
+    bid_docs_query = """
+        SELECT
+            bd.bid_doc_id,
+            bd.file_path,
+            COALESCE(dt.type_name, trd.custom_doc_name, 'Document') AS document_type
+        FROM bid_documents bd
+        LEFT JOIN tender_required_documents trd ON bd.req_doc_id = trd.req_doc_id
+        LEFT JOIN document_types dt ON trd.doc_type_id = dt.type_id
+        WHERE bd.bid_id = $1;
+    """
+    bid_doc_rows = await connection.fetch(bid_docs_query, result["winning_bid_id"])
+    result["bid_documents"] = [dict(bd) for bd in bid_doc_rows]
+
+    return result
 

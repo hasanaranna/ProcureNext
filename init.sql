@@ -322,7 +322,7 @@ CREATE TABLE bids (
 CREATE TABLE bid_documents (
     bid_doc_id      SERIAL      PRIMARY KEY,
     bid_id          INT         NOT NULL REFERENCES bids(bid_id) ON DELETE CASCADE,
-    doc_type_id     INT         NOT NULL REFERENCES document_types(type_id),
+    req_doc_id      INT         NOT NULL REFERENCES tender_required_documents(req_doc_id) ON DELETE CASCADE,
     file_path       TEXT,
     uploaded_at     TIMESTAMP   DEFAULT NOW()
 );

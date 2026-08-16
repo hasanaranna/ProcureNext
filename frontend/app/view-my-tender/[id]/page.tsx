@@ -270,6 +270,32 @@ export default function ViewMyTenderPage() {
           </div>
         </div>
 
+        {/* Awarded Banner if Tender is Awarded */}
+        {(tender?.status === 'Awarded' || hasAcceptedBid) && (
+          <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-2xl p-5 shadow-xl mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-xl flex-shrink-0">
+                🏆
+              </div>
+              <div>
+                <h3 className="font-bold text-white text-base">Tender Awarded & Ongoing</h3>
+                <p className="text-emerald-100 text-xs mt-0.5">
+                  Winning bid accepted. You can view contracts, fulfillment details, and counterpart information.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => router.push(`/ongoing-tenders/${tenderId}`)}
+              className="px-5 py-2.5 bg-white text-emerald-900 hover:bg-emerald-50 font-bold text-xs rounded-xl shadow transition-all whitespace-nowrap flex items-center gap-1.5"
+            >
+              View in Ongoing Tenders
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
+            </button>
+          </div>
+        )}
+
         {/* Manage Document Access Button - OUTSIDE the white box */}
         <div className="flex justify-end mb-6">
           <button

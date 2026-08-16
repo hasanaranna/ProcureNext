@@ -65,9 +65,13 @@ async def get_bid_by_tender_and_vendor(
     bid_dict = dict(bid_row)
 
     docs_query = """
-        SELECT bd.bid_doc_id, bd.file_path, dt.type_name as document_type
+        SELECT 
+            bd.bid_doc_id, 
+            bd.file_path, 
+            COALESCE(dt.type_name, trd.custom_doc_name, 'Document') AS document_type
         FROM bid_documents bd
-        JOIN document_types dt ON bd.doc_type_id = dt.type_id
+        LEFT JOIN tender_required_documents trd ON bd.req_doc_id = trd.req_doc_id
+        LEFT JOIN document_types dt ON trd.doc_type_id = dt.type_id
         WHERE bd.bid_id = $1
     """
     docs_rows = await connection.fetch(docs_query, bid_dict["bid_id"])
@@ -113,9 +117,14 @@ async def get_bids_for_buyer_tender(
 
     # Fetch documents for these bids
     docs_query = """
-        SELECT bd.bid_id, bd.bid_doc_id, bd.file_path, dt.type_name as document_type
+        SELECT 
+            bd.bid_id, 
+            bd.bid_doc_id, 
+            bd.file_path, 
+            COALESCE(dt.type_name, trd.custom_doc_name, 'Document') AS document_type
         FROM bid_documents bd
-        JOIN document_types dt ON bd.doc_type_id = dt.type_id
+        LEFT JOIN tender_required_documents trd ON bd.req_doc_id = trd.req_doc_id
+        LEFT JOIN document_types dt ON trd.doc_type_id = dt.type_id
         WHERE bd.bid_id = ANY($1)
     """
     docs_rows = await connection.fetch(docs_query, bid_ids)
