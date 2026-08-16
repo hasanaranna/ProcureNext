@@ -577,3 +577,119 @@ async def delete_tender_document(
     return {"message": "Tender document deleted successfully.", "doc_id": doc_id}
 
 
+async def get_public_active_tenders(
+    connection: asyncpg.Connection,
+    category_id: int | None = None,
+    search: str | None = None,
+) -> list[dict]:
+    """
+    Fetch active, publicly visible published tenders for unregistered users.
+    Filters out restricted and draft/cancelled tenders.
+    """
+    query = """
+        SELECT
+            t.tender_id,
+            t.title,
+            t.description,
+            t.status,
+            t.visibility_type,
+            o.organization_name AS buyer_org_name,
+            o.organization_type AS buyer_org_type,
+            (o.verification_status = 'Verified') AS buyer_verified,
+            tc.category_name,
+            pn.nature_name AS procurement_nature,
+            pm.method_name AS procurement_method,
+            t.budget_min,
+            t.budget_max,
+            t.security_required,
+            t.submission_deadline,
+            t.tender_public_date,
+            t.created_at
+        FROM tenders t
+        JOIN organizations o ON t.buyer_id = o.organization_id
+        LEFT JOIN tender_categories tc ON t.category_id = tc.category_id
+        LEFT JOIN procurement_nature pn ON t.nature_id = pn.nature_id
+        LEFT JOIN procurement_method pm ON t.method_id = pm.method_id
+        WHERE t.status = 'Published'
+          AND (t.visibility_type = 'Public' OR t.visibility_type IS NULL)
+    """
+    params = []
+    p_idx = 1
+
+    if category_id is not None:
+        query += f" AND t.category_id = ${p_idx}"
+        params.append(category_id)
+        p_idx += 1
+
+    if search:
+        query += f" AND (t.title ILIKE ${p_idx} OR t.description ILIKE ${p_idx} OR o.organization_name ILIKE ${p_idx})"
+        params.append(f"%{search}%")
+        p_idx += 1
+
+    query += " ORDER BY t.created_at DESC;"
+
+    rows = await connection.fetch(query, *params)
+    return [dict(r) for r in rows]
+
+
+async def get_public_tender_detail(
+    connection: asyncpg.Connection,
+    tender_id: int,
+) -> dict | None:
+    """
+    Fetch detailed public notice information for an active public tender.
+    Does not expose private documents or bidder information.
+    """
+    query = """
+        SELECT
+            t.tender_id,
+            t.title,
+            t.description,
+            t.status,
+            t.visibility_type,
+            o.organization_name AS buyer_org_name,
+            o.organization_type AS buyer_org_type,
+            (o.verification_status = 'Verified') AS buyer_verified,
+            o.website_url AS buyer_org_website,
+            tc.category_name,
+            pn.nature_name AS procurement_nature,
+            pm.method_name AS procurement_method,
+            t.budget_min,
+            t.budget_max,
+            t.security_required,
+            t.security_valid_until,
+            t.proposal_valid_until,
+            t.tender_public_date,
+            t.pre_bid_meeting,
+            t.tender_opening_date,
+            t.submission_deadline,
+            t.created_at
+        FROM tenders t
+        JOIN organizations o ON t.buyer_id = o.organization_id
+        LEFT JOIN tender_categories tc ON t.category_id = tc.category_id
+        LEFT JOIN procurement_nature pn ON t.nature_id = pn.nature_id
+        LEFT JOIN procurement_method pm ON t.method_id = pm.method_id
+        WHERE t.tender_id = $1
+          AND t.status = 'Published'
+          AND (t.visibility_type = 'Public' OR t.visibility_type IS NULL);
+    """
+    row = await connection.fetchrow(query, tender_id)
+    if not row:
+        return None
+
+    result = dict(row)
+
+    # Fetch required document eligibility checklist
+    req_docs_query = """
+        SELECT req_doc_id, custom_doc_name, is_mandatory
+        FROM public.tender_required_documents
+        WHERE tender_id = $1
+        ORDER BY req_doc_id;
+    """
+    req_doc_rows = await connection.fetch(req_docs_query, tender_id)
+    result["required_documents"] = [dict(r) for r in req_doc_rows]
+
+    return result
+
+
+

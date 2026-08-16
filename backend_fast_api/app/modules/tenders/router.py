@@ -77,8 +77,8 @@ import os
 import json
 import uuid
 import shutil
-from typing import List
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
+from typing import List, Optional
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Query, status
 from app.core.db import get_db_connection
 from app.modules.auth.dependencies import get_current_user_org
 from app.modules.tenders.schemas import (
@@ -88,7 +88,9 @@ from app.modules.tenders.schemas import (
     TenderDetailResponse,
     UpdateTenderReqDocAccessRequest,
     OngoingTenderListItem,
-    OngoingTenderDetail
+    OngoingTenderDetail,
+    PublicTenderListItem,
+    PublicTenderDetailResponse,
 )
 from app.modules.tenders.service import (
     publish_tender_with_documents,
@@ -99,10 +101,13 @@ from app.modules.tenders.service import (
     get_ongoing_tenders,
     get_ongoing_tender_detail,
     delete_tender,
-    delete_tender_document
+    delete_tender_document,
+    get_public_active_tenders,
+    get_public_tender_detail,
 )
 
 router = APIRouter(prefix="/tenders", tags=["Tenders"])
+
 
 TEMP_UPLOAD_DIR = os.getenv("UPLOAD_DIR", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../uploads")))
 os.makedirs(TEMP_UPLOAD_DIR, exist_ok=True)
@@ -197,7 +202,49 @@ async def list_buyer_tenders(
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
 
 
+@router.get("/public/active", response_model=List[PublicTenderListItem])
+async def list_active_public_tenders(
+    category_id: Optional[int] = Query(None),
+    search: Optional[str] = Query(None),
+):
+    """
+    Public Read-Only Endpoint: Browse currently active published tenders.
+    Accessible without authentication by unregistered visitors.
+    """
+    try:
+        async with get_db_connection() as connection:
+            return await get_public_active_tenders(
+                connection=connection,
+                category_id=category_id,
+                search=search,
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
+@router.get("/public/{tender_id}", response_model=PublicTenderDetailResponse)
+async def get_public_tender_detail_endpoint(
+    tender_id: int,
+):
+    """
+    Public Read-Only Endpoint: Retrieve complete public notice, scope,
+    administrative/legal details, key dates, financial terms, and eligibility checklist.
+    Accessible without authentication.
+    """
+    try:
+        async with get_db_connection() as connection:
+            tender = await get_public_tender_detail(connection, tender_id)
+            if tender is None:
+                raise HTTPException(status_code=404, detail="Public tender not found or is restricted/closed.")
+            return tender
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
 @router.get("/seller/all-tenders", response_model=List[TenderListItem])
+
 async def list_all_tenders_for_seller(
     enlisted_only: bool = False,
     current_user: dict = Depends(get_current_user_org)

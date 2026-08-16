@@ -16,6 +16,12 @@ interface InvitationDetails {
   status: string;
 }
 
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
 function SignupUserContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -39,6 +45,7 @@ function SignupUserContent() {
     nidBack: null,
   });
 
+  const [fileErrors, setFileErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState(false);
@@ -92,18 +99,46 @@ function SignupUserContent() {
     const file = e.target.files?.[0] ?? null;
     if (file) {
       if (!file.type.startsWith("image/")) {
-        alert("Please upload an image file.");
+        setFileErrors((prev) => ({ ...prev, [field]: "Please upload an image file (JPG, PNG)." }));
+        e.target.value = "";
+        return;
+      }
+      if (file.size > 20 * 1024 * 1024) {
+        setFileErrors((prev) => ({ ...prev, [field]: "File size must not exceed 20MB." }));
         e.target.value = "";
         return;
       }
     }
+
+    setFileErrors((prev) => {
+      const copy = { ...prev };
+      delete copy[field];
+      return copy;
+    });
     setFiles((prev) => ({ ...prev, [field]: file }));
+  };
+
+  const removeNidFile = (field: keyof FileFields, inputId: string) => {
+    setFiles((prev) => ({ ...prev, [field]: null }));
+    const input = document.getElementById(inputId) as HTMLInputElement | null;
+    if (input) input.value = "";
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setIsSubmitting(true);
     setSubmitError("");
+
+    const errors: Record<string, string> = {};
+    if (!files.nidFront) errors.nidFront = "NID Front image is required";
+    if (!files.nidBack) errors.nidBack = "NID Back image is required";
+
+    if (Object.keys(errors).length > 0) {
+      setFileErrors(errors);
+      setSubmitError("Please upload both Front and Back sides of your National ID.");
+      return;
+    }
+
+    setIsSubmitting(true);
 
     try {
       const body = new FormData();
@@ -149,72 +184,55 @@ function SignupUserContent() {
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          <p className="text-slate-300 text-lg font-medium">Validating invitation...</p>
+          <p className="text-slate-300 text-lg">Validating invitation...</p>
         </div>
       </main>
     );
   }
 
-  // ─── No Token / Invalid Token ─────────────────────────────
+  // ─── Token error ──────────────────────────────────────────
   if (tokenError) {
     return (
-      <main className="w-full min-h-screen flex items-center justify-center py-20 px-4 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
-        <div className="relative z-10 max-w-lg mx-auto w-full animate-scale-in">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 md:p-12 text-center">
-            <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-red-50 flex items-center justify-center">
-              <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-              </svg>
-            </div>
-
-            {tokenError === "no-token" ? (
-              <>
-                <h1 className="text-2xl font-black text-navy-900 mb-3">Invitation Required</h1>
-                <p className="text-slate-600 mb-2">Employee accounts can only be created through an invitation from your company owner.</p>
-                <p className="text-slate-400 text-sm mb-8">Please ask your organization&apos;s master account holder to send you an invitation link.</p>
-              </>
-            ) : (
-              <>
-                <h1 className="text-2xl font-black text-navy-900 mb-3">Invalid Invitation</h1>
-                <p className="text-slate-600 mb-8">{tokenError}</p>
-              </>
-            )}
-
-            <div className="flex gap-3 justify-center">
-              <button onClick={() => router.push("/login")}
-                className="px-6 py-2.5 bg-gradient-to-r from-navy-900 to-navy-800 text-white font-bold rounded-xl hover:from-navy-800 hover:to-navy-700 transition-all shadow-lg">
-                Go to Login
-              </button>
-              <button onClick={() => router.push("/")}
-                className="px-6 py-2.5 bg-white text-navy-900 font-semibold rounded-xl border-2 border-slate-200 hover:bg-slate-50 transition-all">
-                Home
-              </button>
-            </div>
+      <main className="w-full min-h-screen flex items-center justify-center py-12 px-4 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8 text-center animate-scale-in">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-50 flex items-center justify-center">
+            <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
           </div>
+          <h2 className="text-2xl font-black text-navy-900 mb-2">Invitation Error</h2>
+          <p className="text-slate-600 mb-6 text-sm">
+            {tokenError === "no-token"
+              ? "No invitation token found. Please use the link provided in your invitation email."
+              : tokenError}
+          </p>
+          <button onClick={() => router.push("/login")}
+            className="w-full py-3 bg-navy-900 text-white font-bold rounded-xl hover:bg-navy-800 transition">
+            Go to Login
+          </button>
         </div>
       </main>
     );
   }
 
-  // ─── Success ──────────────────────────────────────────────
+  // ─── Success state ────────────────────────────────────────
   if (submitSuccess) {
     return (
-      <main className="w-full min-h-screen flex items-center justify-center py-20 px-4 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
-        <div className="relative z-10 max-w-xl mx-auto w-full animate-scale-in">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 md:p-12 text-center">
-            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-emerald-50 flex items-center justify-center">
-              <svg className="w-10 h-10 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <h1 className="text-3xl font-black text-navy-900 mb-3">Welcome to {invitation?.organization_name}!</h1>
-            <p className="text-slate-600 mb-8">Your account has been created successfully. You can now log in and start using ProcureNext.</p>
-            <button onClick={() => router.push("/home")}
-              className="px-8 py-3 bg-gradient-to-r from-navy-900 to-navy-800 text-white font-bold rounded-xl hover:from-navy-800 hover:to-navy-700 transition-all shadow-lg">
-              Go to Dashboard
-            </button>
+      <main className="w-full min-h-screen flex items-center justify-center py-12 px-4 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8 text-center animate-scale-in">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-50 flex items-center justify-center">
+            <svg className="w-8 h-8 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+            </svg>
           </div>
+          <h2 className="text-2xl font-black text-navy-900 mb-2">Account Created!</h2>
+          <p className="text-slate-600 mb-6 text-sm">
+            You have successfully joined <strong className="text-navy-900">{invitation?.organization_name}</strong>.
+          </p>
+          <button onClick={() => router.push("/home")}
+            className="w-full py-3 bg-gradient-to-r from-navy-900 to-navy-800 text-white font-bold rounded-xl hover:from-navy-800 hover:to-navy-700 transition shadow-lg">
+            Go to Dashboard
+          </button>
         </div>
       </main>
     );
@@ -222,8 +240,9 @@ function SignupUserContent() {
 
   // ─── Registration Form ────────────────────────────────────
   return (
-    <main className="w-full min-h-screen flex items-center justify-center py-12 px-4 relative overflow-x-hidden bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
+    <main className="w-full min-h-screen flex items-center justify-center py-12 px-4 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800 relative overflow-x-hidden">
       <div className="absolute top-1/4 right-1/4 w-72 h-72 bg-accent-500/5 rounded-full blur-3xl" />
+      <div className="absolute bottom-1/4 left-1/4 w-56 h-56 bg-accent-400/5 rounded-full blur-3xl" />
 
       <div className="relative z-10 max-w-2xl mx-auto w-full animate-fade-in">
         <div className="bg-white rounded-2xl shadow-2xl p-8 md:p-10 border border-slate-200">
@@ -234,45 +253,42 @@ function SignupUserContent() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
               </svg>
             </div>
-            <h1 className="text-3xl font-black text-navy-900 mb-1">Create Your Account</h1>
-            <p className="text-slate-500">
-              Register as a member of <span className="font-bold text-navy-900">{invitation?.organization_name}</span>
-            </p>
-            <p className="text-sm text-slate-400 mt-2">
-              Invitation sent to: <span className="font-medium">{invitation?.email}</span>
+            <h1 className="text-3xl font-black text-navy-900 mb-1">Join Your Organization</h1>
+            <p className="text-slate-500 text-sm">
+              Complete your profile to join <strong className="text-navy-900">{invitation?.organization_name}</strong>
             </p>
           </div>
 
           {/* Error Message */}
           {submitError && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm flex items-start gap-3">
-              <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="mb-6 p-4 bg-red-50 border-2 border-red-200 rounded-xl text-red-700 text-sm flex items-start gap-3 animate-fade-in">
+              <svg className="w-5 h-5 flex-shrink-0 mt-0.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              {submitError}
+              <div>
+                <strong className="font-bold">Error:</strong> {submitError}
+              </div>
             </div>
           )}
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="name" className="block text-sm font-semibold text-navy-900 mb-1.5">Full Name</label>
-                <input type="text" id="name" name="name" value={formData.name} onChange={handleChange} placeholder="Enter your full name"
+                <label htmlFor="name" className="block text-sm font-semibold text-navy-900 mb-1.5">Full Name <span className="text-red-500">*</span></label>
+                <input type="text" id="name" name="name" value={formData.name} onChange={handleChange} placeholder="Enter your full name" required
                   className="w-full px-4 py-3 border border-slate-300 rounded-xl bg-white text-navy-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent transition" />
               </div>
               <div>
-                <label htmlFor="email" className="block text-sm font-semibold text-navy-900 mb-1.5">Email Address <span className="text-red-500">*</span></label>
-                <input type="email" id="email" name="email" value={formData.email} readOnly
+                <label htmlFor="email" className="block text-sm font-semibold text-navy-900 mb-1.5">Email Address</label>
+                <input type="email" id="email" name="email" value={formData.email} disabled
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" />
-                <p className="text-xs text-slate-400 mt-1">This email was specified in the invitation and cannot be changed.</p>
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="phone" className="block text-sm font-semibold text-navy-900 mb-1.5">Mobile Phone <span className="text-red-500">*</span></label>
-                <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleChange} placeholder="Enter your mobile phone number" required
+                <label htmlFor="phone" className="block text-sm font-semibold text-navy-900 mb-1.5">Phone Number <span className="text-red-500">*</span></label>
+                <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleChange} placeholder="Enter your phone number" required
                   className="w-full px-4 py-3 border border-slate-300 rounded-xl bg-white text-navy-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent transition" />
               </div>
               <div>
@@ -296,39 +312,53 @@ function SignupUserContent() {
             </div>
 
             {/* NID — Front & Back */}
-            <div>
-              <label className="block text-sm font-semibold text-navy-900 mb-2">National ID (NID)</label>
-              <div className="grid grid-cols-2 gap-4">
-                {(['nidFront', 'nidBack'] as const).map((field) => (
-                  <div key={field}>
-                    <p className="text-xs text-slate-500 mb-1.5 font-medium">{field === 'nidFront' ? 'Front Side' : 'Back Side'}</p>
-                    <label htmlFor={field}
-                      className={`flex flex-col items-center justify-center gap-2 px-3 py-5 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-300 ${
-                        files[field] ? 'border-emerald-300 bg-emerald-50' : 'border-slate-300 bg-slate-50 hover:border-accent-400 hover:bg-accent-50'
-                      }`}>
-                      {files[field] ? (
-                        <>
-                          <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
-                            <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          </div>
-                          <span className="text-xs text-slate-600 text-center truncate w-full font-medium">{files[field]!.name}</span>
-                        </>
+            <div className="pt-2">
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-semibold text-navy-900">
+                  National ID (NID) <span className="text-red-500">*</span>
+                </label>
+                <span className="text-xs text-slate-400">JPG or PNG image</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {(['nidFront', 'nidBack'] as const).map((field) => {
+                  const hasError = !!fileErrors[field];
+                  const file = files[field];
+                  const label = field === 'nidFront' ? 'Front Side' : 'Back Side';
+
+                  return (
+                    <div key={field} className={`p-4 border-2 rounded-2xl transition-all ${
+                      hasError ? 'border-red-400 bg-red-50/60' : file ? 'border-emerald-300 bg-emerald-50/50' : 'border-slate-300 bg-slate-50'
+                    }`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-bold text-navy-900">{label} <span className="text-red-500">*</span></span>
+                        {file ? (
+                          <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">✓ Attached</span>
+                        ) : (
+                          <span className="text-[10px] bg-red-100 text-red-700 font-bold px-2 py-0.5 rounded-full">Required</span>
+                        )}
+                      </div>
+
+                      {file ? (
+                        <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-xl border border-slate-200">
+                          <span className="text-xs text-navy-900 font-medium truncate">{file.name} ({formatFileSize(file.size)})</span>
+                          <button type="button" onClick={() => removeNidFile(field, field)} className="text-red-500 hover:text-red-700 p-1 text-xs font-bold">
+                            Remove
+                          </button>
+                        </div>
                       ) : (
-                        <>
-                          <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center">
-                            <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                          </div>
-                          <span className="text-xs text-slate-500">Upload image</span>
-                        </>
+                        <label htmlFor={field} className="flex flex-col items-center justify-center p-4 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-accent-400 bg-white transition">
+                          <svg className="w-6 h-6 text-slate-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          <span className="text-xs font-semibold text-accent-600">Select Image ({label})</span>
+                          <input id={field} type="file" accept="image/*" className="hidden" onChange={(e) => handleNidFile(field, e)} />
+                        </label>
                       )}
-                      <input id={field} type="file" accept="image/*" className="hidden" onChange={(e) => handleNidFile(field, e)} />
-                    </label>
-                  </div>
-                ))}
+                      {hasError && <p className="text-xs text-red-600 font-semibold mt-1.5">{fileErrors[field]}</p>}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -341,7 +371,7 @@ function SignupUserContent() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  Creating Account...
+                  <span>Creating Account...</span>
                 </>
               ) : (
                 "Create Account"
