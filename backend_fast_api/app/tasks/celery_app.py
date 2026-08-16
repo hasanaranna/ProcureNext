@@ -11,7 +11,7 @@ celery_app = Celery(
     "procurenext_tasks",
     broker=redis_url,
     backend=redis_url,
-    include=["app.tasks.document_tasks"]
+    include=["app.tasks.document_tasks", "app.tasks.audit_tasks"]
 )
 
 celery_app.conf.update(

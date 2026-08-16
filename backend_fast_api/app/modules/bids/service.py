@@ -420,3 +420,242 @@ async def delete_bid_document(
 
     return {"message": "Bid document deleted successfully.", "doc_id": doc_id}
 
+
+async def get_tender_bid_comparison(
+    connection: asyncpg.Connection,
+    tender_id: int,
+    buyer_org_id: int
+) -> dict:
+    """
+    Fetch comprehensive side-by-side comparison data for all bids submitted on a tender.
+    Includes financial metrics, budget deviations, vendor credibility & ratings,
+    compliance matrices against required documents, and bid securities.
+    """
+    # 1. Verify tender ownership
+    tender_row = await connection.fetchrow("""
+        SELECT tender_id, title, status, budget_min, budget_max, buyer_id
+        FROM tenders
+        WHERE tender_id = $1 AND buyer_id = $2
+    """, tender_id, buyer_org_id)
+
+    if not tender_row:
+        exists = await connection.fetchval("SELECT 1 FROM tenders WHERE tender_id = $1", tender_id)
+        if exists:
+            raise PermissionError("You do not have permission to view bids for this tender.")
+        raise KeyError("Tender not found")
+
+    budget_min = float(tender_row["budget_min"]) if tender_row["budget_min"] is not None else None
+    budget_max = float(tender_row["budget_max"]) if tender_row["budget_max"] is not None else None
+
+    # 2. Fetch tender required documents
+    req_docs_rows = await connection.fetch("""
+        SELECT req_doc_id, custom_doc_name, is_mandatory, allowed_roles
+        FROM tender_required_documents
+        WHERE tender_id = $1
+        ORDER BY req_doc_id
+    """, tender_id)
+    required_documents = [dict(r) for r in req_docs_rows]
+
+    # 3. Fetch bids with vendor organization details, ratings, completed contracts, enlistment status
+    bids_query = """
+        SELECT 
+            b.bid_id,
+            b.vendor_org_id,
+            b.submitted_by,
+            b.tender_id,
+            b.financial_amount,
+            b.description,
+            b.status,
+            b.submitted_at,
+            b.updated_at,
+            o.organization_name AS vendor_name,
+            o.address AS vendor_address,
+            o.website AS vendor_website,
+            o.verification_status AS vendor_verification_status,
+            COALESCE(vr.avg_rating, 0.0) AS vendor_rating,
+            COALESCE(vr.total_ratings_count, 0) AS total_ratings_count,
+            COALESCE(vc.completed_contracts_count, 0) AS completed_contracts_count,
+            CASE WHEN ev.enlisted_org_id IS NOT NULL THEN true ELSE false END AS is_enlisted
+        FROM bids b
+        JOIN organizations o ON b.vendor_org_id = o.organization_id
+        LEFT JOIN (
+            SELECT 
+                vendor_org_id, 
+                ROUND(AVG(rating)::numeric, 1)::float AS avg_rating,
+                COUNT(*)::int AS total_ratings_count
+            FROM vendor_performance
+            GROUP BY vendor_org_id
+        ) vr ON b.vendor_org_id = vr.vendor_org_id
+        LEFT JOIN (
+            SELECT 
+                wb.vendor_org_id,
+                COUNT(*)::int AS completed_contracts_count
+            FROM contracts c
+            JOIN awards a ON c.award_id = a.award_id
+            JOIN bids wb ON a.winning_bid_id = wb.bid_id
+            WHERE c.status = 'Completed'
+            GROUP BY wb.vendor_org_id
+        ) vc ON b.vendor_org_id = vc.vendor_org_id
+        LEFT JOIN enlisted_vendors ev ON ev.org_id = $2 AND ev.enlisted_org_id = b.vendor_org_id
+        WHERE b.tender_id = $1
+        ORDER BY b.submitted_at ASC
+    """
+    bids_rows = await connection.fetch(bids_query, tender_id, buyer_org_id)
+    raw_bids = [dict(r) for r in bids_rows]
+
+    bid_ids = [b["bid_id"] for b in raw_bids]
+
+    # 4. Fetch bid documents
+    docs_by_bid: dict[int, list[dict]] = {}
+    if bid_ids:
+        docs_rows = await connection.fetch("""
+            SELECT 
+                bd.bid_id, 
+                bd.bid_doc_id, 
+                bd.req_doc_id,
+                bd.file_path, 
+                COALESCE(dt.type_name, trd.custom_doc_name, 'Document') AS document_type
+            FROM bid_documents bd
+            LEFT JOIN tender_required_documents trd ON bd.req_doc_id = trd.req_doc_id
+            LEFT JOIN document_types dt ON trd.doc_type_id = dt.type_id
+            WHERE bd.bid_id = ANY($1)
+        """, bid_ids)
+
+        for doc in docs_rows:
+            b_id = doc["bid_id"]
+            if b_id not in docs_by_bid:
+                docs_by_bid[b_id] = []
+            docs_by_bid[b_id].append(dict(doc))
+
+    # 5. Fetch bid securities
+    secs_by_bid: dict[int, list[dict]] = {}
+    if bid_ids:
+        secs_rows = await connection.fetch("""
+            SELECT security_id, bid_id, security_amount, security_type, bid_security_doc_path, valid_until
+            FROM bid_securities
+            WHERE bid_id = ANY($1)
+        """, bid_ids)
+
+        for sec in secs_rows:
+            b_id = sec["bid_id"]
+            if b_id not in secs_by_bid:
+                secs_by_bid[b_id] = []
+            secs_by_bid[b_id].append(dict(sec))
+
+    # 6. Calculate summary metrics
+    amounts = [float(b["financial_amount"]) for b in raw_bids if b["financial_amount"] is not None]
+    min_amount = min(amounts) if amounts else None
+    max_amount = max(amounts) if amounts else None
+    avg_amount = round(sum(amounts) / len(amounts), 2) if amounts else None
+
+    lowest_bid_id = None
+    if min_amount is not None:
+        for b in raw_bids:
+            if b["financial_amount"] is not None and float(b["financial_amount"]) == min_amount:
+                lowest_bid_id = b["bid_id"]
+                break
+
+    # 7. Build evaluated bids with compliance matrices and analytics
+    evaluated_bids = []
+    fully_compliant_count = 0
+
+    for b in raw_bids:
+        b_id = b["bid_id"]
+        b_docs = docs_by_bid.get(b_id, [])
+        b_secs = secs_by_bid.get(b_id, [])
+
+        amount = float(b["financial_amount"]) if b["financial_amount"] is not None else None
+
+        # Budget variance
+        budget_variance_pct = None
+        if amount is not None and budget_max is not None and budget_max > 0:
+            budget_variance_pct = round(((amount - budget_max) / budget_max) * 100, 1)
+
+        # Average variance
+        avg_variance_pct = None
+        if amount is not None and avg_amount is not None and avg_amount > 0:
+            avg_variance_pct = round(((amount - avg_amount) / avg_amount) * 100, 1)
+
+        # Build compliance matrix
+        # Map submitted docs by req_doc_id
+        submitted_by_req_doc: dict[int, dict] = {}
+        for d in b_docs:
+            if d.get("req_doc_id"):
+                submitted_by_req_doc[d["req_doc_id"]] = d
+
+        compliance_matrix = []
+        mandatory_missing = 0
+        total_req = len(required_documents)
+        submitted_req_count = 0
+
+        for req in required_documents:
+            r_id = req["req_doc_id"]
+            is_mand = req.get("is_mandatory", True)
+            submitted_doc = submitted_by_req_doc.get(r_id)
+
+            is_submitted = submitted_doc is not None
+            if is_submitted:
+                submitted_req_count += 1
+            elif is_mand:
+                mandatory_missing += 1
+
+            compliance_matrix.append({
+                "req_doc_id": r_id,
+                "custom_doc_name": req.get("custom_doc_name") or "Document",
+                "is_mandatory": is_mand,
+                "is_submitted": is_submitted,
+                "bid_doc_id": submitted_doc["bid_doc_id"] if submitted_doc else None,
+                "file_path": submitted_doc["file_path"] if submitted_doc else None
+            })
+
+        if total_req > 0:
+            compliance_score_pct = round((submitted_req_count / total_req) * 100, 1)
+        else:
+            compliance_score_pct = 100.0
+
+        mandatory_satisfied = (mandatory_missing == 0)
+        if mandatory_satisfied and (compliance_score_pct >= 100.0 or total_req == 0):
+            fully_compliant_count += 1
+
+        is_lowest = (b_id == lowest_bid_id)
+
+        evaluated_bids.append({
+            **b,
+            "financial_amount": amount,
+            "vendor_rating": float(b.get("vendor_rating", 0.0)),
+            "total_ratings_count": int(b.get("total_ratings_count", 0)),
+            "completed_contracts_count": int(b.get("completed_contracts_count", 0)),
+            "is_enlisted": bool(b.get("is_enlisted", False)),
+            "budget_variance_pct": budget_variance_pct,
+            "avg_variance_pct": avg_variance_pct,
+            "is_lowest_bid": is_lowest,
+            "compliance_score_pct": compliance_score_pct,
+            "mandatory_docs_satisfied": mandatory_satisfied,
+            "documents": b_docs,
+            "compliance_matrix": compliance_matrix,
+            "securities": b_secs
+        })
+
+    summary = {
+        "total_bids": len(raw_bids),
+        "min_amount": min_amount,
+        "max_amount": max_amount,
+        "avg_amount": avg_amount,
+        "budget_min": budget_min,
+        "budget_max": budget_max,
+        "lowest_bid_id": lowest_bid_id,
+        "fully_compliant_bids_count": fully_compliant_count
+    }
+
+    return {
+        "tender_id": tender_id,
+        "tender_title": tender_row["title"],
+        "tender_status": tender_row["status"],
+        "budget_min": budget_min,
+        "budget_max": budget_max,
+        "required_documents": required_documents,
+        "summary": summary,
+        "bids": evaluated_bids
+    }
+
+

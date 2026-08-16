@@ -10,12 +10,18 @@ from typing import List
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
 from app.core.db import get_db_connection
 from app.modules.auth.dependencies import get_current_user_org
-from app.modules.bids.schemas import BidResponse, BidListItem, BidUpdateRequest
+from app.modules.bids.schemas import (
+    BidResponse,
+    BidListItem,
+    BidUpdateRequest,
+    TenderBidComparisonResponse,
+)
 from app.modules.bids.service import (
     submit_bid_with_documents, 
     get_bid_by_tender_and_vendor, 
     get_bid_document_by_id,
     get_bids_for_buyer_tender,
+    get_tender_bid_comparison,
     accept_bid_for_tender,
     get_vendor_submitted_bids,
     update_bid,
@@ -25,6 +31,7 @@ from app.modules.bids.service import (
 from app.services.supabase_storage import generate_signed_url
 
 router = APIRouter(prefix="/bids", tags=["Bids"])
+
 
 TEMP_UPLOAD_DIR = os.getenv("UPLOAD_DIR", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../uploads")))
 os.makedirs(TEMP_UPLOAD_DIR, exist_ok=True)
@@ -197,7 +204,36 @@ async def get_buyer_bids_for_tender(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
 
+
+@router.get("/buyer/tender/{tender_id}/compare", response_model=TenderBidComparisonResponse)
+async def compare_buyer_bids_for_tender(
+    tender_id: int,
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    Fetch multi-dimensional side-by-side comparison of all bids for a specific tender.
+    Buyer only. Includes financial metrics, vendor reputation, document compliance, and securities.
+    """
+    buyer_org_id = current_user.get("organization_id")
+    if not buyer_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            comparison_data = await get_tender_bid_comparison(connection, tender_id, buyer_org_id)
+            return comparison_data
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Tender not found.")
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
 @router.post("/buyer/{bid_id}/accept")
+
 async def accept_bid(
     bid_id: int,
     current_user: dict = Depends(get_current_user_org)
