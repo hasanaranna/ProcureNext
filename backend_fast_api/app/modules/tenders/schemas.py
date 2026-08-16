@@ -31,7 +31,7 @@
 # - TenderAmendmentResponse: amendment details
 # ============================================================
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
 from datetime import datetime
 from app.modules.tenders.models import TenderVisibility, TenderStatus
@@ -56,6 +56,8 @@ class TenderCreateRequest(BaseModel):
     required_seller_docs: Optional[List[dict]] = None  # [{name: str, allowed_roles: [str]}]
 
 class TenderResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     tender_id: int
     buyer_id: int
     created_by: int
@@ -67,11 +69,10 @@ class TenderResponse(BaseModel):
     pre_bid_meeting: Optional[datetime] = None
     tender_opening_date: Optional[datetime] = None
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 class TenderListItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     tender_id: int
     title: str
     description: str
@@ -80,26 +81,21 @@ class TenderListItem(BaseModel):
     submission_deadline: Optional[datetime] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-
 class TenderDocumentItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     tender_doc_id: int
     file_name: Optional[str] = None
     file_path: Optional[str] = None
     uploaded_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
-
 class RequiredDocumentItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     req_doc_id: int
     custom_doc_name: Optional[str] = None
     is_mandatory: bool = True
     allowed_roles: List[str] = ["Owner"]
-
-    class Config:
-        from_attributes = True
 
 class UpdateReqDocAccessItem(BaseModel):
     req_doc_id: int
@@ -109,6 +105,8 @@ class UpdateTenderReqDocAccessRequest(BaseModel):
     documents: List[UpdateReqDocAccessItem]
 
 class TenderDetailResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     tender_id: int
     title: str
     description: str
@@ -125,15 +123,78 @@ class TenderDetailResponse(BaseModel):
     documents: List[TenderDocumentItem] = []
     required_documents: List[RequiredDocumentItem] = []
 
-    class Config:
-        from_attributes = True
-
 class TenderDocumentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     tender_doc_id: int
     tender_id: int
     file_name: str
     file_path: str
     uploaded_at: datetime
-    
-    class Config:
-        from_attributes = True
+
+
+class OngoingTenderListItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    award_id: int
+    tender_id: int
+    tender_title: str
+    tender_description: Optional[str] = None
+    tender_status: str
+    budget_min: Optional[float] = None
+    budget_max: Optional[float] = None
+    submission_deadline: Optional[datetime] = None
+    tender_created_at: Optional[datetime] = None
+    awarded_at: Optional[datetime] = None
+    remarks: Optional[str] = None
+    winning_bid_id: int
+    winning_bid_amount: Optional[float] = None
+    winning_bid_description: Optional[str] = None
+    winning_bid_submitted_at: Optional[datetime] = None
+    buyer_org_id: int
+    buyer_org_name: str
+    vendor_org_id: int
+    vendor_org_name: str
+    role_in_tender: Optional[str] = None
+
+
+class OngoingTenderBidDocument(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    bid_doc_id: int
+    file_path: Optional[str] = None
+    document_type: str
+
+
+class OngoingTenderDetail(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    award_id: int
+    tender_id: int
+    tender_title: str
+    tender_description: str
+    tender_status: str
+    budget_min: Optional[float] = None
+    budget_max: Optional[float] = None
+    submission_deadline: Optional[datetime] = None
+    tender_public_date: Optional[datetime] = None
+    pre_bid_meeting: Optional[datetime] = None
+    tender_opening_date: Optional[datetime] = None
+    tender_created_at: Optional[datetime] = None
+    awarded_at: Optional[datetime] = None
+    remarks: Optional[str] = None
+    winning_bid_id: int
+    winning_bid_amount: Optional[float] = None
+    winning_bid_description: Optional[str] = None
+    winning_bid_submitted_at: Optional[datetime] = None
+    buyer_org_id: int
+    buyer_org_name: str
+    buyer_org_address: Optional[str] = None
+    buyer_org_website: Optional[str] = None
+    vendor_org_id: int
+    vendor_org_name: str
+    vendor_org_address: Optional[str] = None
+    vendor_org_website: Optional[str] = None
+    role_in_tender: Optional[str] = None
+    tender_documents: List[TenderDocumentItem] = []
+    bid_documents: List[OngoingTenderBidDocument] = []

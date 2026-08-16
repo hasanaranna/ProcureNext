@@ -71,8 +71,10 @@ export default function HomePage() {
   const [buyerTenders, setBuyerTenders] = useState<TenderItem[]>([]);
   const [sellerTenders, setSellerTenders] = useState<TenderItem[]>([]);
   const [tendersLoading, setTendersLoading] = useState(false);
+  const [filterStatus, setFilterStatus] = useState<'all' | 'published' | 'accepted'>('all');
+  const [enlistedOrgs, setEnlistedOrgs] = useState<Array<{ organization_id: number; organization_name: string; organization_type: string }>>([]);
 
-  // Fetch tenders when mode changes
+  // Fetch tenders when mode or activeTab changes
   useEffect(() => {
     const fetchTenders = async () => {
       setTendersLoading(true);
@@ -84,7 +86,10 @@ export default function HomePage() {
             setBuyerTenders(data);
           }
         } else {
-          const res = await fetch('/api/tenders/seller/all-tenders');
+          const endpoint = activeTab === 'enlisted'
+            ? '/api/tenders/seller/all-tenders?enlisted_only=true'
+            : '/api/tenders/seller/all-tenders';
+          const res = await fetch(endpoint);
           if (res.ok) {
             const data = await res.json();
             setSellerTenders(data);
@@ -97,7 +102,23 @@ export default function HomePage() {
       }
     };
     fetchTenders();
-  }, [mode]);
+  }, [mode, activeTab]);
+
+  // Fetch enlisted organizations
+  useEffect(() => {
+    const fetchEnlisted = async () => {
+      try {
+        const res = await fetch('/api/org/enlisted');
+        if (res.ok) {
+          const data = await res.json();
+          setEnlistedOrgs(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch enlisted orgs:', err);
+      }
+    };
+    fetchEnlisted();
+  }, []);
 
   const user = {
     name: userData.full_name || 'User',
@@ -121,10 +142,12 @@ export default function HomePage() {
 
   // Sidebar nav items
   const navItems = [
-    { label: 'Update Credentials', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) },
-    { label: 'Change Password', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>) },
-    { label: 'Payment Methods', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10a1 1 0 011-1h16a1 1 0 011 1v7a1 1 0 01-1 1H4a1 1 0 01-1-1v-7z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 6V4a2 2 0 012-2h6a2 2 0 012 2v2" /></svg>) },
-    { label: 'Manage Tokens', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) },
+    { label: 'Find Organizations', href: '/organizations', icon: (<svg className="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>) },
+    { label: 'Ongoing Tenders', href: '/ongoing-tenders', icon: (<svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>) },
+    { label: 'Update Credentials', href: '#', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) },
+    { label: 'Change Password', href: '#', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>) },
+    { label: 'Payment Methods', href: '#', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10a1 1 0 011-1h16a1 1 0 011 1v7a1 1 0 01-1 1H4a1 1 0 01-1-1v-7z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 6V4a2 2 0 012-2h6a2 2 0 012 2v2" /></svg>) },
+    { label: 'Manage Tokens', href: '#', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) },
   ];
 
   const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
@@ -171,10 +194,17 @@ export default function HomePage() {
         <ul className="space-y-1">
           {navItems.map((item, i) => (
             <li key={i}>
-              <a href="#" className="flex items-center gap-3 p-3 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-all duration-200">
+              <button
+                onClick={() => {
+                  if (item.href && item.href !== '#') {
+                    router.push(item.href);
+                  }
+                }}
+                className="w-full flex items-center gap-3 p-3 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-all duration-200 text-left"
+              >
                 {item.icon}
                 {(sidebarOpen || isMobile) && <span className="text-sm font-medium">{item.label}</span>}
-              </a>
+              </button>
             </li>
           ))}
         </ul>
@@ -284,26 +314,53 @@ export default function HomePage() {
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="text-slate-400 text-xs font-semibold">Total Published Tenders</p>
-                            <p className="text-2xl font-black text-white mt-1">12</p>
+                            <p className="text-2xl font-black text-white mt-1">{buyerTenders.filter(t => t.status === 'Published').length}</p>
                           </div>
                           <div className="w-10 h-10 bg-gradient-to-br from-accent-500 to-accent-600 rounded-xl flex items-center justify-center text-white text-lg shadow-lg">📊</div>
                         </div>
                       </div>
-                      <div className="bg-white/10 rounded-2xl p-4 border border-white/10 backdrop-blur-sm">
+                      <div
+                        onClick={() => router.push('/ongoing-tenders')}
+                        className="bg-white/10 hover:bg-white/15 rounded-2xl p-4 border border-white/10 backdrop-blur-sm cursor-pointer transition group"
+                      >
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-slate-400 text-xs font-semibold">Accepted Tenders</p>
-                            <p className="text-2xl font-black text-white mt-1">8</p>
+                            <div className="flex items-center gap-1">
+                              <p className="text-slate-400 text-xs font-semibold group-hover:text-emerald-300 transition-colors">Accepted / Ongoing Tenders</p>
+                              <span className="text-xs text-slate-400">→</span>
+                            </div>
+                            <p className="text-2xl font-black text-white mt-1">{buyerTenders.filter(t => t.status === 'Awarded').length}</p>
                           </div>
                           <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-xl flex items-center justify-center text-white text-lg shadow-lg">📦</div>
                         </div>
                       </div>
                       <div className="bg-white/10 rounded-2xl p-4 border border-white/10 backdrop-blur-sm sm:col-span-2">
-                        <p className="text-slate-400 text-xs font-semibold mb-2">Enlisted Vendors (5)</p>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-slate-400 text-xs font-semibold">
+                            Enlisted Vendors ({enlistedOrgs.filter(o => o.organization_type === 'Vendor').length})
+                          </p>
+                          <button
+                            onClick={() => router.push('/organizations')}
+                            className="text-xs text-accent-300 hover:text-white font-bold transition flex items-center gap-1"
+                          >
+                            + Find Vendors →
+                          </button>
+                        </div>
                         <div className="flex flex-wrap gap-2">
-                          {['Global Supplies Co.', 'Tech Solutions Ltd.', 'Modern Furnishings', 'CleanPro Services', 'Enterprise Software'].map(v => (
-                            <span key={v} className="px-3 py-1 rounded-full text-xs text-white bg-white/10 border border-white/10 font-medium">{v}</span>
-                          ))}
+                          {enlistedOrgs.filter(o => o.organization_type === 'Vendor').length === 0 ? (
+                            <span className="text-xs text-slate-400 italic">No vendors enlisted yet. Explore the directory to enlist trusted suppliers.</span>
+                          ) : (
+                            enlistedOrgs.filter(o => o.organization_type === 'Vendor').map(v => (
+                              <button
+                                key={v.organization_id}
+                                onClick={() => router.push(`/organizations/${v.organization_id}`)}
+                                className="px-3 py-1 rounded-full text-xs text-white bg-white/10 hover:bg-white/20 border border-white/10 font-medium transition cursor-pointer flex items-center gap-1"
+                              >
+                                <span>⭐</span>
+                                <span>{v.organization_name}</span>
+                              </button>
+                            ))
+                          )}
                         </div>
                       </div>
                     </>
@@ -318,21 +375,48 @@ export default function HomePage() {
                           <div className="w-10 h-10 bg-gradient-to-br from-accent-500 to-accent-600 rounded-xl flex items-center justify-center text-white text-lg shadow-lg">📊</div>
                         </div>
                       </div>
-                      <div className="bg-white/10 rounded-2xl p-4 border border-white/10 backdrop-blur-sm">
+                      <div
+                        onClick={() => router.push('/ongoing-tenders')}
+                        className="bg-white/10 hover:bg-white/15 rounded-2xl p-4 border border-white/10 backdrop-blur-sm cursor-pointer transition group"
+                      >
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-slate-400 text-xs font-semibold">Accepted Bids</p>
+                            <div className="flex items-center gap-1">
+                              <p className="text-slate-400 text-xs font-semibold group-hover:text-emerald-300 transition-colors">Accepted Bids / Ongoing</p>
+                              <span className="text-xs text-slate-400">→</span>
+                            </div>
                             <p className="text-2xl font-black text-white mt-1">6</p>
                           </div>
                           <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-xl flex items-center justify-center text-white text-lg shadow-lg">✅</div>
                         </div>
                       </div>
                       <div className="bg-white/10 rounded-2xl p-4 border border-white/10 backdrop-blur-sm sm:col-span-2">
-                        <p className="text-slate-400 text-xs font-semibold mb-2">Enlisted Buyers (4)</p>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-slate-400 text-xs font-semibold">
+                            Enlisted Buyers ({enlistedOrgs.filter(o => o.organization_type === 'Buyer').length})
+                          </p>
+                          <button
+                            onClick={() => router.push('/organizations')}
+                            className="text-xs text-accent-300 hover:text-white font-bold transition flex items-center gap-1"
+                          >
+                            + Find Buyers →
+                          </button>
+                        </div>
                         <div className="flex flex-wrap gap-2">
-                          {['Acme Corporation', 'BuildRight Inc.', 'Metro Industries', 'Summit Holdings'].map(v => (
-                            <span key={v} className="px-3 py-1 rounded-full text-xs text-white bg-white/10 border border-white/10 font-medium">{v}</span>
-                          ))}
+                          {enlistedOrgs.filter(o => o.organization_type === 'Buyer').length === 0 ? (
+                            <span className="text-xs text-slate-400 italic">No buyers enlisted yet. Explore the directory to find verified buyers.</span>
+                          ) : (
+                            enlistedOrgs.filter(o => o.organization_type === 'Buyer').map(b => (
+                              <button
+                                key={b.organization_id}
+                                onClick={() => router.push(`/organizations/${b.organization_id}`)}
+                                className="px-3 py-1 rounded-full text-xs text-white bg-white/10 hover:bg-white/20 border border-white/10 font-medium transition cursor-pointer flex items-center gap-1"
+                              >
+                                <span>⭐</span>
+                                <span>{b.organization_name}</span>
+                              </button>
+                            ))
+                          )}
                         </div>
                       </div>
                     </>
@@ -378,12 +462,22 @@ export default function HomePage() {
                         <div className="bg-navy-900 rounded-xl px-4 py-2 flex items-center gap-2">
                           <label htmlFor="filter-dropdown" className="text-slate-300 font-medium text-sm">Filter:</label>
                           <select id="filter-dropdown"
+                            value={filterStatus}
+                            onChange={(e) => setFilterStatus(e.target.value as any)}
                             className="bg-white text-navy-900 font-medium text-sm outline-none cursor-pointer rounded-lg px-2 py-1">
                             <option value="all">Show All</option>
                             <option value="published">Published</option>
-                            <option value="accepted">Accepted</option>
+                            <option value="accepted">Accepted / Awarded</option>
                           </select>
                         </div>
+                        <button onClick={() => router.push('/organizations')}
+                          className="px-4 py-2 rounded-xl bg-cyan-50 text-cyan-800 border border-cyan-300 font-bold hover:bg-cyan-100 transition-all text-sm flex items-center gap-1.5 shadow-sm">
+                          🌐 Find Organizations
+                        </button>
+                        <button onClick={() => router.push('/ongoing-tenders')}
+                          className="px-4 py-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold hover:bg-emerald-100 transition-all text-sm flex items-center gap-1.5 shadow-sm">
+                          📋 Ongoing Tenders
+                        </button>
                         <button onClick={() => router.push('/new-tender')}
                           className="px-6 py-2 rounded-xl bg-gradient-to-r from-accent-500 to-accent-600 text-white font-bold hover:from-accent-600 hover:to-accent-700 transition-all shadow-lg hover:shadow-xl hover:scale-[1.02] text-sm">
                           + Create Tender
@@ -399,23 +493,25 @@ export default function HomePage() {
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                           </svg>
                         </div>
-                      ) : buyerTenders.length === 0 ? (
+                      ) : buyerTenders.filter(t => filterStatus === 'all' ? true : filterStatus === 'published' ? t.status === 'Published' : (t.status === 'Awarded' || t.status === 'Accepted')).length === 0 ? (
                         <div className="col-span-full text-center py-16">
                           <svg className="w-12 h-12 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                           </svg>
-                          <p className="text-slate-400 text-lg font-medium">No tenders yet. Create your first tender!</p>
+                          <p className="text-slate-400 text-lg font-medium">No tenders found matching your filter.</p>
                         </div>
                       ) : (
-                        buyerTenders.map((tender) => (
-                          <TenderCard
-                            key={tender.tender_id}
-                            title={tender.title}
-                            subtitle={tender.description}
-                            vendor={tender.buyer_org_name}
-                            onClick={() => router.push(`/view-my-tender/${tender.tender_id}`)}
-                          />
-                        ))
+                        buyerTenders
+                          .filter(t => filterStatus === 'all' ? true : filterStatus === 'published' ? t.status === 'Published' : (t.status === 'Awarded' || t.status === 'Accepted'))
+                          .map((tender) => (
+                            <TenderCard
+                              key={tender.tender_id}
+                              title={tender.title}
+                              subtitle={tender.description}
+                              vendor={tender.buyer_org_name}
+                              onClick={() => router.push(`/view-my-tender/${tender.tender_id}`)}
+                            />
+                          ))
                       )}
                     </div>
                   </div>
@@ -424,10 +520,20 @@ export default function HomePage() {
                 <div className="rounded-xl p-4 md:p-8">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                     <h2 className="text-2xl font-black text-navy-900">Available Tenders</h2>
-                    <button onClick={() => router.push('/view-my-bids')}
-                      className="px-6 py-2 rounded-xl bg-gradient-to-r from-accent-500 to-accent-600 text-white font-bold hover:from-accent-600 hover:to-accent-700 transition-all shadow-lg hover:shadow-xl hover:scale-[1.02] text-sm">
-                      View My Bids
-                    </button>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <button onClick={() => router.push('/organizations')}
+                        className="px-4 py-2 rounded-xl bg-cyan-50 text-cyan-800 border border-cyan-300 font-bold hover:bg-cyan-100 transition-all text-sm flex items-center gap-1.5 shadow-sm">
+                        🌐 Find Organizations
+                      </button>
+                      <button onClick={() => router.push('/ongoing-tenders')}
+                        className="px-4 py-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold hover:bg-emerald-100 transition-all text-sm flex items-center gap-1.5 shadow-sm">
+                        📋 Ongoing Tenders
+                      </button>
+                      <button onClick={() => router.push('/view-my-bids')}
+                        className="px-6 py-2 rounded-xl bg-gradient-to-r from-accent-500 to-accent-600 text-white font-bold hover:from-accent-600 hover:to-accent-700 transition-all shadow-lg hover:shadow-xl hover:scale-[1.02] text-sm">
+                        View My Bids
+                      </button>
+                    </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {tendersLoading ? (
@@ -438,11 +544,26 @@ export default function HomePage() {
                         </svg>
                       </div>
                     ) : sellerTenders.length === 0 ? (
-                      <div className="col-span-full text-center py-16">
+                      <div className="col-span-full text-center py-16 bg-slate-50 rounded-2xl border border-slate-200">
                         <svg className="w-12 h-12 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                         </svg>
-                        <p className="text-slate-400 text-lg font-medium">No tenders available at the moment.</p>
+                        {activeTab === 'enlisted' ? (
+                          <>
+                            <p className="text-navy-900 text-lg font-bold">No tenders from your enlisted buyers</p>
+                            <p className="text-slate-400 text-sm mt-1 max-w-md mx-auto mb-4">
+                              Enlist trusted buyer organizations from the directory to see their active and exclusive tenders here.
+                            </p>
+                            <button
+                              onClick={() => router.push('/organizations')}
+                              className="px-5 py-2.5 bg-accent-600 hover:bg-accent-700 text-white font-bold text-xs rounded-xl transition shadow"
+                            >
+                              + Discover & Enlist Buyers
+                            </button>
+                          </>
+                        ) : (
+                          <p className="text-slate-400 text-lg font-medium">No tenders available at the moment.</p>
+                        )}
                       </div>
                     ) : (
                       sellerTenders.map((tender) => (
