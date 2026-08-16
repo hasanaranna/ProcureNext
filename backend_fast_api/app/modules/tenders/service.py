@@ -370,3 +370,198 @@ async def get_ongoing_tender_detail(
 
     return result
 
+
+async def delete_tender(
+    connection: asyncpg.Connection,
+    tender_id: int,
+    buyer_org_id: int
+) -> dict:
+    """
+    Deletes a tender, its related DB records (cascading all bids, documents, chat, messages, awards),
+    and cleans up all associated storage files from Supabase.
+    Only the owning buyer organization can delete the tender.
+    Awarded tenders cannot be deleted.
+    """
+    from app.services.supabase_storage import delete_files
+    import logging
+    logger = logging.getLogger(__name__)
+
+    # 1. Verify tender exists and ownership
+    tender_row = await connection.fetchrow(
+        "SELECT tender_id, buyer_id, status FROM tenders WHERE tender_id = $1",
+        tender_id
+    )
+    if not tender_row:
+        raise KeyError("Tender not found")
+
+    if tender_row["buyer_id"] != buyer_org_id:
+        raise PermissionError("You do not have permission to delete this tender.")
+
+    if tender_row["status"] == "Awarded":
+        raise ValueError("Cannot delete an awarded tender.")
+
+    # 2. Gather all storage file paths for cleanup
+    # Tender documents
+    tender_docs = await connection.fetch(
+        "SELECT file_path FROM tender_documents WHERE tender_id = $1",
+        tender_id
+    )
+    # Bid documents for all bids on this tender
+    bid_docs = await connection.fetch("""
+        SELECT bd.file_path
+        FROM bid_documents bd
+        JOIN bids b ON bd.bid_id = b.bid_id
+        WHERE b.tender_id = $1
+    """, tender_id)
+    # Bid security documents
+    bid_secs = await connection.fetch("""
+        SELECT bs.bid_security_doc_path
+        FROM bid_securities bs
+        JOIN bids b ON bs.bid_id = b.bid_id
+        WHERE b.tender_id = $1
+    """, tender_id)
+    # Contract documents (if any exist)
+    contract_docs = await connection.fetch("""
+        SELECT c.contract_document_path
+        FROM contracts c
+        JOIN awards a ON c.award_id = a.award_id
+        WHERE a.tender_id = $1
+    """, tender_id)
+
+    storage_paths = [r["file_path"] for r in tender_docs if r.get("file_path")]
+    storage_paths.extend([r["file_path"] for r in bid_docs if r.get("file_path")])
+    storage_paths.extend([r["bid_security_doc_path"] for r in bid_secs if r.get("bid_security_doc_path")])
+    storage_paths.extend([r["contract_document_path"] for r in contract_docs if r.get("contract_document_path")])
+
+    # 3. Perform database cascading deletions within a transaction
+    async with connection.transaction():
+        # Chat
+        await connection.execute("""
+            DELETE FROM tender_chat_seen
+            WHERE message_id IN (
+                SELECT m.message_id
+                FROM tender_chat_messages m
+                JOIN tender_chat_rooms r ON m.room_id = r.room_id
+                WHERE r.tender_id = $1
+            )
+        """, tender_id)
+        await connection.execute("""
+            DELETE FROM tender_chat_messages
+            WHERE room_id IN (SELECT room_id FROM tender_chat_rooms WHERE tender_id = $1)
+        """, tender_id)
+        await connection.execute("""
+            DELETE FROM tender_chat_participants
+            WHERE room_id IN (SELECT room_id FROM tender_chat_rooms WHERE tender_id = $1)
+        """, tender_id)
+        await connection.execute("DELETE FROM tender_chat_rooms WHERE tender_id = $1", tender_id)
+
+        # Message threads
+        await connection.execute("""
+            DELETE FROM messages
+            WHERE thread_id IN (SELECT thread_id FROM message_threads WHERE tender_id = $1)
+        """, tender_id)
+        await connection.execute("""
+            DELETE FROM thread_participants
+            WHERE thread_id IN (SELECT thread_id FROM message_threads WHERE tender_id = $1)
+        """, tender_id)
+        await connection.execute("DELETE FROM message_threads WHERE tender_id = $1", tender_id)
+
+        # Notifications
+        await connection.execute("""
+            DELETE FROM notification_recipients
+            WHERE notification_id IN (
+                SELECT notification_id FROM notifications
+                WHERE (reference_type = 'TENDER' AND reference_id = $1)
+                   OR (reference_type = 'BID' AND reference_id IN (SELECT bid_id FROM bids WHERE tender_id = $1))
+            )
+        """, tender_id)
+        await connection.execute("""
+            DELETE FROM notifications
+            WHERE (reference_type = 'TENDER' AND reference_id = $1)
+               OR (reference_type = 'BID' AND reference_id IN (SELECT bid_id FROM bids WHERE tender_id = $1))
+        """, tender_id)
+
+        # Awards & contracts
+        await connection.execute("""
+            DELETE FROM vendor_performance
+            WHERE contract_id IN (
+                SELECT c.contract_id FROM contracts c
+                JOIN awards a ON c.award_id = a.award_id
+                WHERE a.tender_id = $1
+            )
+        """, tender_id)
+        await connection.execute("""
+            DELETE FROM contracts
+            WHERE award_id IN (SELECT award_id FROM awards WHERE tender_id = $1)
+        """, tender_id)
+        await connection.execute("DELETE FROM awards WHERE tender_id = $1", tender_id)
+
+        # Bids
+        await connection.execute("""
+            DELETE FROM bid_documents
+            WHERE bid_id IN (SELECT bid_id FROM bids WHERE tender_id = $1)
+        """, tender_id)
+        await connection.execute("""
+            DELETE FROM bid_securities
+            WHERE bid_id IN (SELECT bid_id FROM bids WHERE tender_id = $1)
+        """, tender_id)
+        await connection.execute("DELETE FROM bids WHERE tender_id = $1", tender_id)
+
+        # Tender sub-tables
+        await connection.execute("DELETE FROM tender_documents WHERE tender_id = $1", tender_id)
+        await connection.execute("DELETE FROM tender_required_documents WHERE tender_id = $1", tender_id)
+        await connection.execute("DELETE FROM tender_invitations WHERE tender_id = $1", tender_id)
+        await connection.execute("DELETE FROM tender_vendor_suggestions WHERE tender_id = $1", tender_id)
+
+        # Tender itself
+        await connection.execute("DELETE FROM tenders WHERE tender_id = $1", tender_id)
+
+    # 4. Clean up storage files after successful DB transaction
+    if storage_paths:
+        try:
+            await delete_files(storage_paths)
+        except Exception as e:
+            logger.warning(f"Failed to delete storage files for tender {tender_id}: {e}")
+
+    return {"message": "Tender and all associated data deleted successfully.", "tender_id": tender_id}
+
+
+async def delete_tender_document(
+    connection: asyncpg.Connection,
+    doc_id: int,
+    buyer_org_id: int
+) -> dict:
+    """
+    Deletes a specific tender document from storage and database.
+    Only the owning buyer organization can delete the document.
+    """
+    from app.services.supabase_storage import delete_files
+    import logging
+    logger = logging.getLogger(__name__)
+
+    doc_row = await connection.fetchrow("""
+        SELECT td.tender_doc_id, td.file_path, t.buyer_id, td.tender_id
+        FROM tender_documents td
+        JOIN tenders t ON td.tender_id = t.tender_id
+        WHERE td.tender_doc_id = $1
+    """, doc_id)
+
+    if not doc_row:
+        raise KeyError("Document not found")
+
+    if doc_row["buyer_id"] != buyer_org_id:
+        raise PermissionError("You do not have permission to delete this document.")
+
+    file_path = doc_row["file_path"]
+
+    await connection.execute("DELETE FROM tender_documents WHERE tender_doc_id = $1", doc_id)
+
+    if file_path:
+        try:
+            await delete_files([file_path])
+        except Exception as e:
+            logger.warning(f"Failed to delete storage file {file_path}: {e}")
+
+    return {"message": "Tender document deleted successfully.", "doc_id": doc_id}
+
+

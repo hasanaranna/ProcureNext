@@ -31,7 +31,7 @@ from fastapi import HTTPException, UploadFile
 
 from app.core.security import create_access_token, create_refresh_token, verify_password, hash_password
 from app.modules.auth.schemas import LoginRequest, TokenResponse, UserResponse, AdminTokenResponse, AdminUserResponse
-from app.services.supabase_storage import build_registration_prefix, upload_optional_file
+from app.services.supabase_storage import build_registration_prefix, upload_optional_file, delete_files
 
 
 async def authenticate_user(connection: asyncpg.Connection, payload: LoginRequest) -> TokenResponse:
@@ -124,47 +124,63 @@ async def register_employee_user(
     
     password_hash = hash_password(password)
     storage_prefix = build_registration_prefix(email)
-    nid_front_url = await upload_optional_file(nid_front, f"{storage_prefix}/nid")
-    nid_back_url = await upload_optional_file(nid_back, f"{storage_prefix}/nid")
+    uploaded_files: list[str] = []
 
-    async with connection.transaction():
-        # Create User
-        user = await connection.fetchrow(
-            """
-            INSERT INTO users (full_name, email, nid, date_of_birth, password_hash, phone, status)
-            VALUES ($1, $2, $3, $4, $5, $6, 'Active')
-            RETURNING user_id, email, status
-            """,
-            name, email, nid, date_of_birth, password_hash, phone
-        )
-        if not user:
-            raise HTTPException(status_code=500, detail="Failed to create user.")
-        
-        user_id = user["user_id"]
+    try:
+        nid_front_url = await upload_optional_file(nid_front, f"{storage_prefix}/nid")
+        if nid_front_url:
+            uploaded_files.append(nid_front_url)
 
-        # Add Verification details
-        await connection.execute(
-            """
-            INSERT INTO user_verification (user_id, nid_front_file_path, nid_back_file_path, review_status)
-            VALUES ($1, $2, $3, 'Pending')
-            """,
-            user_id, nid_front_url, nid_back_url
-        )
+        nid_back_url = await upload_optional_file(nid_back, f"{storage_prefix}/nid")
+        if nid_back_url:
+            uploaded_files.append(nid_back_url)
 
-        # Add to Organization Employees (Default Viewer role)
-        await connection.execute(
-            """
-            INSERT INTO organization_employees (organization_id, user_id, role_in_org)
-            VALUES ($1, $2, 'Viewer')
-            """,
-            invitation["organization_id"], user_id
-        )
+        async with connection.transaction():
+            # Create User
+            user = await connection.fetchrow(
+                """
+                INSERT INTO users (full_name, email, nid, date_of_birth, password_hash, phone, status)
+                VALUES ($1, $2, $3, $4, $5, $6, 'Active')
+                RETURNING user_id, email, status
+                """,
+                name, email, nid, date_of_birth, password_hash, phone
+            )
+            if not user:
+                raise HTTPException(status_code=500, detail="Failed to create user.")
+            
+            user_id = user["user_id"]
 
-        # Update Invitation Status
-        await connection.execute(
-            "UPDATE user_invitations SET status = 'Accepted' WHERE invitation_id = $1",
-            invitation["invitation_id"]
-        )
+            # Add Verification details
+            await connection.execute(
+                """
+                INSERT INTO user_verification (user_id, nid_front_file_path, nid_back_file_path, review_status)
+                VALUES ($1, $2, $3, 'Pending')
+                """,
+                user_id, nid_front_url, nid_back_url
+            )
+
+            # Add to Organization Employees (Default Viewer role)
+            await connection.execute(
+                """
+                INSERT INTO organization_employees (organization_id, user_id, role_in_org)
+                VALUES ($1, $2, 'Viewer')
+                """,
+                invitation["organization_id"], user_id
+            )
+
+            # Update Invitation Status
+            await connection.execute(
+                "UPDATE user_invitations SET status = 'Accepted' WHERE invitation_id = $1",
+                invitation["invitation_id"]
+            )
+    except Exception:
+        if uploaded_files:
+            try:
+                await delete_files(uploaded_files)
+            except Exception:
+                pass
+        raise
+
 
     # Automatically generate tokens
     user_response = UserResponse(

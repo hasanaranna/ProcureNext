@@ -93,7 +93,12 @@ from app.modules.organizations.service import (
     get_enlisted_organizations,
     get_organization_profile
 )
-from app.services.supabase_storage import build_registration_prefix, upload_optional_file, upload_optional_files
+from app.services.supabase_storage import (
+    build_registration_prefix,
+    upload_optional_file,
+    upload_optional_files,
+    delete_files
+)
 
 router = APIRouter(prefix="/api/org", tags=["organizations"])
 
@@ -119,50 +124,88 @@ async def create_organization(
     additional_docs: list[UploadFile] = File(default=[], alias="additionalDocs"),
 ) -> OrgCreateResponse:
     storage_prefix = build_registration_prefix(email)
-
-    nid_front_url = await upload_optional_file(nid_front, f"{storage_prefix}/nid")
-    nid_back_url = await upload_optional_file(nid_back, f"{storage_prefix}/nid")
-    trade_license_url = await upload_optional_file(trade_license, f"{storage_prefix}/org")
-    tin_certificate_url = await upload_optional_file(tin_certificate, f"{storage_prefix}/org")
-    vat_certificate_url = await upload_optional_file(vat_certificate, f"{storage_prefix}/org")
-    additional_document_urls = await upload_optional_files(additional_docs, f"{storage_prefix}/org/additional")
-
-    payload = OrgCreateRequest(
-        full_name=name,
-        email=email,
-        phone=phone,
-        nid=nid,
-        date_of_birth=date_of_birth,
-        password=password,
-        organization_name=organization_name,
-        organization_type=organization_type,
-        address=address,
-        website=website,
-        description=description,
-        nid_front_url=nid_front_url,
-        nid_back_url=nid_back_url,
-        trade_license_url=trade_license_url,
-        tin_certificate_url=tin_certificate_url,
-        vat_certificate_url=vat_certificate_url,
-        additional_document_urls=additional_document_urls,
-    )
-
-    print(
-        f"[POST /api/org/orgs] body={payload.model_dump(exclude={'password'})}",
-        flush=True,
-    )
+    uploaded_files: list[str] = []
 
     try:
+        # 1. Pre-validate that user doesn't already exist before uploading files
+        async with get_db_connection() as connection:
+            existing_user = await connection.fetchrow(
+                "SELECT user_id, email, nid FROM users WHERE email = $1 OR nid = $2",
+                email,
+                nid,
+            )
+            if existing_user is not None:
+                if existing_user["email"] == email:
+                    raise HTTPException(status_code=409, detail="A user with this email already exists.")
+                raise HTTPException(status_code=409, detail="A user with this NID already exists.")
+
+        # 2. Upload files tracking all uploaded paths for cleanup if later step fails
+        nid_front_url = await upload_optional_file(nid_front, f"{storage_prefix}/nid")
+        if nid_front_url:
+            uploaded_files.append(nid_front_url)
+
+        nid_back_url = await upload_optional_file(nid_back, f"{storage_prefix}/nid")
+        if nid_back_url:
+            uploaded_files.append(nid_back_url)
+
+        trade_license_url = await upload_optional_file(trade_license, f"{storage_prefix}/org")
+        if trade_license_url:
+            uploaded_files.append(trade_license_url)
+
+        tin_certificate_url = await upload_optional_file(tin_certificate, f"{storage_prefix}/org")
+        if tin_certificate_url:
+            uploaded_files.append(tin_certificate_url)
+
+        vat_certificate_url = await upload_optional_file(vat_certificate, f"{storage_prefix}/org")
+        if vat_certificate_url:
+            uploaded_files.append(vat_certificate_url)
+
+        additional_document_urls = await upload_optional_files(additional_docs, f"{storage_prefix}/org/additional")
+        uploaded_files.extend(additional_document_urls)
+
+        payload = OrgCreateRequest(
+            full_name=name,
+            email=email,
+            phone=phone,
+            nid=nid,
+            date_of_birth=date_of_birth,
+            password=password,
+            organization_name=organization_name,
+            organization_type=organization_type,
+            address=address,
+            website=website,
+            description=description,
+            nid_front_url=nid_front_url,
+            nid_back_url=nid_back_url,
+            trade_license_url=trade_license_url,
+            tin_certificate_url=tin_certificate_url,
+            vat_certificate_url=vat_certificate_url,
+            additional_document_urls=additional_document_urls,
+        )
+
+        print(
+            f"[POST /api/org/orgs] body={payload.model_dump(exclude={'password'})}",
+            flush=True,
+        )
+
         async with get_db_connection() as connection:
             return await create_master_organization(connection, payload)
-    except HTTPException:
-        raise
-    except asyncpg.PostgresError as exc:
-        print(f"[DB ERROR] {exc}", flush=True)
-        raise HTTPException(status_code=500, detail=f"Database Error: {str(exc)}") from exc
     except Exception as exc:
+        # Clean up any files that were uploaded to Supabase Storage if the operation failed!
+        if uploaded_files:
+            try:
+                await delete_files(uploaded_files)
+            except Exception as del_exc:
+                print(f"[STORAGE CLEANUP ERROR] {del_exc}", flush=True)
+
+        if isinstance(exc, HTTPException):
+            raise exc
+        if isinstance(exc, asyncpg.PostgresError):
+            print(f"[DB ERROR] {exc}", flush=True)
+            raise HTTPException(status_code=500, detail=f"Database Error: {str(exc)}") from exc
         print(f"[SYSTEM ERROR] {exc}", flush=True)
         raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
 
 
 @router.get("/invitation-details")
