@@ -29,16 +29,18 @@
 import asyncpg
 from app.modules.tenders.schemas import TenderCreateRequest
 from app.tasks.document_tasks import upload_tender_documents_to_supabase
+from app.modules.payments.service import deduct_tokens_for_tender_publish
 
 async def publish_tender_with_documents(
     connection: asyncpg.Connection, 
     buyer_id: int, 
-    user_id: int, 
+    org_user_id: int, 
+    user_id: int,
     tender_data: TenderCreateRequest, 
     files_data: list[dict]
 ) -> dict:
     """
-    Creates a tender directly in Published state and queues background file upload.
+    Creates a tender directly in Published state, deducts tokens, and queues background file upload.
     """
     
     query = """
@@ -50,44 +52,54 @@ async def publish_tender_with_documents(
         RETURNING *;
     """
     
-    row = await connection.fetchrow(
-        query,
-        buyer_id,
-        user_id,
-        tender_data.title,
-        tender_data.description,
-        tender_data.visibility_type.value,
-        tender_data.budget_min,
-        tender_data.budget_max,
-        "Published",
-        tender_data.submission_deadline.replace(tzinfo=None) if tender_data.submission_deadline else None,
-        tender_data.tender_public_date.replace(tzinfo=None) if tender_data.tender_public_date else None,
-        tender_data.pre_bid_meeting.replace(tzinfo=None) if tender_data.pre_bid_meeting else None,
-        tender_data.tender_opening_date.replace(tzinfo=None) if tender_data.tender_opening_date else None
-    )
-    
-    tender_id = row['tender_id']
+    async with connection.transaction():
+        row = await connection.fetchrow(
+            query,
+            buyer_id,
+            org_user_id,
+            tender_data.title,
+            tender_data.description,
+            tender_data.visibility_type.value,
+            tender_data.budget_min,
+            tender_data.budget_max,
+            "Published",
+            tender_data.submission_deadline.replace(tzinfo=None) if tender_data.submission_deadline else None,
+            tender_data.tender_public_date.replace(tzinfo=None) if tender_data.tender_public_date else None,
+            tender_data.pre_bid_meeting.replace(tzinfo=None) if tender_data.pre_bid_meeting else None,
+            tender_data.tender_opening_date.replace(tzinfo=None) if tender_data.tender_opening_date else None
+        )
+        
+        tender_id = row['tender_id']
 
-    if tender_data.required_seller_docs:
-        insert_req_doc_query = """
-            INSERT INTO public.tender_required_documents (
-                tender_id, custom_doc_name, is_mandatory, allowed_roles
-            )
-            VALUES ($1, $2, $3, $4::public.role_in_org[]);
-        """
-        for doc_entry in tender_data.required_seller_docs:
-            doc_name = doc_entry.get("name", "")
-            roles = doc_entry.get("allowed_roles", ["Owner"])
-            # Ensure Owner is always included
-            if "Owner" not in roles:
-                roles = ["Owner"] + roles
-            await connection.execute(
-                insert_req_doc_query,
-                tender_id,
-                doc_name,
-                True,
-                roles
-            )
+        if tender_data.required_seller_docs:
+            insert_req_doc_query = """
+                INSERT INTO public.tender_required_documents (
+                    tender_id, custom_doc_name, is_mandatory, allowed_roles
+                )
+                VALUES ($1, $2, $3, $4::public.role_in_org[]);
+            """
+            for doc_entry in tender_data.required_seller_docs:
+                doc_name = doc_entry.get("name", "")
+                roles = doc_entry.get("allowed_roles", ["Owner"])
+                # Ensure Owner is always included
+                if "Owner" not in roles:
+                    roles = ["Owner"] + roles
+                await connection.execute(
+                    insert_req_doc_query,
+                    tender_id,
+                    doc_name,
+                    True,
+                    roles
+                )
+
+        # Deduct configured tokens from buyer organization
+        await deduct_tokens_for_tender_publish(
+            connection=connection,
+            organization_id=buyer_id,
+            user_id=user_id,
+            tender_id=tender_id,
+            tender_title=tender_data.title,
+        )
 
     if files_data:
         # Dispatch Celery task to upload the local files to Supabase

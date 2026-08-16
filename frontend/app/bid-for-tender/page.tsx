@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import ManageTokensModal from "@/components/ManageTokensModal";
 import ModalShell from "@/components/ModalShell";
 
 interface TenderDocument {
@@ -91,6 +92,12 @@ function BidForTenderContent() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // Token monetization state
+  const [tokenBalance, setTokenBalance] = useState<number>(0);
+  const [bidCost, setBidCost] = useState<number>(20);
+  const [showManageTokens, setShowManageTokens] = useState(false);
+  const [tokenError, setTokenError] = useState<string | null>(null);
+
   const [formData, setFormData] = useState({
     description: "",
     bidAmount: "",
@@ -107,6 +114,13 @@ function BidForTenderContent() {
   const [submittedBidResult, setSubmittedBidResult] = useState<any>(null);
 
   useEffect(() => {
+    try {
+      const cached = localStorage.getItem('org_token_balance');
+      if (cached !== null && !isNaN(Number(cached))) {
+        setTokenBalance(Number(cached));
+      }
+    } catch { }
+
     if (!tenderId) {
       setError("No tender ID provided");
       setLoading(false);
@@ -114,18 +128,35 @@ function BidForTenderContent() {
     }
     const fetchData = async () => {
       try {
-        const tenderRes = await fetch(`/api/tenders/${tenderId}/detail`);
+        const [tenderRes, bidRes, balRes, priceRes] = await Promise.all([
+          fetch(`/api/tenders/${tenderId}/detail`),
+          fetch(`/api/bids/vendor/tender/${tenderId}`),
+          fetch('/api/payments/balance'),
+          fetch('/api/payments/pricing'),
+        ]);
+
         if (!tenderRes.ok) {
           throw new Error(tenderRes.status === 404 ? "Tender not found" : "Failed to load tender");
         }
         const tenderData = await tenderRes.json();
         setTender(tenderData);
 
-        // Fetch existing bid if any
-        const bidRes = await fetch(`/api/bids/vendor/tender/${tenderId}`);
         if (bidRes.ok) {
           const bidData = await bidRes.json();
           setExistingBid(bidData);
+        }
+
+        if (balRes.ok) {
+          const balData = await balRes.json();
+          setTokenBalance(balData.credit_balance);
+          try {
+            localStorage.setItem('org_token_balance', balData.credit_balance.toString());
+          } catch { }
+        }
+
+        if (priceRes.ok) {
+          const priceData = await priceRes.json();
+          setBidCost(priceData.bid_cost);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load data");
@@ -181,6 +212,12 @@ function BidForTenderContent() {
     e.preventDefault();
     if (!tenderId || submitting) return;
 
+    if (tokenBalance < bidCost) {
+      setTokenError(`Insufficient tokens. Submitting this bid requires ${bidCost} tokens, but your organization only has ${tokenBalance} tokens.`);
+      setShowManageTokens(true);
+      return;
+    }
+
     setFormValidationError(null);
 
     // Validate financial amount
@@ -218,6 +255,7 @@ function BidForTenderContent() {
     }
 
     setSubmitting(true);
+    setTokenError(null);
     try {
       const body = new FormData();
 
@@ -246,7 +284,14 @@ function BidForTenderContent() {
 
       if (!res.ok) {
         const errData = await res.json().catch(() => null);
-        throw new Error(errData?.detail || "Failed to submit bid");
+        const errorMsg = errData?.detail || "Failed to submit bid";
+        setTokenError(errorMsg);
+        if (res.status === 400 && typeof errorMsg === 'string' && errorMsg.toLowerCase().includes('token')) {
+          setShowManageTokens(true);
+        } else {
+          alert(errorMsg);
+        }
+        return;
       }
 
       const newBid = await res.json();
@@ -492,6 +537,60 @@ function BidForTenderContent() {
               )}
 
               <form onSubmit={handleSubmit} className="space-y-6">
+                {/* ── Token Cost & Balance Banner ───────── */}
+                <div className={`p-4 rounded-2xl border transition-all duration-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+                  tokenBalance < bidCost
+                    ? 'bg-rose-50 border-rose-200 text-rose-900'
+                    : 'bg-amber-50/70 border-amber-200/80 text-navy-900'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                      tokenBalance < bidCost ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'
+                    }`}>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase font-bold text-slate-500">Bidding Fee</p>
+                      <p className="text-sm font-black text-navy-900">
+                        Cost: <span className="text-amber-600 font-black">{bidCost} Tokens</span>
+                        <span className="mx-2 text-slate-300">|</span>
+                        Available: <span className={`font-black ${tokenBalance < bidCost ? 'text-rose-600' : 'text-emerald-600'}`}>{tokenBalance} Tokens</span>
+                      </p>
+                      {tokenBalance < bidCost && (
+                        <p className="text-xs text-rose-600 font-semibold mt-0.5">
+                          ⚠️ Insufficient balance. You need {bidCost - tokenBalance} more tokens to place a bid.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowManageTokens(true)}
+                    className="px-4 py-2 bg-navy-900 hover:bg-navy-800 text-white text-xs font-bold rounded-xl transition shadow flex items-center gap-1.5 flex-shrink-0 cursor-pointer"
+                  >
+                    <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    Buy Tokens
+                  </button>
+                </div>
+
+                {tokenError && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold rounded-xl flex items-center justify-between">
+                    <span>{tokenError}</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowManageTokens(true)}
+                      className="underline font-bold text-rose-900 hover:text-rose-950 ml-2"
+                    >
+                      Buy Tokens Now
+                    </button>
+                  </div>
+                )}
+
                 {/* Financial Amount */}
                 <div>
                   <label htmlFor="bidAmount" className="block text-sm font-semibold text-navy-900 mb-2">
@@ -635,11 +734,11 @@ function BidForTenderContent() {
                 {/* Buttons */}
                 <div className="flex gap-4 pt-4">
                   <button type="button" onClick={() => router.push("/home")}
-                    className="flex-1 px-6 py-3.5 bg-slate-100 text-navy-900 font-semibold rounded-xl hover:bg-slate-200 transition border border-slate-200 text-sm">
+                    className="flex-1 px-6 py-3.5 bg-slate-100 text-navy-900 font-semibold rounded-xl hover:bg-slate-200 transition border border-slate-200 text-sm cursor-pointer">
                     Cancel
                   </button>
                   <button type="submit" disabled={submitting}
-                    className="flex-1 px-6 py-3.5 bg-gradient-to-r from-navy-900 to-navy-800 text-white font-bold rounded-xl hover:from-navy-800 hover:to-navy-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm">
+                    className="flex-1 px-6 py-3.5 bg-gradient-to-r from-navy-900 to-navy-800 text-white font-bold rounded-xl hover:from-navy-800 hover:to-navy-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm cursor-pointer">
                     {submitting ? (
                       <>
                         <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
@@ -651,8 +750,33 @@ function BidForTenderContent() {
                     ) : (
                       <>
                         <span>Submit Bid Proposal</span>
+                        <span className="text-xs opacity-80 font-normal">({bidCost}</span>
+                        <svg className="w-3.5 h-3.5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="text-xs opacity-80 font-normal">)</span>
                       </>
                     )}
+                  </button>
+                </div>
+
+                {/* Token Info */}
+                <div className="text-center pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+                  <p className="flex items-center gap-1">
+                    Organization Balance:{" "}
+                    <span className="font-bold text-navy-900 flex items-center gap-1 text-sm">
+                      {tokenBalance.toLocaleString()}
+                      <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowManageTokens(true)}
+                    className="font-bold text-amber-600 hover:text-amber-700 underline cursor-pointer"
+                  >
+                    + Buy More Tokens
                   </button>
                 </div>
               </form>
@@ -660,6 +784,19 @@ function BidForTenderContent() {
           </div>
         )}
       </div>
+
+      {/* Manage Tokens Modal */}
+      <ManageTokensModal
+        isOpen={showManageTokens}
+        onClose={() => setShowManageTokens(false)}
+        onBalanceUpdate={(newBal) => {
+          setTokenBalance(newBal);
+          setTokenError(null);
+          try {
+            localStorage.setItem('org_token_balance', newBal.toString());
+          } catch { }
+        }}
+      />
 
       {/* Bid Submitted Successfully Modal */}
       <ModalShell
@@ -676,13 +813,13 @@ function BidForTenderContent() {
 
           <h2 className="text-2xl font-black text-navy-900 mb-1">Bid Placed Successfully!</h2>
           <p className="text-slate-600 text-sm mb-6">
-            Your proposal has been submitted to <strong className="text-navy-900">{tender.buyer_org_name}</strong> for evaluation.
+            Your proposal has been submitted to <strong className="text-navy-900">{tender?.buyer_org_name || 'Buyer'}</strong> for evaluation.
           </p>
 
           <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 mb-6 text-left space-y-3">
             <div className="flex justify-between items-center pb-2.5 border-b border-slate-200">
               <span className="text-xs text-slate-500 font-semibold uppercase">Tender</span>
-              <span className="text-xs font-bold text-navy-900 truncate max-w-[240px]">{tender.title}</span>
+              <span className="text-xs font-bold text-navy-900 truncate max-w-[240px]">{tender?.title}</span>
             </div>
             <div className="flex justify-between items-center pb-2.5 border-b border-slate-200">
               <span className="text-xs text-slate-500 font-semibold uppercase">Your Proposal</span>

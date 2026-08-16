@@ -6,6 +6,7 @@ import TenderCard from '@/components/TenderCard';
 import SlidingToggle from '@/components/SlidingToggle';
 import MessagingSidebar from '@/components/MessagingSidebar';
 import OrgManagementModal from '@/components/OrgManagementModal';
+import ManageTokensModal from '@/components/ManageTokensModal';
 
 export default function HomePage() {
   const router = useRouter();
@@ -18,6 +19,9 @@ export default function HomePage() {
   const [modeFadeIn, setModeFadeIn] = useState(true);
   const [tabFadeIn, setTabFadeIn] = useState(true);
   const [showOrgManagement, setShowOrgManagement] = useState(false);
+  const [showManageTokens, setShowManageTokens] = useState(false);
+  const [tokenBalance, setTokenBalance] = useState<number | null>(null);
+  const [loadingBalance, setLoadingBalance] = useState(true);
 
   // Load user data from localStorage
   const [userData, setUserData] = useState<{
@@ -33,7 +37,26 @@ export default function HomePage() {
       if (stored) {
         setUserData(JSON.parse(stored));
       }
+      const cachedBalance = localStorage.getItem('org_token_balance');
+      if (cachedBalance !== null && !isNaN(Number(cachedBalance))) {
+        setTokenBalance(Number(cachedBalance));
+        setLoadingBalance(false);
+      }
     } catch { }
+
+    // Fetch live organization token balance
+    fetch('/api/payments/balance')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && typeof data.credit_balance === 'number') {
+          setTokenBalance(data.credit_balance);
+          try {
+            localStorage.setItem('org_token_balance', data.credit_balance.toString());
+          } catch { }
+        }
+      })
+      .catch((err) => console.error('Failed to fetch balance:', err))
+      .finally(() => setLoadingBalance(false));
   }, []);
 
   const handleModeSwitch = (newMode: 'buyer' | 'seller') => {
@@ -141,13 +164,12 @@ export default function HomePage() {
   };
 
   // Sidebar nav items
-  const navItems = [
+  const navItems: Array<{ label: string; href?: string; onClick?: () => void; icon: React.ReactNode }> = [
     { label: 'Find Organizations', href: '/organizations', icon: (<svg className="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>) },
     { label: 'Ongoing Tenders', href: '/ongoing-tenders', icon: (<svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>) },
+    { label: 'Manage Tokens', onClick: () => setShowManageTokens(true), icon: (<svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) },
     { label: 'Update Credentials', href: '#', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) },
     { label: 'Change Password', href: '#', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>) },
-    { label: 'Payment Methods', href: '#', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10a1 1 0 011-1h16a1 1 0 011 1v7a1 1 0 01-1 1H4a1 1 0 01-1-1v-7z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 6V4a2 2 0 012-2h6a2 2 0 012 2v2" /></svg>) },
-    { label: 'Manage Tokens', href: '#', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) },
   ];
 
   const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
@@ -196,11 +218,13 @@ export default function HomePage() {
             <li key={i}>
               <button
                 onClick={() => {
-                  if (item.href && item.href !== '#') {
+                  if (item.onClick) {
+                    item.onClick();
+                  } else if (item.href && item.href !== '#') {
                     router.push(item.href);
                   }
                 }}
-                className="w-full flex items-center gap-3 p-3 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-all duration-200 text-left"
+                className="w-full flex items-center gap-3 p-3 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-all duration-200 text-left cursor-pointer"
               >
                 {item.icon}
                 {(sidebarOpen || isMobile) && <span className="text-sm font-medium">{item.label}</span>}
@@ -283,13 +307,23 @@ export default function HomePage() {
                 </div>
 
                 {/* Token capsule */}
-                <div className="rounded-xl px-4 py-2 flex items-center gap-2 whitespace-nowrap bg-white/10 border border-white/10">
+                <button
+                  onClick={() => setShowManageTokens(true)}
+                  className="rounded-xl px-4 py-2 flex items-center gap-2 whitespace-nowrap bg-white/10 hover:bg-white/15 border border-white/10 hover:border-amber-400/30 transition-all duration-200 cursor-pointer shadow-sm group"
+                  title="Manage Organization Tokens (Shared Pool)"
+                >
                   <span className="text-slate-400 text-sm font-medium">Tokens:</span>
-                  <span className="text-white text-lg font-black">250</span>
-                  <svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <span className="text-white text-lg font-black group-hover:text-amber-300 transition min-w-[28px] text-center inline-flex items-center justify-center">
+                    {tokenBalance !== null ? (
+                      tokenBalance.toLocaleString()
+                    ) : (
+                      <span className="inline-block w-8 h-4 bg-white/20 rounded animate-pulse"></span>
+                    )}
+                  </span>
+                  <svg className="w-5 h-5 text-yellow-400 group-hover:scale-110 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                </div>
+                </button>
 
                 {isOwner && (
                   <button onClick={() => setShowOrgManagement(true)}
@@ -609,6 +643,18 @@ export default function HomePage() {
       <OrgManagementModal
         isOpen={showOrgManagement}
         onClose={() => setShowOrgManagement(false)}
+      />
+
+      {/* Manage Tokens Modal */}
+      <ManageTokensModal
+        isOpen={showManageTokens}
+        onClose={() => setShowManageTokens(false)}
+        onBalanceUpdate={(newBal) => {
+          setTokenBalance(newBal);
+          try {
+            localStorage.setItem('org_token_balance', newBal.toString());
+          } catch { }
+        }}
       />
     </>
   );

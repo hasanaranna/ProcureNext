@@ -49,7 +49,7 @@ async def get_current_user_org(token: str = Depends(oauth2_scheme)) -> dict:
         return dict(user_org.items())
 
 
-async def get_current_admin_user(token: str = Depends(oauth2_scheme)) -> dict:
+async def get_current_admin(token: str = Depends(oauth2_scheme)) -> dict:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate admin credentials",
@@ -68,7 +68,7 @@ async def get_current_admin_user(token: str = Depends(oauth2_scheme)) -> dict:
     async with get_db_connection() as connection:
         admin_row = await connection.fetchrow(
             """
-            SELECT u.user_id, u.email, a.admin_id, a.admin_role
+            SELECT u.user_id, u.email, u.full_name, a.admin_id, a.admin_role
             FROM users u
             JOIN admins a ON u.user_id = a.user_id
             WHERE u.user_id = $1
@@ -77,7 +77,12 @@ async def get_current_admin_user(token: str = Depends(oauth2_scheme)) -> dict:
             user_id,
         )
         if admin_row is None and not admin_role:
-            raise HTTPException(status_code=403, detail="Admin access required.")
+            raise HTTPException(status_code=403, detail="Platform administrator privileges required.")
 
         return dict(admin_row.items()) if admin_row else {"user_id": user_id, "admin_role": admin_role}
+
+
+# Alias for compatibility with audit module and other services
+get_current_admin_user = get_current_admin
+
 

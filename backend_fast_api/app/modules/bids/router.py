@@ -91,6 +91,7 @@ async def submit_bid(
 
     vendor_org_id = current_user.get("organization_id", 1)
     org_user_id = current_user.get("org_user_id", 1)
+    user_id = current_user.get("user_id") or current_user.get("org_user_id", 1)
 
     # 3. Save to DB and dispatch background task
     try:
@@ -99,6 +100,7 @@ async def submit_bid(
                 connection=connection,
                 vendor_org_id=vendor_org_id,
                 submitted_by=org_user_id,
+                user_id=user_id,
                 tender_id=tender_id,
                 financial_amount=financial_amount,
                 files_data=files_data,

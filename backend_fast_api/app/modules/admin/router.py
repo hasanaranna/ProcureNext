@@ -56,12 +56,29 @@
 #   - Admin resolves a report (take action or dismiss)
 # ============================================================
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends, status
 from app.core.db import get_db_connection
 from app.modules.auth.schemas import LoginRequest, AdminTokenResponse
 from app.modules.auth.service import authenticate_admin
+from app.modules.auth.dependencies import get_current_admin
+from typing import List
 from app.modules.admin.schemas import PendingMasterAccountsResponse, VerifyOrgRequest
 from app.modules.admin.service import get_pending_master_accounts, verify_organization
+from app.modules.payments.schemas import (
+    PricingConfigResponse,
+    UpdatePricingRequest,
+    TokenPackageResponse,
+    CreatePackageRequest,
+    UpdatePackageRequest,
+)
+from app.modules.payments.service import (
+    get_platform_pricing,
+    update_platform_pricing,
+    list_all_token_packages_admin,
+    create_token_package,
+    update_token_package,
+    delete_token_package,
+)
 # pyrefly: ignore [missing-import]
 import asyncpg
 
@@ -129,3 +146,113 @@ async def verify_organization_endpoint(organization_id: int, payload: VerifyOrgR
     except Exception as exc:
         print(f"[SYSTEM ERROR] {exc}", flush=True)
         raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
+@router.get("/admin/pricing", response_model=PricingConfigResponse)
+async def get_admin_pricing():
+    """
+    Retrieve current platform token pricing configuration for admin panel.
+    """
+    try:
+        async with get_db_connection() as connection:
+            return await get_platform_pricing(connection)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        print(f"[SYSTEM ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
+@router.post("/admin/pricing", response_model=PricingConfigResponse)
+async def update_admin_pricing(
+    payload: UpdatePricingRequest,
+    admin: dict = Depends(get_current_admin),
+):
+    """
+    Admin-only endpoint to update token pricing, tender submission rate, and bid rate.
+    """
+    try:
+        async with get_db_connection() as connection:
+            return await update_platform_pricing(
+                connection=connection,
+                admin_user_id=admin["user_id"],
+                payload=payload,
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        print(f"[SYSTEM ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
+@router.get("/admin/packages", response_model=List[TokenPackageResponse])
+async def list_admin_packages(admin: dict = Depends(get_current_admin)):
+    """
+    List all token packages (active and inactive) for platform admin.
+    """
+    try:
+        async with get_db_connection() as connection:
+            return await list_all_token_packages_admin(connection)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        print(f"[SYSTEM ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
+@router.post("/admin/packages", response_model=TokenPackageResponse, status_code=status.HTTP_201_CREATED)
+async def create_admin_package(
+    payload: CreatePackageRequest,
+    admin: dict = Depends(get_current_admin),
+):
+    """
+    Create a new token package with custom token amount, price in BDT, and optional badge.
+    """
+    try:
+        async with get_db_connection() as connection:
+            return await create_token_package(connection, payload)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        print(f"[SYSTEM ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
+@router.put("/admin/packages/{package_id}", response_model=TokenPackageResponse)
+async def update_admin_package(
+    package_id: int,
+    payload: UpdatePackageRequest,
+    admin: dict = Depends(get_current_admin),
+):
+    """
+    Update an existing token package (price, token amount, badge, active status).
+    """
+    try:
+        async with get_db_connection() as connection:
+            return await update_token_package(connection, package_id, payload)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        print(f"[SYSTEM ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
+@router.delete("/admin/packages/{package_id}")
+async def delete_admin_package(
+    package_id: int,
+    admin: dict = Depends(get_current_admin),
+):
+    """
+    Delete a token package.
+    """
+    try:
+        async with get_db_connection() as connection:
+            await delete_token_package(connection, package_id)
+            return {"success": True, "message": f"Package #{package_id} deleted successfully."}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        print(f"[SYSTEM ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
