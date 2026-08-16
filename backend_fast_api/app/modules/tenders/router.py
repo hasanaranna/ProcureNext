@@ -156,7 +156,7 @@ async def publish_with_documents(
 
     buyer_id = current_user.get("organization_id", 1)
     org_user_id = current_user.get("org_user_id", 1)
-    user_id = current_user.get("user_id", 1)
+    user_id = current_user.get("user_id") or current_user.get("org_user_id", 1)
 
     # 3. Save to DB and Dispatch background task
     try:
