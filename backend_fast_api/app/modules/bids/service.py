@@ -225,3 +225,198 @@ async def get_vendor_submitted_bids(
     """
     bids_rows = await connection.fetch(bids_query, vendor_org_id)
     return [dict(r) for r in bids_rows]
+
+
+async def update_bid(
+    connection: asyncpg.Connection,
+    bid_id: int,
+    vendor_org_id: int,
+    financial_amount: float | None = None,
+    description: str | None = None,
+    status: str | None = None,
+) -> dict:
+    """
+    Update bid details (financial amount, description, status).
+    Only the owning vendor organization can update the bid.
+    Cannot update if bid is already Accepted or if the tender is Awarded/Closed/Cancelled.
+    """
+    # 1. Fetch bid and associated tender status
+    bid_row = await connection.fetchrow("""
+        SELECT b.*, t.status as tender_status
+        FROM bids b
+        JOIN tenders t ON b.tender_id = t.tender_id
+        WHERE b.bid_id = $1
+    """, bid_id)
+
+    if not bid_row:
+        raise KeyError("Bid not found")
+
+    if bid_row["vendor_org_id"] != vendor_org_id:
+        raise PermissionError("You do not have permission to update this bid.")
+
+    if bid_row["status"] == "Accepted":
+        raise ValueError("Cannot update an accepted bid.")
+
+    if bid_row["tender_status"] in ("Closed", "Awarded", "Cancelled"):
+        raise ValueError(f"Cannot update bid for a tender that is already {bid_row['tender_status']}.")
+
+    # 2. Build dynamic update statement
+    fields = []
+    args = []
+    idx = 1
+
+    if financial_amount is not None:
+        fields.append(f"financial_amount = ${idx}")
+        args.append(financial_amount)
+        idx += 1
+
+    if description is not None:
+        fields.append(f"description = ${idx}")
+        args.append(description)
+        idx += 1
+
+    if status is not None:
+        fields.append(f"status = ${idx}")
+        args.append(status)
+        idx += 1
+
+    if fields:
+        fields.append("updated_at = NOW()")
+        args.append(bid_id)
+        update_query = f"UPDATE bids SET {', '.join(fields)} WHERE bid_id = ${idx} RETURNING *"
+        updated_row = await connection.fetchrow(update_query, *args)
+        result = dict(updated_row)
+    else:
+        result = dict(bid_row)
+
+    # 3. Attach documents to response
+    docs_query = """
+        SELECT 
+            bd.bid_doc_id, 
+            bd.file_path, 
+            COALESCE(dt.type_name, trd.custom_doc_name, 'Document') AS document_type
+        FROM bid_documents bd
+        LEFT JOIN tender_required_documents trd ON bd.req_doc_id = trd.req_doc_id
+        LEFT JOIN document_types dt ON trd.doc_type_id = dt.type_id
+        WHERE bd.bid_id = $1
+    """
+    docs_rows = await connection.fetch(docs_query, bid_id)
+    result["documents"] = [dict(r) for r in docs_rows]
+
+    return result
+
+
+async def delete_bid(
+    connection: asyncpg.Connection,
+    bid_id: int,
+    vendor_org_id: int
+) -> dict:
+    """
+    Deletes a bid, associated DB records (bid documents, securities, notifications),
+    and cleans up all associated storage files from Supabase.
+    Only the owning vendor organization can delete the bid.
+    Accepted bids cannot be deleted.
+    """
+    from app.services.supabase_storage import delete_files
+    import logging
+    logger = logging.getLogger(__name__)
+
+    # 1. Verify bid exists and ownership
+    bid_row = await connection.fetchrow(
+        "SELECT bid_id, vendor_org_id, status FROM bids WHERE bid_id = $1",
+        bid_id
+    )
+    if not bid_row:
+        raise KeyError("Bid not found")
+
+    if bid_row["vendor_org_id"] != vendor_org_id:
+        raise PermissionError("You do not have permission to delete this bid.")
+
+    if bid_row["status"] == "Accepted":
+        raise ValueError("Cannot delete an accepted bid.")
+
+    # 2. Gather storage files for cleanup
+    bid_docs = await connection.fetch(
+        "SELECT file_path FROM bid_documents WHERE bid_id = $1", bid_id
+    )
+    bid_secs = await connection.fetch(
+        "SELECT bid_security_doc_path FROM bid_securities WHERE bid_id = $1", bid_id
+    )
+
+    storage_paths = [r["file_path"] for r in bid_docs if r.get("file_path")]
+    storage_paths.extend([r["bid_security_doc_path"] for r in bid_secs if r.get("bid_security_doc_path")])
+
+    # 3. Perform database cascading deletions within a transaction
+    async with connection.transaction():
+        # Notifications
+        await connection.execute("""
+            DELETE FROM notification_recipients
+            WHERE notification_id IN (
+                SELECT notification_id FROM notifications
+                WHERE reference_type = 'BID' AND reference_id = $1
+            )
+        """, bid_id)
+        await connection.execute("""
+            DELETE FROM notifications
+            WHERE reference_type = 'BID' AND reference_id = $1
+        """, bid_id)
+
+        # Bid documents and securities
+        await connection.execute("DELETE FROM bid_documents WHERE bid_id = $1", bid_id)
+        await connection.execute("DELETE FROM bid_securities WHERE bid_id = $1", bid_id)
+
+        # Bid record
+        await connection.execute("DELETE FROM bids WHERE bid_id = $1", bid_id)
+
+    # 4. Clean up storage files after successful DB transaction
+    if storage_paths:
+        try:
+            await delete_files(storage_paths)
+        except Exception as e:
+            logger.warning(f"Failed to delete storage files for bid {bid_id}: {e}")
+
+    return {"message": "Bid and all associated documents deleted successfully.", "bid_id": bid_id}
+
+
+async def delete_bid_document(
+    connection: asyncpg.Connection,
+    doc_id: int,
+    vendor_org_id: int
+) -> dict:
+    """
+    Deletes a specific bid document from storage and database.
+    Only the owning vendor organization can delete the document.
+    Cannot delete if bid is already Accepted.
+    """
+    from app.services.supabase_storage import delete_files
+    import logging
+    logger = logging.getLogger(__name__)
+
+    doc_row = await connection.fetchrow("""
+        SELECT bd.bid_doc_id, bd.file_path, b.vendor_org_id, b.status as bid_status
+        FROM bid_documents bd
+        JOIN bids b ON bd.bid_id = b.bid_id
+        WHERE bd.bid_doc_id = $1
+    """, doc_id)
+
+    if not doc_row:
+        raise KeyError("Document not found")
+
+    if doc_row["vendor_org_id"] != vendor_org_id:
+        raise PermissionError("You do not have permission to delete this document.")
+
+    if doc_row["bid_status"] == "Accepted":
+        raise ValueError("Cannot delete documents for an accepted bid.")
+
+    file_path = doc_row["file_path"]
+
+    await connection.execute("DELETE FROM bid_documents WHERE bid_doc_id = $1", doc_id)
+
+    if file_path:
+        try:
+            await delete_files([file_path])
+        except Exception as e:
+            logger.warning(f"Failed to delete storage file {file_path}: {e}")
+
+    return {"message": "Bid document deleted successfully.", "doc_id": doc_id}
+

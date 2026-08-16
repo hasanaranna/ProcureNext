@@ -40,3 +40,10 @@ class BidListItem(BaseModel):
     description: Optional[str] = None
     status: BidStatus
     submitted_at: Optional[datetime] = None
+
+
+class BidUpdateRequest(BaseModel):
+    financial_amount: Optional[float] = None
+    description: Optional[str] = None
+    status: Optional[BidStatus] = None
+

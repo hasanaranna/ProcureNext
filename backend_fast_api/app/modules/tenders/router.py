@@ -97,7 +97,9 @@ from app.modules.tenders.service import (
     get_tender_detail,
     update_tender_required_document_roles,
     get_ongoing_tenders,
-    get_ongoing_tender_detail
+    get_ongoing_tender_detail,
+    delete_tender,
+    delete_tender_document
 )
 
 router = APIRouter(prefix="/tenders", tags=["Tenders"])
@@ -164,7 +166,16 @@ async def publish_with_documents(
             )
             return new_tender
     except Exception as e:
+        for f in files_data:
+            if os.path.exists(f["local_path"]):
+                try:
+                    os.remove(f["local_path"])
+                except Exception:
+                    pass
+        if isinstance(e, HTTPException):
+            raise e
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
 
 
 @router.get("/buyer/my-tenders", response_model=List[TenderListItem])
@@ -319,4 +330,61 @@ async def get_ongoing_tender(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
+@router.delete("/{tender_id}")
+async def delete_existing_tender(
+    tender_id: int,
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    Delete a tender and clean up all associated records and storage files.
+    Buyer only. Cannot delete awarded tenders.
+    """
+    buyer_org_id = current_user.get("organization_id")
+    if not buyer_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            result = await delete_tender(connection, tender_id, buyer_org_id)
+            return result
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Tender not found.")
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="You do not have permission to delete this tender.")
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
+@router.delete("/documents/{doc_id}")
+async def delete_single_tender_document(
+    doc_id: int,
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    Delete a single tender document from storage and database.
+    Buyer only.
+    """
+    buyer_org_id = current_user.get("organization_id")
+    if not buyer_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            result = await delete_tender_document(connection, doc_id, buyer_org_id)
+            return result
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="You do not have permission to delete this document.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
 
