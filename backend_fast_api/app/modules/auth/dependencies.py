@@ -47,3 +47,37 @@ async def get_current_user_org(token: str = Depends(oauth2_scheme)) -> dict:
             raise HTTPException(status_code=403, detail="User does not belong to any organization.")
             
         return dict(user_org.items())
+
+
+async def get_current_admin_user(token: str = Depends(oauth2_scheme)) -> dict:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate admin credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id_str: str = payload.get("sub")
+        if user_id_str is None:
+            raise credentials_exception
+        user_id = int(user_id_str)
+        admin_role = payload.get("admin_role")
+    except JWTError:
+        raise credentials_exception
+
+    async with get_db_connection() as connection:
+        admin_row = await connection.fetchrow(
+            """
+            SELECT u.user_id, u.email, a.admin_id, a.admin_role
+            FROM users u
+            JOIN admins a ON u.user_id = a.user_id
+            WHERE u.user_id = $1
+            LIMIT 1
+            """,
+            user_id,
+        )
+        if admin_row is None and not admin_role:
+            raise HTTPException(status_code=403, detail="Admin access required.")
+
+        return dict(admin_row.items()) if admin_row else {"user_id": user_id, "admin_role": admin_role}
+

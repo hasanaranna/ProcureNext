@@ -195,6 +195,64 @@ class OngoingTenderDetail(BaseModel):
     vendor_org_name: str
     vendor_org_address: Optional[str] = None
     vendor_org_website: Optional[str] = None
-    role_in_tender: Optional[str] = None
     tender_documents: List[TenderDocumentItem] = []
     bid_documents: List[OngoingTenderBidDocument] = []
+
+
+class PublicRequiredDocItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    req_doc_id: int
+    custom_doc_name: Optional[str] = None
+    is_mandatory: bool = True
+
+
+class PublicTenderListItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    tender_id: int
+    title: str
+    description: str
+    status: str
+    visibility_type: Optional[str] = "Public"
+    category_name: Optional[str] = None
+    procurement_nature: Optional[str] = None
+    procurement_method: Optional[str] = None
+    buyer_org_name: str
+    buyer_org_type: Optional[str] = None
+    buyer_verified: bool = True
+    budget_min: Optional[float] = None
+    budget_max: Optional[float] = None
+    security_required: bool = False
+    submission_deadline: Optional[datetime] = None
+    tender_public_date: Optional[datetime] = None
+    created_at: datetime
+
+
+class PublicTenderDetailResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    tender_id: int
+    title: str
+    description: str
+    status: str
+    visibility_type: Optional[str] = "Public"
+    category_name: Optional[str] = None
+    procurement_nature: Optional[str] = None
+    procurement_method: Optional[str] = None
+    buyer_org_name: str
+    buyer_org_type: Optional[str] = None
+    buyer_verified: bool = True
+    buyer_org_website: Optional[str] = None
+    budget_min: Optional[float] = None
+    budget_max: Optional[float] = None
+    security_required: bool = False
+    security_valid_until: Optional[datetime] = None
+    proposal_valid_until: Optional[datetime] = None
+    tender_public_date: Optional[datetime] = None
+    pre_bid_meeting: Optional[datetime] = None
+    tender_opening_date: Optional[datetime] = None
+    submission_deadline: Optional[datetime] = None
+    created_at: datetime
+    required_documents: List[PublicRequiredDocItem] = []
+
