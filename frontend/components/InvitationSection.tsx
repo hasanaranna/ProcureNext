@@ -74,7 +74,7 @@ export default function InvitationSection() {
         fetchInvitations(); // Refresh the list
       } else {
         const err = await res.json();
-        setError(err.error?.message || 'Failed to send invitation.');
+        setError(err.detail || err.error?.message || 'Failed to send invitation.');
       }
     } catch {
       setError('Network error. Please try again.');
@@ -92,7 +92,7 @@ export default function InvitationSection() {
         setInvitations((prev) => prev.filter((inv) => inv.invitation_id !== invitationId));
       } else {
         const err = await res.json();
-        alert(err.error?.message || 'Failed to cancel invitation.');
+        alert(err.detail || err.error?.message || 'Failed to cancel invitation.');
       }
     } catch {
       alert('Network error.');
@@ -178,7 +178,7 @@ export default function InvitationSection() {
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Invitation sent successfully!
+                    Invitation link sent to email and generated below!
                   </div>
                   {invitationToken && (
                     <div className="flex items-center gap-2">
