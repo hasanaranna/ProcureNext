@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import TenderCard from '@/components/TenderCard';
 import SlidingToggle from '@/components/SlidingToggle';
@@ -21,6 +21,18 @@ export default function HomePage() {
   const [showOrgManagement, setShowOrgManagement] = useState(false);
   const [showManageTokens, setShowManageTokens] = useState(false);
   const [tokenBalance, setTokenBalance] = useState<number | null>(null);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifTab, setNotifTab] = useState<'unread' | 'read'>('unread');
+  const notifModalRef = useRef<HTMLDivElement>(null);
+
+  const notifications = [
+    { id: 1, type: 'bid', title: 'New bid received', body: 'TechSupply Co. submitted a bid on "Office Equipment Procurement Q3".', time: '2 min ago', seen: false },
+    { id: 2, type: 'award', title: 'Tender awarded', body: 'Your bid for "IT Infrastructure Upgrade" has been accepted by GlobalBuyers Ltd.', time: '1 hr ago', seen: false },
+    { id: 3, type: 'deadline', title: 'Deadline approaching', body: 'Submission deadline for "Logistics Services 2025" is in 24 hours.', time: '3 hr ago', seen: false },
+    { id: 4, type: 'enlist', title: 'New organization enlisted', body: 'Rapid Vendors Inc. has enlisted your organization as a trusted buyer.', time: 'Yesterday', seen: true },
+    { id: 5, type: 'system', title: 'Token balance low', body: 'Your organization token balance has dropped below 50. Top up to keep bidding.', time: '2 days ago', seen: true },
+  ];
+  const unseenCount = notifications.filter(n => !n.seen).length;
   const [loadingBalance, setLoadingBalance] = useState(true);
 
   // Load user data from localStorage
@@ -299,6 +311,22 @@ export default function HomePage() {
                   value={mode}
                   onChange={(v) => handleModeSwitch(v as 'buyer' | 'seller')}
                 />
+
+                {/* Notification Bell */}
+                <button
+                  onClick={() => setShowNotifications(true)}
+                  className="relative p-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 hover:border-accent-400/40 text-white transition-all duration-200 shadow-sm"
+                  title="Notifications"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                  {unseenCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-accent-500 text-white text-[10px] font-black flex items-center justify-center shadow-lg border border-navy-900">
+                      {unseenCount}
+                    </span>
+                  )}
+                </button>
 
                 {/* Search */}
                 <div className="flex-1 md:flex-initial" style={{ minWidth: '180px' }}>
@@ -656,6 +684,123 @@ export default function HomePage() {
           } catch { }
         }}
       />
+      {/* Notifications Modal */}
+      {showNotifications && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-end"
+          style={{ backdropFilter: 'blur(2px)', background: 'rgba(15,23,42,0.55)' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowNotifications(false); }}
+        >
+          <div
+            ref={notifModalRef}
+            className="mt-16 mr-4 md:mr-8 w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            style={{ background: 'linear-gradient(160deg, #0f2744 0%, #0f172a 100%)', border: '1px solid rgba(20,184,166,0.25)', maxHeight: '80vh' }}
+          >
+            {/* Header row */}
+            <div className="flex items-center justify-between px-5 pt-4 pb-3">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-accent-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                <h2 className="text-white font-bold text-base">Notifications</h2>
+              </div>
+              <button
+                onClick={() => setShowNotifications(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Tab bar */}
+            <div className="flex border-b border-white/10 px-5">
+              {(['unread', 'read'] as const).map((tab) => {
+                const count = tab === 'unread' ? notifications.filter(n => !n.seen).length : notifications.filter(n => n.seen).length;
+                const active = notifTab === tab;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setNotifTab(tab)}
+                    className={`relative pb-2.5 mr-5 text-sm font-semibold transition-colors capitalize ${active ? 'text-accent-300' : 'text-slate-500 hover:text-slate-300'
+                      }`}
+                  >
+                    {tab === 'unread' ? 'Unread' : 'Read'}
+                    {count > 0 && (
+                      <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${active ? 'bg-accent-500/30 text-accent-300' : 'bg-white/10 text-slate-400'
+                        }`}>
+                        {count}
+                      </span>
+                    )}
+                    {active && (
+                      <span className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full bg-accent-400" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Notification list */}
+            <div className="overflow-y-auto flex-1">
+              {(() => {
+                const filtered = notifications.filter(n => notifTab === 'unread' ? !n.seen : n.seen);
+                const iconMap: Record<string, React.ReactNode> = {
+                  bid: <span className="text-lg">📩</span>,
+                  award: <span className="text-lg">🏆</span>,
+                  deadline: <span className="text-lg">⏰</span>,
+                  enlist: <span className="text-lg">🤝</span>,
+                  system: <span className="text-lg">⚠️</span>,
+                };
+                if (filtered.length === 0) {
+                  return (
+                    <div className="flex flex-col items-center justify-center py-14 text-center px-6">
+                      <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-3">
+                        <svg className="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                        </svg>
+                      </div>
+                      <p className="text-slate-400 text-sm font-medium">
+                        {notifTab === 'unread' ? 'You\'re all caught up!' : 'No read notifications yet.'}
+                      </p>
+                    </div>
+                  );
+                }
+                return filtered.map((notif) => (
+                  <div
+                    key={notif.id}
+                    className={`flex gap-3 px-5 py-4 border-b border-white/5 transition-colors hover:bg-white/5 ${!notif.seen ? 'bg-accent-500/5' : ''
+                      }`}
+                  >
+                    <div className="flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center bg-white/10">
+                      {iconMap[notif.type]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className={`text-sm font-semibold leading-snug ${!notif.seen ? 'text-white' : 'text-slate-300'}`}>
+                          {notif.title}
+                        </p>
+                        {!notif.seen && (
+                          <span className="flex-shrink-0 w-2 h-2 rounded-full bg-accent-400 mt-1" />
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">{notif.body}</p>
+                      <p className="text-[10px] text-slate-500 mt-1.5 font-medium">{notif.time}</p>
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3 border-t border-white/10 flex justify-center">
+              <button className="text-xs text-accent-400 hover:text-accent-300 font-semibold transition">
+                Mark all as read
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
