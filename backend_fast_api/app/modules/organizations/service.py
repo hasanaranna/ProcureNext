@@ -231,17 +231,35 @@ async def create_or_update_invitation(
     email: str,
     token: str,
 ) -> dict:
-    """Create a new invitation or re-issue an existing one with fresh timestamps."""
+    """Create a new invitation or re-issue an existing one with fresh timestamps and send email."""
+    import os
+    import asyncio
+
+    # Check if this email already belongs to an active employee of this organization
+    already_member = await connection.fetchval(
+        """
+        SELECT 1 
+        FROM organization_employees oe
+        JOIN users u ON oe.user_id = u.user_id
+        WHERE oe.organization_id = $1 AND u.email = $2
+        """,
+        organization_id,
+        email,
+    )
+    if already_member:
+        raise HTTPException(
+            status_code=400,
+            detail=f"A user with email '{email}' is already a member of your organization.",
+        )
+
     existing = await connection.fetchrow(
         """
         SELECT invitation_id
         FROM user_invitations
         WHERE organization_id = $1
-          AND invited_by = $2
-          AND email = $3
+          AND email = $2
         """,
         organization_id,
-        invited_by,
         email,
     )
 
@@ -250,15 +268,18 @@ async def create_or_update_invitation(
             """
             UPDATE user_invitations
             SET token = $1,
+                status = 'Pending',
+                invited_by = $2,
                 created_at = NOW(),
                 expires_at = NOW() + INTERVAL '7 days'
-            WHERE invitation_id = $2
+            WHERE invitation_id = $3
             RETURNING invitation_id, organization_id, invited_by, email, token, status, created_at, expires_at
             """,
             token,
+            invited_by,
             existing["invitation_id"],
         )
-        message = "Invitation updated."
+        message = "Invitation updated and email sent."
     else:
         invitation = await connection.fetchrow(
             """
@@ -277,10 +298,51 @@ async def create_or_update_invitation(
             email,
             token,
         )
-        message = "Invitation created."
+        message = "Invitation created and email sent."
 
     if invitation is None:
         raise HTTPException(status_code=500, detail="Failed to create invitation: query returned None.")
+
+    # Retrieve organization and inviter details for the email
+    org_info = await connection.fetchrow(
+        """
+        SELECT o.organization_name, u.full_name as inviter_name
+        FROM organizations o
+        LEFT JOIN users u ON u.user_id = $2
+        WHERE o.organization_id = $1
+        """,
+        organization_id,
+        invited_by,
+    )
+    org_name = org_info["organization_name"] if org_info else "Your Organization"
+    inviter_name = org_info["inviter_name"] if org_info else None
+
+    # Construct the full invitation link
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+    invite_link = f"{frontend_url}/signup-user?token={token}"
+
+    # Asynchronously dispatch email via Celery task (with fallback to direct async threadpool)
+    try:
+        from app.tasks.notification_tasks import send_invitation_email_task
+        send_invitation_email_task.delay(
+            to_email=email,
+            org_name=org_name,
+            invite_link=invite_link,
+            inviter_name=inviter_name,
+        )
+        print(f"[INVITATION] Dispatched Celery email task to {email}", flush=True)
+    except Exception as task_exc:
+        print(f"[INVITATION CELERY FALLBACK] {task_exc}. Using background thread...", flush=True)
+        from app.services.email import send_employee_invitation_email
+        asyncio.create_task(
+            asyncio.to_thread(
+                send_employee_invitation_email,
+                to_email=email,
+                org_name=org_name,
+                invite_link=invite_link,
+                inviter_name=inviter_name,
+            )
+        )
 
     return {
         "message": message,

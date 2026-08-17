@@ -166,7 +166,7 @@ function SignupUserContent() {
         setSubmitSuccess(true);
       } else {
         const err = await res.json();
-        setSubmitError(err.error?.message || "Registration failed.");
+        setSubmitError(err.detail || err.error?.message || "Registration failed.");
       }
     } catch {
       setSubmitError("Network error. Unable to connect to the server.");
