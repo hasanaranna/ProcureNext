@@ -91,9 +91,11 @@ from app.modules.tenders.schemas import (
     OngoingTenderDetail,
     PublicTenderListItem,
     PublicTenderDetailResponse,
+    TenderPdfExtractResponse,
 )
 from app.modules.tenders.service import (
     publish_tender_with_documents,
+    create_tender_from_pdf_file,
     get_buyer_tenders,
     get_all_published_tenders,
     get_tender_detail,
@@ -105,12 +107,98 @@ from app.modules.tenders.service import (
     get_public_active_tenders,
     get_public_tender_detail,
 )
+from app.services.ml_client import parse_and_embed_tender_pdf
 
 router = APIRouter(prefix="/tenders", tags=["Tenders"])
 
 
 TEMP_UPLOAD_DIR = os.getenv("UPLOAD_DIR", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../uploads")))
 os.makedirs(TEMP_UPLOAD_DIR, exist_ok=True)
+
+@router.post("/extract-from-pdf", response_model=TenderPdfExtractResponse)
+async def extract_from_pdf(
+    file: UploadFile = File(...)
+):
+    """
+    Send only the PDF to extract structured JSON and 384-dimensional vector embedding.
+    """
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided")
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported")
+
+    try:
+        content = await file.read()
+        parsed = await parse_and_embed_tender_pdf(content)
+        return TenderPdfExtractResponse(
+            title=parsed.title,
+            description=parsed.description,
+            procurement_nature=parsed.procurement_nature,
+            procurement_method=parsed.procurement_method,
+            category=parsed.category,
+            eligibility_of_tenderer=parsed.eligibility_of_tenderer,
+            budget_min=parsed.budget_min,
+            budget_max=parsed.budget_max,
+            submission_deadline=parsed.submission_deadline,
+            tender_public_date=parsed.tender_public_date,
+            pre_bid_meeting=parsed.pre_bid_meeting,
+            tender_opening_date=parsed.tender_opening_date,
+            embedding=parsed.embedding
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse PDF: {e}")
+
+
+@router.post("/buyer/create-from-pdf", response_model=TenderResponse, status_code=status.HTTP_201_CREATED)
+async def create_tender_from_pdf(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    1-Click Tender Creation from PDF.
+    Uploads the PDF document, extracts structured fields, computes the 384-d embedding,
+    creates the tender in PostgreSQL, schedules file upload to Supabase, and deducts tokens.
+    """
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided")
+    
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported")
+
+    safe_filename = f"{uuid.uuid4().hex}_{file.filename}"
+    local_path = os.path.join(TEMP_UPLOAD_DIR, safe_filename)
+
+    try:
+        with open(local_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save temporary PDF file: {e}")
+
+    buyer_id = current_user.get("organization_id", 1)
+    org_user_id = current_user.get("org_user_id", 1)
+    user_id = current_user.get("user_id") or current_user.get("org_user_id", 1)
+
+    try:
+        async with get_db_connection() as connection:
+            new_tender = await create_tender_from_pdf_file(
+                connection=connection,
+                buyer_id=buyer_id,
+                org_user_id=org_user_id,
+                user_id=user_id,
+                pdf_path=local_path,
+                original_filename=file.filename
+            )
+            return new_tender
+    except Exception as e:
+        if os.path.exists(local_path):
+            try:
+                os.remove(local_path)
+            except Exception:
+                pass
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=f"Tender creation from PDF failed: {e}")
+
 
 @router.post("/buyer/publish-with-documents", response_model=TenderResponse, status_code=status.HTTP_201_CREATED)
 async def publish_with_documents(
