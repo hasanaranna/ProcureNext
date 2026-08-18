@@ -1,31 +1,68 @@
 # ============================================================
 # tasks/notification_tasks.py - Async Notification Tasks
 # ============================================================
-# PURPOSE:
-# Celery tasks for sending notifications asynchronously.
-# Prevents email/SMS sends from blocking the API response.
-#
-# TASKS TO DEFINE:
-#
-# - send_email_task(to, subject, template, context):
-#     Send a single email via SMTP
-#     Includes retry logic for transient SMTP failures
-#
-# - send_bulk_email_task(recipients, subject, template, context):
-#     Send emails to multiple recipients (e.g., all vendors
-#     who bid on a cancelled tender)
-#
-# - send_sms_task(phone, message):
-#     Send SMS via OTP service provider
-#
-# - send_otp_task(phone, otp_code):
-#     Send OTP code via SMS for verification
-#
-# - send_deadline_reminders():
-#     Periodic task (Celery Beat): find tenders with deadlines
-#     in the next 24 hours and notify relevant vendors
-#
-# - send_tender_match_notifications(tender_id):
-#     When a new tender is published, notify vendors whose
-#     profiles match the tender's category/skills
-# ============================================================
+import logging
+from app.tasks.celery_app import celery_app
+from app.services.email import send_employee_invitation_email, send_smtp_email
+
+logger = logging.getLogger("app.tasks.notifications")
+
+
+@celery_app.task(
+    name="send_invitation_email_task",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+)
+def send_invitation_email_task(
+    self,
+    to_email: str,
+    org_name: str,
+    invite_link: str,
+    inviter_name: str | None = None,
+) -> bool:
+    """Asynchronously send an employee invitation email using Celery."""
+    try:
+        print(f"[CELERY TASK] Sending invitation email to {to_email} for org '{org_name}'...", flush=True)
+        success = send_employee_invitation_email(
+            to_email=to_email,
+            org_name=org_name,
+            invite_link=invite_link,
+            inviter_name=inviter_name,
+        )
+        return success
+    except Exception as exc:
+        logger.error(f"Error in send_invitation_email_task for {to_email}: {exc}", exc_info=True)
+        try:
+            raise self.retry(exc=exc)
+        except Exception:
+            return False
+
+
+@celery_app.task(
+    name="send_smtp_email_task",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+)
+def send_smtp_email_task(
+    self,
+    to_email: str,
+    subject: str,
+    html_body: str,
+    text_body: str | None = None,
+) -> bool:
+    """Generic async SMTP email sending task."""
+    try:
+        return send_smtp_email(
+            to_email=to_email,
+            subject=subject,
+            html_body=html_body,
+            text_body=text_body,
+        )
+    except Exception as exc:
+        logger.error(f"Error in send_smtp_email_task for {to_email}: {exc}", exc_info=True)
+        try:
+            raise self.retry(exc=exc)
+        except Exception:
+            return False

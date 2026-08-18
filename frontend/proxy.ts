@@ -21,7 +21,7 @@ import { NextRequest, NextResponse } from 'next/server';
 // ─── Route Definitions ────────────────────────────────────────────────────────
 
 /** Pages a regular logged-in user must not see (redirect to /home). */
-const USER_GUEST_ONLY_ROUTES = ['/login', '/signup-master', '/signup-user'];
+const USER_GUEST_ONLY_ROUTES = ['/login', '/signup-master'];
 
 /** Pages an admin must not see when already logged in (redirect to /admin-home). */
 const ADMIN_GUEST_ONLY_ROUTES = ['/admin-login'];
