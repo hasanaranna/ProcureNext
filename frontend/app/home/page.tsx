@@ -13,6 +13,7 @@ export default function HomePage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
+  const [totalUnreadMessages, setTotalUnreadMessages] = useState(0);
   const [upperCollapsed, setUpperCollapsed] = useState(false);
   const [mode, setMode] = useState<'buyer' | 'seller'>('buyer');
   const [activeTab, setActiveTab] = useState<'recommended' | 'enlisted'>('recommended');
@@ -662,9 +663,14 @@ export default function HomePage() {
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
+          {totalUnreadMessages > 0 && (
+            <span className="absolute -top-1.5 -left-1.5 min-w-[20px] h-[20px] px-1 rounded-full bg-accent-500 text-white text-[10px] font-black flex items-center justify-center shadow-lg border-2 border-navy-900 animate-pulse">
+              {totalUnreadMessages > 99 ? '99+' : totalUnreadMessages}
+            </span>
+          )}
         </button>
 
-        <MessagingSidebar isOpen={rightSidebarOpen} onClose={() => setRightSidebarOpen(false)} />
+        <MessagingSidebar isOpen={rightSidebarOpen} onClose={() => setRightSidebarOpen(false)} onUnreadCountChange={setTotalUnreadMessages} />
       </div>
 
       {/* Organization Management Modal */}
