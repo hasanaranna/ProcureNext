@@ -25,16 +25,34 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
+function formatDateForInput(dateStr: string | null | undefined): string {
+  if (!dateStr) return "";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "";
+    return d.toISOString().split("T")[0];
+  } catch {
+    return "";
+  }
+}
+
 export default function NewTenderPage() {
   const router = useRouter();
   const [sellerDocs, setSellerDocs] = useState<SellerDoc[]>([]);
   const [newSellerDoc, setNewSellerDoc] = useState("");
   const [showAccessConfig, setShowAccessConfig] = useState(false);
   
-  const [fileCount, setFileCount] = useState<number | "">("");
-  const [customFiles, setCustomFiles] = useState<{name: string, file: File | null}[]>([]);
+  const [fileCount, setFileCount] = useState<number | "">(1);
+  const [customFiles, setCustomFiles] = useState<{name: string, file: File | null}[]>([
+    { name: "", file: null }
+  ]);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // PDF Extraction & AI state
+  const [isExtractingPdf, setIsExtractingPdf] = useState(false);
+  const [pdfSuccessMessage, setPdfSuccessMessage] = useState<string | null>(null);
+  const [extractedEmbedding, setExtractedEmbedding] = useState<number[] | null>(null);
 
   // Success Modal State
   const [createdTenderResult, setCreatedTenderResult] = useState<any>(null);
@@ -45,8 +63,21 @@ export default function NewTenderPage() {
   const [tenderPublishCost, setTenderPublishCost] = useState<number>(50);
   const [loadingTokens, setLoadingTokens] = useState(true);
   const [showManageTokens, setShowManageTokens] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [tokenError, setTokenError] = useState<string | null>(null);
+
+  const [formData, setFormData] = useState({
+    title: "",
+    description: "",
+    procurementNature: "Goods",
+    procurementMethod: "OTM",
+    eligibilityOfTenderer: "",
+    category: "construction",
+    budget: "",
+    deadline: "",
+    tenderPublicDate: "",
+    preBidMeeting: "",
+    tenderOpeningDate: "",
+  });
 
   useEffect(() => {
     try {
@@ -112,17 +143,6 @@ export default function NewTenderPage() {
     });
   };
 
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    budget: "",
-    deadline: "",
-    tenderPublicDate: "",
-    preBidMeeting: "",
-    tenderOpeningDate: "",
-    category: "",
-  });
-
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
@@ -177,6 +197,110 @@ export default function NewTenderPage() {
     });
   };
 
+  // ── Handle PDF File Extraction ──────────────────────────────────────────
+  const handlePdfFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+      setFormError("Please select a valid PDF file.");
+      return;
+    }
+
+    setIsExtractingPdf(true);
+    setPdfSuccessMessage(null);
+    setFormError(null);
+
+    try {
+      const uploadData = new FormData();
+      uploadData.append("file", file);
+
+      const res = await fetch("/api/tenders/extract-from-pdf", {
+        method: "POST",
+        body: uploadData,
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => null);
+        throw new Error(errJson?.detail || "Failed to extract data from PDF.");
+      }
+
+      const data = await res.json();
+
+      setFormData({
+        title: data.title || "",
+        description: data.description || "",
+        procurementNature: data.procurement_nature || "Goods",
+        procurementMethod: data.procurement_method || "OTM",
+        eligibilityOfTenderer: data.eligibility_of_tenderer || "",
+        category: data.category || "construction",
+        budget: data.budget_max ? data.budget_max.toString() : "",
+        deadline: formatDateForInput(data.submission_deadline),
+        tenderPublicDate: formatDateForInput(data.tender_public_date),
+        preBidMeeting: formatDateForInput(data.pre_bid_meeting),
+        tenderOpeningDate: formatDateForInput(data.tender_opening_date),
+      });
+
+      if (data.embedding && Array.isArray(data.embedding)) {
+        setExtractedEmbedding(data.embedding);
+      }
+
+      // Attach this PDF into document slot #1
+      setFileCount(1);
+      setCustomFiles([
+        {
+          name: file.name.replace(/\.pdf$/i, "").replace(/_/g, " "),
+          file: file,
+        }
+      ]);
+
+      setPdfSuccessMessage(`Extracted "${data.title?.substring(0, 60)}..." and generated 384-d semantic embedding vector!`);
+    } catch (err: any) {
+      setFormError(err.message || "Error processing PDF notice.");
+    } finally {
+      setIsExtractingPdf(false);
+    }
+  };
+
+  // ── Handle 1-Click PDF Creation ──────────────────────────────────────────
+  const handleDirect1ClickCreate = async (file: File) => {
+    if (tokenBalance < tenderPublishCost) {
+      setTokenError(`Insufficient tokens. Publishing this tender requires ${tenderPublishCost} tokens, but your organization only has ${tokenBalance} tokens.`);
+      setShowManageTokens(true);
+      return;
+    }
+
+    setIsSubmitting(true);
+    setFormError(null);
+
+    try {
+      const directData = new FormData();
+      directData.append("file", file);
+
+      const res = await fetch("/api/tenders/buyer/create-from-pdf", {
+        method: "POST",
+        body: directData,
+      });
+
+      if (res.ok) {
+        const resJson = await res.json().catch(() => null);
+        setCreatedTenderResult(resJson);
+        setIsSuccessModalOpen(true);
+      } else {
+        const errorJson = await res.json().catch(() => null);
+        const errorMsg = errorJson?.detail || "Failed to publish tender from PDF.";
+        setFormError(errorMsg);
+        if (res.status === 400 && typeof errorMsg === "string" && errorMsg.toLowerCase().includes("token")) {
+          setShowManageTokens(true);
+        }
+      }
+    } catch (e: any) {
+      setFormError(e.message || "Error creating tender from PDF.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setFormError(null);
@@ -200,6 +324,9 @@ export default function NewTenderPage() {
     const tenderData = {
       title: formData.title,
       description: formData.description,
+      procurement_nature: formData.procurementNature || "Goods",
+      procurement_method: formData.procurementMethod || "OTM",
+      eligibility_of_tenderer: formData.eligibilityOfTenderer || null,
       budget_max: parseFloat(formData.budget) || null,
       submission_deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null,
       visibility_type: "Public",
@@ -209,6 +336,7 @@ export default function NewTenderPage() {
       pre_bid_meeting: formData.preBidMeeting ? new Date(formData.preBidMeeting).toISOString() : null,
       tender_opening_date: formData.tenderOpeningDate ? new Date(formData.tenderOpeningDate).toISOString() : null,
       required_seller_docs: sellerDocs.length > 0 ? sellerDocs : null,
+      embedding: extractedEmbedding,
     };
     
     const validFiles = customFiles.filter(cf => cf.name.trim() && cf.file);
@@ -221,12 +349,6 @@ export default function NewTenderPage() {
     filesToUpload.forEach(f => {
       if (f) data.append('files', f);
     });
-    
-    if (tokenBalance < tenderPublishCost) {
-      setFormError(`Insufficient tokens. Publishing a tender requires ${tenderPublishCost} tokens, but your organization only has ${tokenBalance} tokens.`);
-      setShowManageTokens(true);
-      return;
-    }
 
     setIsSubmitting(true);
     setFormError(null);
@@ -265,9 +387,9 @@ export default function NewTenderPage() {
     <main className="w-full min-h-screen py-12 px-4 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800 relative overflow-x-hidden">
       <div className="absolute top-1/3 right-1/4 w-72 h-72 bg-accent-500/5 rounded-full blur-3xl" />
       
-      <div className="relative z-10 max-w-2xl mx-auto w-full animate-fade-in">
+      <div className="relative z-10 max-w-3xl mx-auto w-full animate-fade-in">
         {/* Back button */}
-        <button onClick={handleCancel} className="mb-6 flex items-center gap-2 text-slate-400 hover:text-white transition-colors duration-200">
+        <button onClick={handleCancel} className="mb-6 flex items-center gap-2 text-slate-400 hover:text-white transition-colors duration-200 cursor-pointer">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
@@ -279,7 +401,7 @@ export default function NewTenderPage() {
           <div className="bg-gradient-to-r from-navy-900 to-navy-800 px-8 py-6 flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-black text-white">Create New Tender</h1>
-              <p className="text-slate-300 text-sm mt-1">Fill in the details and attach specification documents to publish a new tender</p>
+              <p className="text-slate-300 text-sm mt-1">Upload a PDF notice for instant AI extraction & 384-d embedding, or fill out manually</p>
             </div>
 
             {/* Quick Token Badge in Header */}
@@ -309,7 +431,96 @@ export default function NewTenderPage() {
             </div>
           )}
 
+          {/* PDF AI Success Notice */}
+          {pdfSuccessMessage && (
+            <div className="m-8 mb-0 p-4 bg-emerald-50 border-2 border-emerald-300 rounded-xl flex items-start gap-3 animate-fade-in text-emerald-900 text-sm">
+              <div className="p-1.5 bg-emerald-500 text-white rounded-lg flex-shrink-0">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <p className="font-bold text-emerald-950">AI Document Parser & Embedder Completed</p>
+                <p className="text-xs text-emerald-800 mt-0.5">{pdfSuccessMessage}</p>
+              </div>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="p-8 space-y-8">
+            {/* ── AI PDF Import Card ───────── */}
+            <div className="p-6 bg-gradient-to-br from-indigo-50/90 via-sky-50/60 to-purple-50/80 border-2 border-indigo-200/80 rounded-2xl shadow-sm transition-all duration-200">
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md flex-shrink-0">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-navy-900 flex items-center gap-2">
+                      <span>Instant AI Tender Import (PDF Only)</span>
+                      <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] font-extrabold uppercase tracking-wide rounded-full border border-indigo-200">
+                        384-d Vector Engine
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      Upload your official tender notice PDF (e.g. e-GP / government notice). We extract all fields & generate 384-d pgvector embeddings automatically.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center gap-3">
+                <label className={`flex-1 w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed rounded-xl cursor-pointer transition ${
+                  isExtractingPdf
+                    ? "bg-slate-100 border-slate-300 text-slate-400 cursor-not-allowed"
+                    : "bg-white border-indigo-300 hover:border-indigo-500 text-indigo-900 hover:bg-indigo-50/50 shadow-sm"
+                }`}>
+                  <input
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    className="hidden"
+                    disabled={isExtractingPdf || isSubmitting}
+                    onChange={handlePdfFileSelected}
+                  />
+                  {isExtractingPdf ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-indigo-600" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      <span className="text-xs font-bold text-indigo-900">Parsing PDF & Generating Embeddings...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      </svg>
+                      <span className="text-xs font-bold">Auto-Fill Form from PDF</span>
+                    </>
+                  )}
+                </label>
+
+                {/* 1-Click Instant Upload button */}
+                <label className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-3 bg-gradient-to-r from-indigo-600 to-navy-900 hover:from-indigo-700 hover:to-navy-800 text-white rounded-xl text-xs font-bold cursor-pointer transition shadow-md flex-shrink-0">
+                  <input
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    className="hidden"
+                    disabled={isExtractingPdf || isSubmitting}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleDirect1ClickCreate(file);
+                    }}
+                  />
+                  <svg className="w-4 h-4 text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <span>1-Click Publish PDF</span>
+                </label>
+              </div>
+            </div>
+
             {/* ── Token Cost & Balance Banner ───────── */}
             <div className={`p-4 rounded-2xl border transition-all duration-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
               tokenBalance < tenderPublishCost
@@ -363,33 +574,12 @@ export default function NewTenderPage() {
                 </button>
               </div>
             )}
-            {/* ── Section: Tender Details ───────────── */}
+
+            {/* ── Section 1: Tender Details ───────────── */}
             <div className="space-y-5">
               <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
                 <span className="w-7 h-7 rounded-lg bg-navy-900 text-white flex items-center justify-center text-xs font-bold">1</span>
-                <h3 className="text-sm font-bold text-navy-900 uppercase tracking-wide">Tender Details</h3>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="category" className="block text-sm font-semibold text-navy-900 mb-1.5">Category <span className="text-red-500">*</span></label>
-                  <select id="category" name="category" value={formData.category} onChange={handleChange} required
-                    className={`${inputClass} appearance-none`}>
-                    <option value="">Select a category</option>
-                    <option value="supplies">Supplies</option>
-                    <option value="equipment">Equipment</option>
-                    <option value="services">Services</option>
-                    <option value="construction">Construction</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="budget" className="block text-sm font-semibold text-navy-900 mb-1.5">Budget Ceiling (BDT) <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">৳</span>
-                    <input type="number" id="budget" name="budget" value={formData.budget} onChange={handleChange} placeholder="Enter budget" required min="0" className={`${inputClass} pl-10`} />
-                  </div>
-                </div>
+                <h3 className="text-sm font-bold text-navy-900 uppercase tracking-wide">Tender Details & Classification</h3>
               </div>
 
               <div>
@@ -397,32 +587,75 @@ export default function NewTenderPage() {
                 <input type="text" id="title" name="title" value={formData.title} onChange={handleChange} placeholder="Enter tender title" required className={inputClass} />
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label htmlFor="procurementNature" className="block text-sm font-semibold text-navy-900 mb-1.5">Procurement Nature <span className="text-red-500">*</span></label>
+                  <select id="procurementNature" name="procurementNature" value={formData.procurementNature} onChange={handleChange} required className={`${inputClass} appearance-none`}>
+                    <option value="Goods">Goods</option>
+                    <option value="Works">Works</option>
+                    <option value="Services">Services</option>
+                    <option value="Consultancy">Consultancy</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="procurementMethod" className="block text-sm font-semibold text-navy-900 mb-1.5">Procurement Method <span className="text-red-500">*</span></label>
+                  <select id="procurementMethod" name="procurementMethod" value={formData.procurementMethod} onChange={handleChange} required className={`${inputClass} appearance-none`}>
+                    <option value="OTM">Open Tendering Method (OTM)</option>
+                    <option value="RFQ">Request for Quotation (RFQ)</option>
+                    <option value="RFP">Request for Proposal (RFP)</option>
+                    <option value="ReverseAuction">Reverse Auction</option>
+                    <option value="Direct">Direct Procurement</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="category" className="block text-sm font-semibold text-navy-900 mb-1.5">Category <span className="text-red-500">*</span></label>
+                  <input type="text" id="category" name="category" value={formData.category} onChange={handleChange} placeholder="e.g. Stone & Construction Materials" required className={inputClass} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="budget" className="block text-sm font-semibold text-navy-900 mb-1.5">Budget Ceiling / Security Amount (BDT)</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">৳</span>
+                    <input type="number" id="budget" name="budget" value={formData.budget} onChange={handleChange} placeholder="e.g. 3900000" min="0" className={`${inputClass} pl-10`} />
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="deadline" className="block text-sm font-semibold text-navy-900 mb-1.5">Submission Deadline <span className="text-red-500">*</span></label>
+                  <input type="date" id="deadline" name="deadline" value={formData.deadline} onChange={handleChange} required className={inputClass} />
+                </div>
+              </div>
+
               <div>
-                <label htmlFor="description" className="block text-sm font-semibold text-navy-900 mb-1.5">Description <span className="text-red-500">*</span></label>
+                <label htmlFor="eligibilityOfTenderer" className="block text-sm font-semibold text-navy-900 mb-1.5">Eligibility of Tenderer</label>
+                <textarea id="eligibilityOfTenderer" name="eligibilityOfTenderer" value={formData.eligibilityOfTenderer} onChange={handleChange} placeholder="Enter specific financial and experience criteria required from vendors..." rows={3}
+                  className={`${inputClass} resize-none`} />
+              </div>
+
+              <div>
+                <label htmlFor="description" className="block text-sm font-semibold text-navy-900 mb-1.5">Detailed Description & Scope of Work <span className="text-red-500">*</span></label>
                 <textarea id="description" name="description" value={formData.description} onChange={handleChange} placeholder="Enter detailed tender requirements, scope of work, and terms..." required rows={4}
                   className={`${inputClass} resize-none`} />
               </div>
             </div>
 
-            {/* ── Section: Key Dates ───────────────── */}
+            {/* ── Section 2: Key Dates ───────────────── */}
             <div className="space-y-5">
               <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
                 <span className="w-7 h-7 rounded-lg bg-navy-900 text-white flex items-center justify-center text-xs font-bold">2</span>
-                <h3 className="text-sm font-bold text-navy-900 uppercase tracking-wide">Key Dates</h3>
-              </div>
-
-              <div>
-                <label htmlFor="deadline" className="block text-sm font-semibold text-navy-900 mb-1.5">Submission Deadline <span className="text-red-500">*</span></label>
-                <input type="date" id="deadline" name="deadline" value={formData.deadline} onChange={handleChange} required className={inputClass} />
+                <h3 className="text-sm font-bold text-navy-900 uppercase tracking-wide">Key Timeline Dates</h3>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label htmlFor="tenderPublicDate" className="block text-sm font-semibold text-navy-900 mb-1.5">Public Date <span className="text-red-500">*</span></label>
+                  <label htmlFor="tenderPublicDate" className="block text-sm font-semibold text-navy-900 mb-1.5">Publication Date <span className="text-red-500">*</span></label>
                   <input type="date" id="tenderPublicDate" name="tenderPublicDate" value={formData.tenderPublicDate} onChange={handleChange} required className={inputClass} />
                 </div>
                 <div>
-                  <label htmlFor="preBidMeeting" className="block text-sm font-semibold text-navy-900 mb-1.5">Pre-Bid Meeting</label>
+                  <label htmlFor="preBidMeeting" className="block text-sm font-semibold text-navy-900 mb-1.5">Pre-Bid Meeting Date</label>
                   <input type="date" id="preBidMeeting" name="preBidMeeting" value={formData.preBidMeeting} onChange={handleChange} className={inputClass} />
                 </div>
                 <div>
@@ -432,7 +665,7 @@ export default function NewTenderPage() {
               </div>
             </div>
 
-            {/* ── Section: Documents ────────────────── */}
+            {/* ── Section 3: Documents ────────────────── */}
             <div className="space-y-5">
               <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
                 <span className="w-7 h-7 rounded-lg bg-navy-900 text-white flex items-center justify-center text-xs font-bold">3</span>
@@ -441,9 +674,9 @@ export default function NewTenderPage() {
 
               <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
                 <label htmlFor="fileCount" className="block text-sm font-semibold text-navy-900 mb-1.5">
-                  How many specification files does this tender include?
+                  Specification Files to Attach
                 </label>
-                <input type="number" id="fileCount" name="fileCount" value={fileCount} onChange={handleFileCountChange} placeholder="e.g. 2" min="0" className={`${inputClass} mb-4`} />
+                <input type="number" id="fileCount" name="fileCount" value={fileCount} onChange={handleFileCountChange} placeholder="e.g. 1" min="0" className={`${inputClass} mb-4`} />
                 
                 {customFiles.length > 0 && (
                   <div className="space-y-3">
@@ -463,7 +696,7 @@ export default function NewTenderPage() {
                             <button
                               type="button"
                               onClick={() => removeFileSlot(index)}
-                              className="text-xs text-red-500 hover:text-red-700 font-semibold"
+                              className="text-xs text-red-500 hover:text-red-700 font-semibold cursor-pointer"
                             >
                               Remove Slot
                             </button>
@@ -473,12 +706,12 @@ export default function NewTenderPage() {
                             <div>
                               <label className="block text-xs font-medium text-slate-500 mb-1">Document Title <span className="text-red-500">*</span></label>
                               <input type="text" value={cf.name} onChange={(e) => updateCustomFile(index, 'name', e.target.value)}
-                                placeholder="e.g. Technical Specifications" required
+                                placeholder="e.g. Tender Notice Specification" required
                                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-navy-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500 transition text-xs" />
                             </div>
 
                             <div>
-                              <label className="block text-xs font-medium text-slate-500 mb-1">Upload File <span className="text-red-500">*</span></label>
+                              <label className="block text-xs font-medium text-slate-500 mb-1">Upload PDF File <span className="text-red-500">*</span></label>
                               {cf.file ? (
                                 <div className="flex items-center justify-between p-2 bg-emerald-50 border border-emerald-200 rounded-lg">
                                   <span className="text-xs text-emerald-800 font-medium truncate max-w-[150px]">
@@ -498,7 +731,7 @@ export default function NewTenderPage() {
                                     if (e.target.files && e.target.files[0]) {
                                       updateCustomFile(index, 'file', e.target.files[0]);
                                     }
-                                 }} required
+                                  }} required
                                   className="w-full px-3 py-1 text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-accent-50 file:text-accent-700 hover:file:bg-accent-100 transition" />
                               )}
                             </div>
@@ -516,7 +749,7 @@ export default function NewTenderPage() {
                   <label className="block text-sm font-semibold text-navy-900">Mandatory Documents Required from Vendors</label>
                   {sellerDocs.length > 0 && (
                     <button type="button" onClick={() => setShowAccessConfig(!showAccessConfig)}
-                      className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all duration-200 ${
+                      className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all duration-200 cursor-pointer ${
                         showAccessConfig
                           ? 'bg-accent-50 text-accent-700 border-accent-200'
                           : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
@@ -541,7 +774,7 @@ export default function NewTenderPage() {
                             <span className="text-sm text-navy-900 font-medium">{doc.name}</span>
                           </div>
                           <button type="button" onClick={() => removeSellerDoc(index)}
-                            className="text-slate-400 hover:text-red-500 transition flex-shrink-0 ml-3" aria-label="Remove">
+                            className="text-slate-400 hover:text-red-500 transition flex-shrink-0 ml-3 cursor-pointer" aria-label="Remove">
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                             </svg>
@@ -576,10 +809,10 @@ export default function NewTenderPage() {
                 <div className="flex gap-2">
                   <input type="text" value={newSellerDoc} onChange={(e) => setNewSellerDoc(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSellerDoc(); } }}
-                    placeholder="e.g. ISO Certification, Tax Clearance"
+                    placeholder="e.g. Trade License, Tax Certificate, VAT Registration"
                     className="flex-1 px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-navy-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500 transition text-sm" />
                   <button type="button" onClick={addSellerDoc}
-                    className="px-4 py-2.5 bg-navy-900 hover:bg-navy-800 text-white text-sm font-semibold rounded-xl transition flex items-center gap-1.5 flex-shrink-0">
+                    className="px-4 py-2.5 bg-navy-900 hover:bg-navy-800 text-white text-sm font-semibold rounded-xl transition flex items-center gap-1.5 flex-shrink-0 cursor-pointer">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
                     </svg>
@@ -595,7 +828,7 @@ export default function NewTenderPage() {
                 className="flex-1 px-6 py-3.5 bg-slate-100 text-navy-900 font-semibold rounded-xl hover:bg-slate-200 transition border border-slate-200 text-sm cursor-pointer">
                 Cancel
               </button>
-              <button type="submit" disabled={isSubmitting}
+              <button type="submit" disabled={isSubmitting || isExtractingPdf}
                 className="flex-1 px-6 py-3.5 bg-gradient-to-r from-navy-900 to-navy-800 text-white font-bold rounded-xl hover:from-navy-800 hover:to-navy-700 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 text-sm cursor-pointer disabled:opacity-50">
                 {isSubmitting ? (
                   <>
@@ -678,6 +911,10 @@ export default function NewTenderPage() {
               <span className="text-xs font-bold text-navy-900 truncate max-w-[240px]">{formData.title}</span>
             </div>
             <div className="flex justify-between items-center pb-2.5 border-b border-slate-200">
+              <span className="text-xs text-slate-500 font-semibold uppercase">Nature / Method</span>
+              <span className="text-xs font-bold text-navy-900">{formData.procurementNature} ({formData.procurementMethod})</span>
+            </div>
+            <div className="flex justify-between items-center pb-2.5 border-b border-slate-200">
               <span className="text-xs text-slate-500 font-semibold uppercase">Budget Ceiling</span>
               <span className="text-base font-black text-navy-900">৳ {parseFloat(formData.budget || '0').toLocaleString()}</span>
             </div>
@@ -693,7 +930,7 @@ export default function NewTenderPage() {
             {createdTenderResult?.tender_id ? (
               <button
                 onClick={() => router.push(`/view-my-tender/${createdTenderResult.tender_id}`)}
-                className="w-full py-3.5 bg-gradient-to-r from-navy-900 to-navy-800 text-white font-bold rounded-xl hover:from-navy-800 hover:to-navy-700 transition shadow-lg text-sm flex items-center justify-center gap-2"
+                className="w-full py-3.5 bg-gradient-to-r from-navy-900 to-navy-800 text-white font-bold rounded-xl hover:from-navy-800 hover:to-navy-700 transition shadow-lg text-sm flex items-center justify-center gap-2 cursor-pointer"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -705,7 +942,7 @@ export default function NewTenderPage() {
 
             <button
               onClick={() => router.push("/home")}
-              className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-navy-900 font-bold rounded-xl transition border border-slate-200 text-sm"
+              className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-navy-900 font-bold rounded-xl transition border border-slate-200 text-sm cursor-pointer"
             >
               Return to Dashboard
             </button>
