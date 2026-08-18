@@ -11,9 +11,11 @@ from datetime import datetime, timezone
 
 from app.core.database_url import get_database_url
 from app.modules.tenders.service import create_tender_from_pdf_file
-from ml.src.tender_parser import parse_and_embed_tender_pdf
+from app.services.tender_parser import parse_and_embed_tender_pdf
 
-SAMPLE_PDF_PATH = "/home/tawhidumar/codes/ProcureNext/documents/3.pdf"
+SAMPLE_PDF_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "documents", "3.pdf")
+)
 
 
 @pytest.mark.asyncio

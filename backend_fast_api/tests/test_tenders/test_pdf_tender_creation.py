@@ -11,9 +11,11 @@ from contextlib import asynccontextmanager
 
 from app.main import app
 from app.modules.auth.dependencies import get_current_user_org
-from ml.src.tender_parser import parse_and_embed_tender_pdf, generate_embedding, ProcurementDocument
+from app.services.tender_parser import parse_and_embed_tender_pdf, generate_embedding, ProcurementDocument
 
-SAMPLE_PDF_PATH = "/home/tawhidumar/codes/ProcureNext/documents/3.pdf"
+SAMPLE_PDF_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "documents", "3.pdf")
+)
 
 def _mock_db_ctx(mock_conn):
     @asynccontextmanager
