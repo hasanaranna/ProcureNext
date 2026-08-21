@@ -34,7 +34,7 @@ load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.db import check_db_connection
+from app.core.db import check_db_connection, create_notifications_table
 from app.modules.organizations.router import router as organizations_router
 from app.modules.auth.router import router as auth_router
 from app.modules.admin.router import router as admin_router
@@ -43,6 +43,7 @@ from app.modules.bids.router import router as bids_router
 from app.modules.messaging.router import router as messaging_router
 from app.modules.payments.router import router as payments_router
 from app.modules.audit.router import router as audit_router
+from app.modules.notifications.router import router as notifications_router
 from app.modules.messaging.websocket import websocket_endpoint
 
 logger = logging.getLogger("app.main")
@@ -57,6 +58,10 @@ async def lifespan(app: FastAPI):
         logger.info("Database connection successfully established.")
     else:
         logger.warning("Database connection check failed at initialization. Some features may not work properly.")
+
+    # Ensure the notifications table exists (idempotent)
+    await create_notifications_table()
+
     yield
     logger.info("ProcureNext backend shutting down.")
 
@@ -82,6 +87,7 @@ app.include_router(bids_router)
 app.include_router(messaging_router)
 app.include_router(payments_router)
 app.include_router(audit_router)
+app.include_router(notifications_router)
 
 app.add_api_websocket_route("/ws/messages", websocket_endpoint)
 

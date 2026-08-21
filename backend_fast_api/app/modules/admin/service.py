@@ -26,6 +26,7 @@ from app.modules.admin.schemas import (
 from app.services.supabase_storage import generate_signed_url_optional, delete_files
 
 from fastapi import HTTPException
+from app.tasks.notification_tasks import send_account_status_email_task
 
 
 async def get_pending_master_accounts(
@@ -179,7 +180,26 @@ async def verify_organization(
             # ── Collect all file paths before records are deleted ──────────
             file_paths: list[str] = []
 
+            # Capture owner email/name BEFORE deletion for the rejection email
+            owner_email = None
+            owner_full_name = None
+            owner_org_name = None
             if owner:
+                owner_info = await connection.fetchrow(
+                    """
+                    SELECT u.email, u.full_name, o.organization_name
+                    FROM users u
+                    JOIN organization_employees oe ON u.user_id = oe.user_id
+                    JOIN organizations o ON oe.organization_id = o.organization_id
+                    WHERE u.user_id = $1 AND oe.organization_id = $2
+                    """,
+                    owner["user_id"], organization_id,
+                )
+                if owner_info:
+                    owner_email = owner_info["email"]
+                    owner_full_name = owner_info["full_name"]
+                    owner_org_name = owner_info["organization_name"]
+
                 nid_rows = await connection.fetch(
                     """
                     SELECT nid_front_file_path, nid_back_file_path
@@ -221,7 +241,16 @@ async def verify_organization(
         if payload.verification_status == "Rejected" and file_paths:
             await delete_files(file_paths)
 
-            # approve or reject jai hok pore mail kore notify korte hobe user ke
+            # Send rejection email (data was captured before deletion)
+            if owner_email:
+                send_account_status_email_task.delay(
+                    to_email=owner_email,
+                    full_name=owner_full_name or "User",
+                    org_name=owner_org_name or "Your organization",
+                    status="Rejected",
+                    review_notes=payload.review_notes,
+                )
+
             return {"message": f"Organization {organization_id} has been Rejected and the user was removed."}
 
         else:
@@ -260,5 +289,23 @@ async def verify_organization(
                     user_id,
                 )
 
-            # approve or reject jai hok pore mail kore notify korte hobe user ke
+            # Send approval email to the user
+            if owner:
+                owner_info = await connection.fetchrow(
+                    "SELECT email, full_name FROM users WHERE user_id = $1",
+                    owner["user_id"],
+                )
+                if owner_info:
+                    org_row = await connection.fetchrow(
+                        "SELECT organization_name FROM organizations WHERE organization_id = $1",
+                        organization_id,
+                    )
+                    send_account_status_email_task.delay(
+                        to_email=owner_info["email"],
+                        full_name=owner_info["full_name"] or "User",
+                        org_name=org_row["organization_name"] if org_row else "Your organization",
+                        status="Verified",
+                        review_notes=payload.review_notes,
+                    )
+
             return {"message": f"Organization {organization_id} has been {payload.verification_status}."}

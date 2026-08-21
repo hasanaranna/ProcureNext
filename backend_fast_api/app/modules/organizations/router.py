@@ -99,6 +99,7 @@ from app.services.supabase_storage import (
     upload_optional_files,
     delete_files
 )
+from app.tasks.notification_tasks import send_pending_account_admin_alert_task
 
 router = APIRouter(prefix="/api/org", tags=["organizations"])
 
@@ -189,7 +190,26 @@ async def create_organization(
         )
 
         async with get_db_connection() as connection:
-            return await create_master_organization(connection, payload)
+            result = await create_master_organization(connection, payload)
+
+        # Notify all admins about the new pending account
+        try:
+            async with get_db_connection() as connection:
+                admin_rows = await connection.fetch(
+                    "SELECT u.email FROM admins a JOIN users u ON a.user_id = u.user_id"
+                )
+                admin_emails = [row["email"] for row in admin_rows]
+                if admin_emails:
+                    send_pending_account_admin_alert_task.delay(
+                        admin_emails=admin_emails,
+                        applicant_name=name,
+                        org_name=organization_name,
+                        org_type=organization_type,
+                    )
+        except Exception as notify_exc:
+            print(f"[NOTIFY WARNING] Failed to send admin alerts: {notify_exc}", flush=True)
+
+        return result
     except Exception as exc:
         # Clean up any files that were uploaded to Supabase Storage if the operation failed!
         if uploaded_files:

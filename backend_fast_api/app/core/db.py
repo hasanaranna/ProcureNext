@@ -60,3 +60,63 @@ async def get_db_connection() -> AsyncIterator[asyncpg.Connection]:
     finally:
         await connection.close()
 
+
+async def create_notifications_table() -> None:
+    """
+    Idempotently create the NOTIFICATIONS table and its indexes.
+    If a legacy notifications table exists (without user_id column),
+    it is dropped and replaced with the new schema.
+    """
+    database_url = get_database_url()
+    if not database_url:
+        logger.warning("[DB] Skipping notifications table creation: DATABASE_URL not set.")
+        return
+
+    try:
+        connection = await asyncpg.connect(
+            database_url,
+            ssl="require",
+            statement_cache_size=0,
+            timeout=10.0,
+        )
+        try:
+            # Check if the table exists and has the correct schema
+            has_user_id = await connection.fetchval(
+                """
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'notifications' AND column_name = 'user_id'
+                """
+            )
+
+            if not has_user_id:
+                # Either table doesn't exist, or it's the old legacy schema — replace it
+                await connection.execute("DROP TABLE IF EXISTS notifications CASCADE")
+                logger.info("[DB] Dropped legacy notifications table (if it existed).")
+
+                await connection.execute("""
+                    CREATE TABLE notifications (
+                        notification_id SERIAL PRIMARY KEY,
+                        user_id         INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+                        title           VARCHAR(255) NOT NULL,
+                        message         TEXT NOT NULL,
+                        type            VARCHAR(50) NOT NULL DEFAULT 'System',
+                        action_url      VARCHAR(512),
+                        is_read         BOOLEAN NOT NULL DEFAULT FALSE,
+                        created_at      TIMESTAMP NOT NULL DEFAULT NOW()
+                    )
+                """)
+                await connection.execute(
+                    "CREATE INDEX idx_notifications_user_unread ON notifications(user_id, is_read)"
+                )
+                await connection.execute(
+                    "CREATE INDEX idx_notifications_user_created ON notifications(user_id, created_at DESC)"
+                )
+                logger.info("[DB] NOTIFICATIONS table created with new schema.")
+            else:
+                logger.info("[DB] NOTIFICATIONS table already has correct schema — skipping.")
+        finally:
+            await connection.close()
+    except Exception as exc:
+        logger.error(f"[DB] Failed to create notifications table: {exc}")
+
+

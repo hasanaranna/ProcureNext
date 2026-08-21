@@ -26,15 +26,78 @@ export default function HomePage() {
   const [notifTab, setNotifTab] = useState<'unread' | 'read'>('unread');
   const notifModalRef = useRef<HTMLDivElement>(null);
 
-  const notifications = [
-    { id: 1, type: 'bid', title: 'New bid received', body: 'TechSupply Co. submitted a bid on "Office Equipment Procurement Q3".', time: '2 min ago', seen: false },
-    { id: 2, type: 'award', title: 'Tender awarded', body: 'Your bid for "IT Infrastructure Upgrade" has been accepted by GlobalBuyers Ltd.', time: '1 hr ago', seen: false },
-    { id: 3, type: 'deadline', title: 'Deadline approaching', body: 'Submission deadline for "Logistics Services 2025" is in 24 hours.', time: '3 hr ago', seen: false },
-    { id: 4, type: 'enlist', title: 'New organization enlisted', body: 'Rapid Vendors Inc. has enlisted your organization as a trusted buyer.', time: 'Yesterday', seen: true },
-    { id: 5, type: 'system', title: 'Token balance low', body: 'Your organization token balance has dropped below 50. Top up to keep bidding.', time: '2 days ago', seen: true },
-  ];
-  const unseenCount = notifications.filter(n => !n.seen).length;
+  interface Notification {
+    notification_id: number;
+    user_id: number;
+    title: string;
+    message: string;
+    type: string;
+    action_url: string | null;
+    is_read: boolean;
+    created_at: string;
+  }
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [loadingBalance, setLoadingBalance] = useState(true);
+
+  // Fetch notifications
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const [notifRes, countRes] = await Promise.all([
+          fetch('/api/notifications/list?status=all'),
+          fetch('/api/notifications/unread-count'),
+        ]);
+        if (notifRes.ok) {
+          const data = await notifRes.json();
+          setNotifications(data);
+        }
+        if (countRes.ok) {
+          const data = await countRes.json();
+          setUnreadCount(data.count);
+        }
+      } catch (err) {
+        console.error('Failed to fetch notifications:', err);
+      }
+    };
+    fetchNotifications();
+  }, []);
+
+  const timeAgo = (dateStr: string) => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins} min ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs} hr ago`;
+    const days = Math.floor(hrs / 24);
+    if (days === 1) return 'Yesterday';
+    return `${days} days ago`;
+  };
+
+  const markAsRead = async (id: number) => {
+    try {
+      const res = await fetch(`/api/notifications/${id}/read`, { method: 'PATCH' });
+      if (res.ok) {
+        setNotifications(prev => prev.map(n => n.notification_id === id ? { ...n, is_read: true } : n));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (err) {
+      console.error('Failed to mark notification as read:', err);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      const res = await fetch('/api/notifications/read-all', { method: 'PATCH' });
+      if (res.ok) {
+        setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+        setUnreadCount(0);
+      }
+    } catch (err) {
+      console.error('Failed to mark all as read:', err);
+    }
+  };
 
   // Load user data from localStorage
   const [userData, setUserData] = useState<{
@@ -322,9 +385,9 @@ export default function HomePage() {
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                   </svg>
-                  {unseenCount > 0 && (
+                  {unreadCount > 0 && (
                     <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-accent-500 text-white text-[10px] font-black flex items-center justify-center shadow-lg border border-navy-900">
-                      {unseenCount}
+                      {unreadCount}
                     </span>
                   )}
                 </button>
@@ -723,7 +786,7 @@ export default function HomePage() {
             {/* Tab bar */}
             <div className="flex border-b border-white/10 px-5">
               {(['unread', 'read'] as const).map((tab) => {
-                const count = tab === 'unread' ? notifications.filter(n => !n.seen).length : notifications.filter(n => n.seen).length;
+                const count = tab === 'unread' ? notifications.filter(n => !n.is_read).length : notifications.filter(n => n.is_read).length;
                 const active = notifTab === tab;
                 return (
                   <button
@@ -750,13 +813,14 @@ export default function HomePage() {
             {/* Notification list */}
             <div className="overflow-y-auto flex-1">
               {(() => {
-                const filtered = notifications.filter(n => notifTab === 'unread' ? !n.seen : n.seen);
+                const filtered = notifications.filter(n => notifTab === 'unread' ? !n.is_read : n.is_read);
                 const iconMap: Record<string, React.ReactNode> = {
-                  bid: <span className="text-lg">📩</span>,
-                  award: <span className="text-lg">🏆</span>,
-                  deadline: <span className="text-lg">⏰</span>,
-                  enlist: <span className="text-lg">🤝</span>,
-                  system: <span className="text-lg">⚠️</span>,
+                  BidUpdate: <span className="text-lg">📩</span>,
+                  Award: <span className="text-lg">🏆</span>,
+                  Deadline: <span className="text-lg">⏰</span>,
+                  Enlist: <span className="text-lg">🤝</span>,
+                  System: <span className="text-lg">⚠️</span>,
+                  Verification: <span className="text-lg">✅</span>,
                 };
                 if (filtered.length === 0) {
                   return (
@@ -774,24 +838,28 @@ export default function HomePage() {
                 }
                 return filtered.map((notif) => (
                   <div
-                    key={notif.id}
-                    className={`flex gap-3 px-5 py-4 border-b border-white/5 transition-colors hover:bg-white/5 ${!notif.seen ? 'bg-accent-500/5' : ''
+                    key={notif.notification_id}
+                    className={`flex gap-3 px-5 py-4 border-b border-white/5 transition-colors hover:bg-white/5 cursor-pointer ${!notif.is_read ? 'bg-accent-500/5' : ''
                       }`}
+                    onClick={() => {
+                      if (!notif.is_read) markAsRead(notif.notification_id);
+                      if (notif.action_url) router.push(notif.action_url);
+                    }}
                   >
                     <div className="flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center bg-white/10">
-                      {iconMap[notif.type]}
+                      {iconMap[notif.type] || <span className="text-lg">🔔</span>}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <p className={`text-sm font-semibold leading-snug ${!notif.seen ? 'text-white' : 'text-slate-300'}`}>
+                        <p className={`text-sm font-semibold leading-snug ${!notif.is_read ? 'text-white' : 'text-slate-300'}`}>
                           {notif.title}
                         </p>
-                        {!notif.seen && (
+                        {!notif.is_read && (
                           <span className="flex-shrink-0 w-2 h-2 rounded-full bg-accent-400 mt-1" />
                         )}
                       </div>
-                      <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">{notif.body}</p>
-                      <p className="text-[10px] text-slate-500 mt-1.5 font-medium">{notif.time}</p>
+                      <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">{notif.message}</p>
+                      <p className="text-[10px] text-slate-500 mt-1.5 font-medium">{timeAgo(notif.created_at)}</p>
                     </div>
                   </div>
                 ));
@@ -800,7 +868,10 @@ export default function HomePage() {
 
             {/* Footer */}
             <div className="px-5 py-3 border-t border-white/10 flex justify-center">
-              <button className="text-xs text-accent-400 hover:text-accent-300 font-semibold transition">
+              <button
+                onClick={markAllAsRead}
+                className="text-xs text-accent-400 hover:text-accent-300 font-semibold transition"
+              >
                 Mark all as read
               </button>
             </div>

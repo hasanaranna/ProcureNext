@@ -5,6 +5,12 @@
 import asyncpg
 from app.tasks.document_tasks import upload_bid_documents_to_supabase
 from app.modules.payments.service import deduct_tokens_for_bid_submission
+from app.modules.notifications.service import create_notification
+from app.tasks.notification_tasks import (
+    send_bid_received_email_task,
+    send_bid_accepted_email_task,
+    send_bid_rejected_email_task,
+)
 
 
 async def submit_bid_with_documents(
@@ -60,6 +66,50 @@ async def submit_bid_with_documents(
     if files_data:
         # Dispatch Celery task to upload the local files to Supabase
         upload_bid_documents_to_supabase.delay(bid_id, files_data)
+
+    # Notify the buyer (tender owner) about the new bid
+    try:
+        buyer_info = await connection.fetchrow(
+            """
+            SELECT
+                u.user_id,
+                u.email,
+                u.full_name,
+                vo.organization_name AS vendor_org_name
+            FROM tenders t
+            JOIN organization_employees oe
+                ON t.buyer_id = oe.organization_id
+                AND oe.role_in_org = 'Owner'
+            JOIN users u ON oe.user_id = u.user_id
+            LEFT JOIN organizations vo ON vo.organization_id = $2
+            WHERE t.tender_id = $1
+            """,
+            tender_id, vendor_org_id,
+        )
+        if buyer_info:
+            vendor_org_name = buyer_info["vendor_org_name"]
+            t_title = tender_title or "Untitled Tender"
+
+            # Create in-app notification
+            await create_notification(
+                connection,
+                user_id=buyer_info["user_id"],
+                title="New Bid Received",
+                message=f"{vendor_org_name} has submitted a bid on your tender \"{t_title}\".",
+                notification_type="BidUpdate",
+                action_url=f"/view-my-tender/{tender_id}",
+            )
+
+            # Send email via Celery
+            send_bid_received_email_task.delay(
+                to_email=buyer_info["email"],
+                buyer_name=buyer_info["full_name"] or "Buyer",
+                tender_title=t_title,
+                vendor_name=vendor_org_name or "A vendor",
+                tender_id=tender_id,
+            )
+    except Exception as notify_exc:
+        print(f"[NOTIFY WARNING] Failed to send bid notification: {notify_exc}", flush=True)
 
     return dict(row)
 
@@ -223,6 +273,88 @@ async def accept_bid_for_tender(
         """
         await connection.execute(insert_award_query, bid_id, user_id, tender_id)
 
+        # Notify the winning vendor about bid acceptance
+        try:
+            vendor_info = await connection.fetchrow(
+                """
+                SELECT u.user_id, u.email, u.full_name,
+                       t.title as tender_title,
+                       buyer_org.organization_name as buyer_org_name
+                FROM bids b
+                JOIN organization_employees oe ON b.vendor_org_id = oe.organization_id AND oe.role_in_org = 'Owner'
+                JOIN users u ON oe.user_id = u.user_id
+                JOIN tenders t ON b.tender_id = t.tender_id
+                JOIN organizations buyer_org ON t.buyer_id = buyer_org.organization_id
+                WHERE b.bid_id = $1
+                """,
+                bid_id,
+            )
+            if vendor_info:
+                # Create in-app notification
+                await create_notification(
+                    connection,
+                    user_id=vendor_info["user_id"],
+                    title="Bid Accepted!",
+                    message=f"Your bid on \"{vendor_info['tender_title']}\" has been accepted by {vendor_info['buyer_org_name']}.",
+                    notification_type="Award",
+                    action_url=f"/ongoing-tenders",
+                )
+
+                # Send email via Celery
+                send_bid_accepted_email_task.delay(
+                    to_email=vendor_info["email"],
+                    vendor_name=vendor_info["full_name"] or "Vendor",
+                    tender_title=vendor_info["tender_title"] or "Tender",
+                    buyer_org_name=vendor_info["buyer_org_name"] or "Buyer",
+                    tender_id=tender_id,
+                )
+        except Exception as notify_exc:
+            print(f"[NOTIFY WARNING] Failed to send bid accepted notification: {notify_exc}", flush=True)
+
+        # Notify all losing vendors
+        try:
+            losing_vendors = await connection.fetch(
+                """
+                SELECT
+                    u.user_id,
+                    u.email,
+                    u.full_name,
+                    t.title AS tender_title,
+                    buyer_org.organization_name AS buyer_org_name
+                FROM bids b
+                JOIN organization_employees oe
+                    ON b.vendor_org_id = oe.organization_id
+                    AND oe.role_in_org = 'Owner'
+                JOIN users u ON oe.user_id = u.user_id
+                JOIN tenders t ON b.tender_id = t.tender_id
+                JOIN organizations buyer_org ON t.buyer_id = buyer_org.organization_id
+                WHERE b.tender_id = $1
+                  AND b.bid_id != $2
+                  AND b.status = 'Rejected'
+                """,
+                tender_id,
+                bid_id,
+            )
+            for loser in losing_vendors:
+                # In-app notification
+                await create_notification(
+                    connection,
+                    user_id=loser["user_id"],
+                    title="Bid Not Selected",
+                    message=f"Your bid on \"{loser['tender_title']}\" was not selected by {loser['buyer_org_name']}.",
+                    notification_type="BidUpdate",
+                    action_url="/ongoing-tenders",
+                )
+                # Email via Celery
+                send_bid_rejected_email_task.delay(
+                    to_email=loser["email"],
+                    vendor_name=loser["full_name"] or "Vendor",
+                    tender_title=loser["tender_title"] or "Tender",
+                    buyer_org_name=loser["buyer_org_name"] or "Buyer",
+                )
+        except Exception as notify_exc:
+            print(f"[NOTIFY WARNING] Failed to send losing-vendor notifications: {notify_exc}", flush=True)
+
         return accepted_bid
 
 async def get_vendor_submitted_bids(
@@ -365,18 +497,11 @@ async def delete_bid(
 
     # 3. Perform database cascading deletions within a transaction
     async with connection.transaction():
-        # Notifications
-        await connection.execute("""
-            DELETE FROM notification_recipients
-            WHERE notification_id IN (
-                SELECT notification_id FROM notifications
-                WHERE reference_type = 'BID' AND reference_id = $1
-            )
-        """, bid_id)
+        # Notifications — delete any notifications pointing to this bid's tender page
         await connection.execute("""
             DELETE FROM notifications
-            WHERE reference_type = 'BID' AND reference_id = $1
-        """, bid_id)
+            WHERE action_url = $1
+        """, f"/view-my-tender/{bid_row['tender_id']}")
 
         # Bid documents and securities
         await connection.execute("DELETE FROM bid_documents WHERE bid_id = $1", bid_id)
