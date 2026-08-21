@@ -222,11 +222,26 @@ CREATE TABLE procurement_nature (
     name        procurement_nature_val  UNIQUE NOT NULL
 );
 
+INSERT INTO procurement_nature (name) VALUES
+    ('Goods'),
+    ('Works'),
+    ('Services'),
+    ('Consultancy')
+ON CONFLICT (name) DO NOTHING;
+
 CREATE TABLE procurement_method (
     method_id   SERIAL                  PRIMARY KEY,
     method_code procurement_method_val  UNIQUE NOT NULL,
     description TEXT
 );
+
+INSERT INTO procurement_method (method_code, description) VALUES
+    ('OTM', 'Open Tendering Method'),
+    ('RFQ', 'Request for Quotation'),
+    ('RFP', 'Request for Proposal'),
+    ('ReverseAuction', 'Reverse Auction'),
+    ('Direct', 'Direct Procurement')
+ON CONFLICT (method_code) DO NOTHING;
 
 CREATE TABLE tender_categories (
     category_id     SERIAL          PRIMARY KEY,
@@ -248,6 +263,7 @@ CREATE TABLE tenders (
     method_id           INT             REFERENCES procurement_method(method_id),
     title               VARCHAR(500)    NOT NULL,
     description         TEXT            NOT NULL,
+    eligibility_of_tenderer TEXT,
     visibility_type     tender_visibility DEFAULT 'Public',
     budget_min          NUMERIC(18,2),
     budget_max          NUMERIC(18,2),
@@ -259,7 +275,7 @@ CREATE TABLE tenders (
     tender_opening_date TIMESTAMP,
     submission_deadline TIMESTAMP,
     status              tender_status   DEFAULT 'Draft',
-    embedding           VECTOR(768),
+    embedding           VECTOR(384),
     created_at          TIMESTAMP       DEFAULT NOW(),
     updated_at          TIMESTAMP       DEFAULT NOW()
 );

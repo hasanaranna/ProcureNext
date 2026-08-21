@@ -42,7 +42,11 @@ class TenderCreateRequest(BaseModel):
     category_id: Optional[int] = None
     category: Optional[str] = None
     nature_id: Optional[int] = None
+    procurement_nature: Optional[str] = None
     method_id: Optional[int] = None
+    procurement_method: Optional[str] = None
+    eligibility_of_tenderer: Optional[str] = None
+    embedding: Optional[List[float]] = None
     visibility_type: TenderVisibility = TenderVisibility.Public
     budget_min: Optional[float] = None
     budget_max: Optional[float] = None
@@ -64,11 +68,32 @@ class TenderResponse(BaseModel):
     title: str
     description: str
     status: TenderStatus
+    category: Optional[str] = None
+    procurement_nature: Optional[str] = None
+    procurement_method: Optional[str] = None
+    eligibility_of_tenderer: Optional[str] = None
+    budget_min: Optional[float] = None
+    budget_max: Optional[float] = None
     submission_deadline: Optional[datetime] = None
     tender_public_date: Optional[datetime] = None
     pre_bid_meeting: Optional[datetime] = None
     tender_opening_date: Optional[datetime] = None
     created_at: datetime
+
+class TenderPdfExtractResponse(BaseModel):
+    title: str
+    description: str
+    procurement_nature: Optional[str] = None
+    procurement_method: Optional[str] = None
+    category: Optional[str] = None
+    eligibility_of_tenderer: Optional[str] = None
+    budget_min: Optional[float] = None
+    budget_max: Optional[float] = None
+    submission_deadline: Optional[datetime] = None
+    tender_public_date: Optional[datetime] = None
+    pre_bid_meeting: Optional[datetime] = None
+    tender_opening_date: Optional[datetime] = None
+    embedding: Optional[List[float]] = None
 
 class TenderListItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -112,6 +137,10 @@ class TenderDetailResponse(BaseModel):
     description: str
     status: TenderStatus
     buyer_org_name: str
+    category_name: Optional[str] = None
+    procurement_nature: Optional[str] = None
+    procurement_method: Optional[str] = None
+    eligibility_of_tenderer: Optional[str] = None
     submission_deadline: Optional[datetime] = None
     tender_public_date: Optional[datetime] = None
     pre_bid_meeting: Optional[datetime] = None
@@ -190,11 +219,13 @@ class OngoingTenderDetail(BaseModel):
     buyer_org_id: int
     buyer_org_name: str
     buyer_org_address: Optional[str] = None
+    winner_org_id: Optional[int] = None
     buyer_org_website: Optional[str] = None
     vendor_org_id: int
     vendor_org_name: str
     vendor_org_address: Optional[str] = None
     vendor_org_website: Optional[str] = None
+    eligibility_of_tenderer: Optional[str] = None
     tender_documents: List[TenderDocumentItem] = []
     bid_documents: List[OngoingTenderBidDocument] = []
 
@@ -240,6 +271,7 @@ class PublicTenderDetailResponse(BaseModel):
     category_name: Optional[str] = None
     procurement_nature: Optional[str] = None
     procurement_method: Optional[str] = None
+    eligibility_of_tenderer: Optional[str] = None
     buyer_org_name: str
     buyer_org_type: Optional[str] = None
     buyer_verified: bool = True

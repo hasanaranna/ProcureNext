@@ -26,10 +26,77 @@
 #   past their submission_deadline
 # ============================================================
 
+import logging
 import asyncpg
 from app.modules.tenders.schemas import TenderCreateRequest
 from app.tasks.document_tasks import upload_tender_documents_to_supabase
 from app.modules.payments.service import deduct_tokens_for_tender_publish
+from app.services.ml_client import parse_and_embed_tender_pdf, vectorize_text
+
+logger = logging.getLogger(__name__)
+
+async def resolve_nature_id(connection: asyncpg.Connection, nature_str: str | None, nature_id: int | None) -> int | None:
+    if nature_id:
+        return nature_id
+    if not nature_str:
+        return None
+    cleaned = nature_str.strip()
+    row = await connection.fetchrow(
+        "SELECT nature_id FROM procurement_nature WHERE name::text ILIKE $1 LIMIT 1",
+        cleaned
+    )
+    if row:
+        return row["nature_id"]
+    return None
+
+async def resolve_method_id(connection: asyncpg.Connection, method_str: str | None, method_id: int | None) -> int | None:
+    if method_id:
+        return method_id
+    if not method_str:
+        return None
+    cleaned = method_str.strip()
+    # Map common method names to method_code
+    if "open tendering" in cleaned.lower() or "otm" in cleaned.lower():
+        code = "OTM"
+    elif "rfq" in cleaned.lower() or "quotation" in cleaned.lower():
+        code = "RFQ"
+    elif "rfp" in cleaned.lower() or "proposal" in cleaned.lower():
+        code = "RFP"
+    elif "reverse" in cleaned.lower() or "auction" in cleaned.lower():
+        code = "ReverseAuction"
+    elif "direct" in cleaned.lower():
+        code = "Direct"
+    else:
+        code = cleaned
+
+    row = await connection.fetchrow(
+        "SELECT method_id FROM procurement_method WHERE method_code::text ILIKE $1 OR description ILIKE $2 LIMIT 1",
+        code, f"%{cleaned}%"
+    )
+    if row:
+        return row["method_id"]
+    return None
+
+async def resolve_category_id(connection: asyncpg.Connection, category_name: str | None, category_id: int | None) -> int | None:
+    if category_id:
+        return category_id
+    if not category_name or category_name.strip().lower() in ("not applicable", "n/a", "none", "null"):
+        return None
+    cleaned = category_name.strip()
+    row = await connection.fetchrow(
+        "SELECT category_id FROM tender_categories WHERE category_name ILIKE $1 LIMIT 1",
+        cleaned
+    )
+    if row:
+        return row["category_id"]
+    try:
+        new_cat = await connection.fetchrow(
+            "INSERT INTO tender_categories (category_name) VALUES ($1) RETURNING category_id",
+            cleaned[:255]
+        )
+        return new_cat["category_id"]
+    except Exception:
+        return None
 
 async def publish_tender_with_documents(
     connection: asyncpg.Connection, 
@@ -40,15 +107,35 @@ async def publish_tender_with_documents(
     files_data: list[dict]
 ) -> dict:
     """
-    Creates a tender directly in Published state, deducts tokens, and queues background file upload.
+    Creates a tender directly in Published state, deducts tokens, saves 384-d embedding,
+    and queues background file upload.
     """
-    
+    nature_id = await resolve_nature_id(connection, tender_data.procurement_nature, tender_data.nature_id)
+    method_id = await resolve_method_id(connection, tender_data.procurement_method, tender_data.method_id)
+    category_id = await resolve_category_id(connection, tender_data.category, tender_data.category_id)
+
+    embedding_str = None
+    if tender_data.embedding and len(tender_data.embedding) == 384:
+        embedding_str = f"[{','.join(str(float(x)) for x in tender_data.embedding)}]"
+    elif tender_data.description:
+        try:
+            vec = vectorize_text(tender_data.description)
+            if vec and len(vec) == 384:
+                embedding_str = f"[{','.join(str(float(x)) for x in vec)}]"
+        except Exception as e:
+            logger.warning(f"Failed to generate embedding during tender publish: {e}")
+
     query = """
         INSERT INTO tenders (
-            buyer_id, created_by, title, description, visibility_type, budget_min, budget_max, status,
-            submission_deadline, tender_public_date, pre_bid_meeting, tender_opening_date
+            buyer_id, created_by, title, description, category_id, nature_id, method_id,
+            eligibility_of_tenderer, visibility_type, budget_min, budget_max, status,
+            submission_deadline, tender_public_date, pre_bid_meeting, tender_opening_date,
+            embedding
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+            $17::vector
+        )
         RETURNING *;
     """
     
@@ -59,14 +146,19 @@ async def publish_tender_with_documents(
             org_user_id,
             tender_data.title,
             tender_data.description,
-            tender_data.visibility_type.value,
+            category_id,
+            nature_id,
+            method_id,
+            tender_data.eligibility_of_tenderer,
+            tender_data.visibility_type.value if hasattr(tender_data.visibility_type, "value") else str(tender_data.visibility_type),
             tender_data.budget_min,
             tender_data.budget_max,
             "Published",
             tender_data.submission_deadline.replace(tzinfo=None) if tender_data.submission_deadline else None,
             tender_data.tender_public_date.replace(tzinfo=None) if tender_data.tender_public_date else None,
             tender_data.pre_bid_meeting.replace(tzinfo=None) if tender_data.pre_bid_meeting else None,
-            tender_data.tender_opening_date.replace(tzinfo=None) if tender_data.tender_opening_date else None
+            tender_data.tender_opening_date.replace(tzinfo=None) if tender_data.tender_opening_date else None,
+            embedding_str
         )
         
         tender_id = row['tender_id']
@@ -103,9 +195,64 @@ async def publish_tender_with_documents(
 
     if files_data:
         # Dispatch Celery task to upload the local files to Supabase
-        upload_tender_documents_to_supabase.delay(tender_id, files_data)
+        try:
+            upload_tender_documents_to_supabase.delay(tender_id, files_data)
+        except Exception as e:
+            logger.warning(f"Failed to dispatch Celery upload task: {e}")
 
-    return dict(row)
+    ret = dict(row)
+    if "category" not in ret and tender_data.category:
+        ret["category"] = tender_data.category
+    if "procurement_nature" not in ret and tender_data.procurement_nature:
+        ret["procurement_nature"] = tender_data.procurement_nature
+    if "procurement_method" not in ret and tender_data.procurement_method:
+        ret["procurement_method"] = tender_data.procurement_method
+    return ret
+
+
+async def create_tender_from_pdf_file(
+    connection: asyncpg.Connection,
+    buyer_id: int,
+    org_user_id: int,
+    user_id: int,
+    pdf_path: str,
+    original_filename: str = "tender.pdf"
+) -> dict:
+    """
+    Parses the tender PDF, computes the 384-d vector embedding,
+    creates the tender in Published state, deducts tokens, and schedules document upload.
+    """
+    parsed = await parse_and_embed_tender_pdf(pdf_path)
+
+    tender_req = TenderCreateRequest(
+        title=parsed.title or "Untitled Tender",
+        description=parsed.description or parsed.title or "No description provided",
+        category=parsed.category,
+        procurement_nature=parsed.procurement_nature,
+        procurement_method=parsed.procurement_method,
+        eligibility_of_tenderer=parsed.eligibility_of_tenderer,
+        budget_min=parsed.budget_min,
+        budget_max=parsed.budget_max,
+        tender_public_date=parsed.tender_public_date,
+        submission_deadline=parsed.submission_deadline,
+        pre_bid_meeting=parsed.pre_bid_meeting,
+        tender_opening_date=parsed.tender_opening_date,
+        embedding=parsed.embedding
+    )
+
+    files_data = [{
+        "local_path": pdf_path,
+        "custom_name": original_filename
+    }]
+
+    return await publish_tender_with_documents(
+        connection=connection,
+        buyer_id=buyer_id,
+        org_user_id=org_user_id,
+        user_id=user_id,
+        tender_data=tender_req,
+        files_data=files_data
+    )
 
 
 async def get_buyer_tenders(
@@ -199,8 +346,12 @@ async def get_tender_detail(
             t.tender_id,
             t.title,
             t.description,
+            t.eligibility_of_tenderer,
             t.status,
             o.organization_name AS buyer_org_name,
+            tc.category_name,
+            pn.name::text AS procurement_nature,
+            pm.method_code::text AS procurement_method,
             t.submission_deadline,
             t.tender_public_date,
             t.pre_bid_meeting,
@@ -211,6 +362,9 @@ async def get_tender_detail(
             t.created_at
         FROM tenders t
         JOIN organizations o ON t.buyer_id = o.organization_id
+        LEFT JOIN tender_categories tc ON t.category_id = tc.category_id
+        LEFT JOIN procurement_nature pn ON t.nature_id = pn.nature_id
+        LEFT JOIN procurement_method pm ON t.method_id = pm.method_id
         WHERE t.tender_id = $1;
     """
     row = await connection.fetchrow(tender_query, tender_id)
@@ -591,14 +745,15 @@ async def get_public_active_tenders(
             t.tender_id,
             t.title,
             t.description,
+            t.eligibility_of_tenderer,
             t.status,
             t.visibility_type,
             o.organization_name AS buyer_org_name,
             o.organization_type AS buyer_org_type,
             (o.verification_status = 'Verified') AS buyer_verified,
             tc.category_name,
-            pn.nature_name AS procurement_nature,
-            pm.method_name AS procurement_method,
+            pn.name::text AS procurement_nature,
+            pm.method_code::text AS procurement_method,
             t.budget_min,
             t.budget_max,
             t.security_required,
@@ -645,6 +800,7 @@ async def get_public_tender_detail(
             t.tender_id,
             t.title,
             t.description,
+            t.eligibility_of_tenderer,
             t.status,
             t.visibility_type,
             o.organization_name AS buyer_org_name,
@@ -652,8 +808,8 @@ async def get_public_tender_detail(
             (o.verification_status = 'Verified') AS buyer_verified,
             o.website_url AS buyer_org_website,
             tc.category_name,
-            pn.nature_name AS procurement_nature,
-            pm.method_name AS procurement_method,
+            pn.name::text AS procurement_nature,
+            pm.method_code::text AS procurement_method,
             t.budget_min,
             t.budget_max,
             t.security_required,
