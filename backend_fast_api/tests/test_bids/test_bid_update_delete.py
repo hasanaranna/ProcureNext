@@ -140,7 +140,8 @@ class TestBidDeleteService:
         mock_conn.fetchrow.return_value = {
             "bid_id": 50,
             "vendor_org_id": 2,
-            "status": "Submitted"
+            "status": "Submitted",
+            "tender_id": 10,
         }
 
         # Mock fetch for bid_docs and bid_secs

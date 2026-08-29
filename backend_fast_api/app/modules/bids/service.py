@@ -472,7 +472,7 @@ async def delete_bid(
 
     # 1. Verify bid exists and ownership
     bid_row = await connection.fetchrow(
-        "SELECT bid_id, vendor_org_id, status FROM bids WHERE bid_id = $1",
+        "SELECT bid_id, vendor_org_id, status, tender_id FROM bids WHERE bid_id = $1",
         bid_id
     )
     if not bid_row:
