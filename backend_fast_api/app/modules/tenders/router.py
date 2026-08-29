@@ -79,6 +79,7 @@ import uuid
 import shutil
 from typing import List, Optional
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Query, status
+from celery.result import AsyncResult
 from app.core.db import get_db_connection
 from app.modules.auth.dependencies import get_current_user_org
 from app.modules.tenders.schemas import (
@@ -92,10 +93,11 @@ from app.modules.tenders.schemas import (
     PublicTenderListItem,
     PublicTenderDetailResponse,
     TenderPdfExtractResponse,
+    TenderPdfJobResponse,
+    TenderPdfJobStatus,
 )
 from app.modules.tenders.service import (
     publish_tender_with_documents,
-    create_tender_from_pdf_file,
     get_buyer_tenders,
     get_all_published_tenders,
     get_tender_detail,
@@ -108,6 +110,8 @@ from app.modules.tenders.service import (
     get_public_tender_detail,
 )
 from app.services.ml_client import parse_and_embed_tender_pdf
+from app.tasks.celery_app import celery_app
+from app.tasks.ml_tasks import create_tender_from_pdf_task
 
 router = APIRouter(prefix="/tenders", tags=["Tenders"])
 
@@ -149,19 +153,18 @@ async def extract_from_pdf(
         raise HTTPException(status_code=500, detail=f"Failed to parse PDF: {e}")
 
 
-@router.post("/buyer/create-from-pdf", response_model=TenderResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/buyer/create-from-pdf", response_model=TenderPdfJobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def create_tender_from_pdf(
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user_org)
 ):
     """
-    1-Click Tender Creation from PDF.
-    Uploads the PDF document, extracts structured fields, computes the 384-d embedding,
-    creates the tender in PostgreSQL, schedules file upload to Supabase, and deducts tokens.
+    Queue async tender creation from PDF.
+    Poll GET /buyer/create-from-pdf/jobs/{task_id} for the result.
     """
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
-    
+
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
 
@@ -178,26 +181,36 @@ async def create_tender_from_pdf(
     org_user_id = current_user.get("org_user_id", 1)
     user_id = current_user.get("user_id") or current_user.get("org_user_id", 1)
 
-    try:
-        async with get_db_connection() as connection:
-            new_tender = await create_tender_from_pdf_file(
-                connection=connection,
-                buyer_id=buyer_id,
-                org_user_id=org_user_id,
-                user_id=user_id,
-                pdf_path=local_path,
-                original_filename=file.filename
-            )
-            return new_tender
-    except Exception as e:
-        if os.path.exists(local_path):
-            try:
-                os.remove(local_path)
-            except Exception:
-                pass
-        if isinstance(e, HTTPException):
-            raise e
-        raise HTTPException(status_code=500, detail=f"Tender creation from PDF failed: {e}")
+    task = create_tender_from_pdf_task.delay(
+        buyer_id=buyer_id,
+        org_user_id=org_user_id,
+        user_id=user_id,
+        pdf_path=local_path,
+        original_filename=file.filename,
+    )
+
+    return TenderPdfJobResponse(
+        task_id=task.id,
+        status="processing",
+        message="Tender PDF processing started.",
+    )
+
+
+@router.get("/buyer/create-from-pdf/jobs/{task_id}", response_model=TenderPdfJobStatus)
+async def get_create_tender_from_pdf_job(task_id: str):
+    result = AsyncResult(task_id, app=celery_app)
+
+    if result.state == "PENDING":
+        return TenderPdfJobStatus(task_id=task_id, status="processing")
+    if result.state == "STARTED":
+        return TenderPdfJobStatus(task_id=task_id, status="processing")
+    if result.state == "SUCCESS":
+        return TenderPdfJobStatus(task_id=task_id, status="completed", result=result.result)
+    if result.state == "FAILURE":
+        error_message = str(result.result) if result.result else "Tender PDF processing failed."
+        return TenderPdfJobStatus(task_id=task_id, status="failed", error=error_message)
+
+    return TenderPdfJobStatus(task_id=task_id, status=result.state.lower())
 
 
 @router.post("/buyer/publish-with-documents", response_model=TenderResponse, status_code=status.HTTP_201_CREATED)
@@ -246,7 +259,6 @@ async def publish_with_documents(
     org_user_id = current_user.get("org_user_id", 1)
     user_id = current_user.get("user_id") or current_user.get("org_user_id", 1)
 
-    # 3. Save to DB and Dispatch background task
     try:
         async with get_db_connection() as connection:
             new_tender = await publish_tender_with_documents(

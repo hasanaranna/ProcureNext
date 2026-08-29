@@ -95,6 +95,17 @@ class TenderPdfExtractResponse(BaseModel):
     tender_opening_date: Optional[datetime] = None
     embedding: Optional[List[float]] = None
 
+class TenderPdfJobResponse(BaseModel):
+    task_id: str
+    status: str = "processing"
+    message: str = "Tender PDF processing started."
+
+class TenderPdfJobStatus(BaseModel):
+    task_id: str
+    status: str
+    result: Optional[TenderResponse] = None
+    error: Optional[str] = None
+
 class TenderListItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

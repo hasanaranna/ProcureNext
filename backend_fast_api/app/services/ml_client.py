@@ -1,72 +1,114 @@
 # ============================================================
-# services/ml_client.py - ML Microservice & Extraction Client
+# services/ml_client.py - ML Microservice HTTP Client
 # ============================================================
 
-import os
-import sys
 import logging
-from typing import Optional, List, Union
-import httpx
+import os
+from typing import List, Union
 
-try:
-    from app.services.tender_parser import (
-        ProcurementDocument,
-        parse_and_embed_tender_pdf as _parse_and_embed_tender_pdf,
-        generate_embedding as _generate_embedding,
-        extract_text_from_pdf as _extract_text_from_pdf,
-    )
-except ImportError:
-    try:
-        from ml.src.tender_parser import (
-            ProcurementDocument,
-            parse_and_embed_tender_pdf as _parse_and_embed_tender_pdf,
-            generate_embedding as _generate_embedding,
-            extract_text_from_pdf as _extract_text_from_pdf,
-        )
-    except ImportError:
-        from src.tender_parser import (
-            ProcurementDocument,
-            parse_and_embed_tender_pdf as _parse_and_embed_tender_pdf,
-            generate_embedding as _generate_embedding,
-            extract_text_from_pdf as _extract_text_from_pdf,
-        )
+import httpx
+from fastapi import HTTPException
+
+from app.services.ml_schemas import ProcurementDocument
 
 logger = logging.getLogger(__name__)
 
-ML_SERVICE_URL = os.getenv("ML_SERVICE_URL")
+ML_SERVICE_URL = os.getenv("ML_SERVICE_URL", "").rstrip("/")
+ML_SERVICE_TIMEOUT = float(os.getenv("ML_SERVICE_TIMEOUT", "120"))
+
+
+def _require_ml_service_url() -> str:
+    if not ML_SERVICE_URL:
+        raise HTTPException(
+            status_code=503,
+            detail="ML service is not configured. Set ML_SERVICE_URL.",
+        )
+    return ML_SERVICE_URL
+
+
+def _build_pdf_files(pdf_source: Union[str, bytes, bytearray]) -> dict:
+    if isinstance(pdf_source, str):
+        if not os.path.exists(pdf_source):
+            raise HTTPException(status_code=400, detail="PDF file path does not exist.")
+        with open(pdf_source, "rb") as file_handle:
+            content = file_handle.read()
+        filename = os.path.basename(pdf_source)
+    else:
+        content = bytes(pdf_source)
+        filename = "tender.pdf"
+
+    if not content:
+        raise HTTPException(status_code=400, detail="PDF content is empty.")
+
+    return {"file": (filename, content, "application/pdf")}
+
+
+def _raise_for_ml_response(response: httpx.Response, action: str) -> None:
+    if response.status_code < 400:
+        return
+
+    detail = response.text
+    try:
+        payload = response.json()
+        if isinstance(payload, dict) and payload.get("detail"):
+            detail = payload["detail"]
+    except Exception:
+        pass
+
+    logger.error("ML service %s failed (%s): %s", action, response.status_code, detail)
+    raise HTTPException(
+        status_code=502,
+        detail=f"ML service {action} failed: {detail}",
+    )
+
+
+def parse_and_embed_tender_pdf_sync(pdf_source: Union[str, bytes, bytearray]) -> ProcurementDocument:
+    """Synchronous client for Celery workers."""
+    base_url = _require_ml_service_url()
+    files = _build_pdf_files(pdf_source)
+
+    with httpx.Client(timeout=ML_SERVICE_TIMEOUT) as client:
+        response = client.post(f"{base_url}/documents/tender/parse", files=files)
+        _raise_for_ml_response(response, "PDF parsing")
+        return ProcurementDocument.model_validate(response.json())
 
 
 async def parse_and_embed_tender_pdf(pdf_source: Union[str, bytes, bytearray]) -> ProcurementDocument:
-    """
-    Parse a tender PDF and compute its 384-dimensional embedding vector.
-    If ML_SERVICE_URL is defined, attempts to call the microservice endpoint.
-    Otherwise, executes the Python extraction pipeline directly.
-    """
-    if ML_SERVICE_URL:
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                files = None
-                if isinstance(pdf_source, str) and os.path.exists(pdf_source):
-                    with open(pdf_source, "rb") as f:
-                        content = f.read()
-                    files = {"file": (os.path.basename(pdf_source), content, "application/pdf")}
-                elif isinstance(pdf_source, (bytes, bytearray)):
-                    files = {"file": ("tender.pdf", bytes(pdf_source), "application/pdf")}
+    """Async client for FastAPI request handlers."""
+    base_url = _require_ml_service_url()
+    files = _build_pdf_files(pdf_source)
 
-                if files:
-                    resp = await client.post(f"{ML_SERVICE_URL.rstrip('/')}/documents/tender/parse", files=files)
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        return ProcurementDocument(**data)
-        except Exception as e:
-            logger.warning(f"Failed to communicate with external ML service at {ML_SERVICE_URL}: {e}. Falling back to internal engine.")
-
-    # Execute Python extraction & embedding pipeline directly
-    return _parse_and_embed_tender_pdf(pdf_source)
+    async with httpx.AsyncClient(timeout=ML_SERVICE_TIMEOUT) as client:
+        response = await client.post(f"{base_url}/documents/tender/parse", files=files)
+        _raise_for_ml_response(response, "PDF parsing")
+        return ProcurementDocument.model_validate(response.json())
 
 
-def vectorize_text(text: str) -> List[float]:
-    """
-    Generate 384-dimensional vector embedding for the given text.
-    """
-    return _generate_embedding(text)
+def vectorize_text_sync(text: str) -> List[float]:
+    """Synchronous embedding client for service-layer code."""
+    base_url = _require_ml_service_url()
+    payload = {"text": text or "tender procurement document"}
+
+    with httpx.Client(timeout=ML_SERVICE_TIMEOUT) as client:
+        response = client.post(f"{base_url}/embeddings/text", json=payload)
+        _raise_for_ml_response(response, "text embedding")
+        data = response.json()
+        embedding = data.get("embedding")
+        if not isinstance(embedding, list):
+            raise HTTPException(status_code=502, detail="ML service returned an invalid embedding payload.")
+        return embedding
+
+
+async def vectorize_text(text: str) -> List[float]:
+    """Async embedding client."""
+    base_url = _require_ml_service_url()
+    payload = {"text": text or "tender procurement document"}
+
+    async with httpx.AsyncClient(timeout=ML_SERVICE_TIMEOUT) as client:
+        response = await client.post(f"{base_url}/embeddings/text", json=payload)
+        _raise_for_ml_response(response, "text embedding")
+        data = response.json()
+        embedding = data.get("embedding")
+        if not isinstance(embedding, list):
+            raise HTTPException(status_code=502, detail="ML service returned an invalid embedding payload.")
+        return embedding

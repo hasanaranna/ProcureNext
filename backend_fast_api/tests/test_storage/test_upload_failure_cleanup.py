@@ -154,7 +154,6 @@ class TestTenderPublishFailureCleanup:
         mock_conn = AsyncMock()
         mock_db.side_effect = _mock_db_ctx(mock_conn)
 
-        # DB publish fails
         mock_publish.side_effect = RuntimeError("DB insert failed")
 
         tender_data = {

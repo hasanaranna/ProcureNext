@@ -1,9 +1,29 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import ManageTokensModal from "@/components/ManageTokensModal";
 import ModalShell from "@/components/ModalShell";
+import { parseApiError, pollTenderPdfJob } from "@/lib/tenderPdf";
+import {
+  clearTenderDraft,
+  loadTenderDraft,
+  saveTenderDraft,
+} from "@/lib/tenderDraft";
+
+const EMPTY_FORM_DATA = {
+  title: "",
+  description: "",
+  procurementNature: "Goods",
+  procurementMethod: "OTM",
+  eligibilityOfTenderer: "",
+  category: "construction",
+  budget: "",
+  deadline: "",
+  tenderPublicDate: "",
+  preBidMeeting: "",
+  tenderOpeningDate: "",
+};
 
 const ALL_ROLES = ["Owner", "ProcurementOfficer", "Finance", "Viewer", "TenderReceiver"] as const;
 const ROLE_LABELS: Record<string, string> = {
@@ -48,11 +68,16 @@ export default function NewTenderPage() {
   ]);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPublishingPdf, setIsPublishingPdf] = useState(false);
+  const [pdfJobMessage, setPdfJobMessage] = useState<string | null>(null);
 
   // PDF Extraction & AI state
   const [isExtractingPdf, setIsExtractingPdf] = useState(false);
   const [pdfSuccessMessage, setPdfSuccessMessage] = useState<string | null>(null);
+  const [draftRestoredMessage, setDraftRestoredMessage] = useState<string | null>(null);
   const [extractedEmbedding, setExtractedEmbedding] = useState<number[] | null>(null);
+  const draftReadyRef = useRef(false);
+  const skipDraftSaveRef = useRef(false);
 
   // Success Modal State
   const [createdTenderResult, setCreatedTenderResult] = useState<any>(null);
@@ -65,19 +90,76 @@ export default function NewTenderPage() {
   const [showManageTokens, setShowManageTokens] = useState(false);
   const [tokenError, setTokenError] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    procurementNature: "Goods",
-    procurementMethod: "OTM",
-    eligibilityOfTenderer: "",
-    category: "construction",
-    budget: "",
-    deadline: "",
-    tenderPublicDate: "",
-    preBidMeeting: "",
-    tenderOpeningDate: "",
-  });
+  const [formData, setFormData] = useState({ ...EMPTY_FORM_DATA });
+
+  const clearFormAndDraft = () => {
+    skipDraftSaveRef.current = true;
+    clearTenderDraft();
+    setFormData({ ...EMPTY_FORM_DATA });
+    setSellerDocs([]);
+    setFileCount(1);
+    setCustomFiles([{ name: "", file: null }]);
+    setExtractedEmbedding(null);
+    setPdfSuccessMessage(null);
+    setDraftRestoredMessage(null);
+    setShowAccessConfig(false);
+  };
+
+  useEffect(() => {
+    const draft = loadTenderDraft();
+    if (draft) {
+      setFormData(draft.formData);
+      setSellerDocs(draft.sellerDocs);
+      setFileCount(draft.fileCount);
+      setCustomFiles(
+        draft.customFileNames.length > 0
+          ? draft.customFileNames.map((name) => ({ name, file: null }))
+          : [{ name: "", file: null }],
+      );
+      setExtractedEmbedding(draft.extractedEmbedding);
+      setShowAccessConfig(draft.showAccessConfig);
+      setDraftRestoredMessage(
+        "Restored your saved draft. Re-attach document files if you had any.",
+      );
+    }
+    draftReadyRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    if (!draftReadyRef.current) return;
+    if (skipDraftSaveRef.current) {
+      skipDraftSaveRef.current = false;
+      return;
+    }
+
+    const hasContent =
+      formData.title.trim() ||
+      formData.description.trim() ||
+      formData.budget.trim() ||
+      sellerDocs.length > 0 ||
+      customFiles.some((f) => f.name.trim());
+
+    if (!hasContent) {
+      clearTenderDraft();
+      return;
+    }
+
+    saveTenderDraft({
+      formData,
+      sellerDocs,
+      fileCount,
+      customFileNames: customFiles.map((f) => f.name),
+      extractedEmbedding,
+      showAccessConfig,
+    });
+  }, [
+    formData,
+    sellerDocs,
+    fileCount,
+    customFiles,
+    extractedEmbedding,
+    showAccessConfig,
+  ]);
 
   useEffect(() => {
     try {
@@ -197,7 +279,19 @@ export default function NewTenderPage() {
     });
   };
 
-  // ── Handle PDF File Extraction ──────────────────────────────────────────
+  const refreshTokenBalance = async () => {
+    try {
+      const balRes = await fetch("/api/payments/balance");
+      if (balRes.ok) {
+        const balData = await balRes.json();
+        setTokenBalance(balData.credit_balance);
+        localStorage.setItem("org_token_balance", balData.credit_balance.toString());
+      }
+    } catch (err) {
+      console.error("Error refreshing token balance:", err);
+    }
+  };
+
   const handlePdfFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -221,8 +315,7 @@ export default function NewTenderPage() {
       });
 
       if (!res.ok) {
-        const errJson = await res.json().catch(() => null);
-        throw new Error(errJson?.detail || "Failed to extract data from PDF.");
+        throw new Error(await parseApiError(res, "Failed to extract data from PDF."));
       }
 
       const data = await res.json();
@@ -259,6 +352,7 @@ export default function NewTenderPage() {
       setFormError(err.message || "Error processing PDF notice.");
     } finally {
       setIsExtractingPdf(false);
+      e.target.value = "";
     }
   };
 
@@ -270,8 +364,11 @@ export default function NewTenderPage() {
       return;
     }
 
+    setIsPublishingPdf(true);
     setIsSubmitting(true);
     setFormError(null);
+    setPdfSuccessMessage(null);
+    setPdfJobMessage("Uploading PDF and starting AI processing...");
 
     try {
       const directData = new FormData();
@@ -282,22 +379,44 @@ export default function NewTenderPage() {
         body: directData,
       });
 
+      if (res.status === 202) {
+        const job = await res.json();
+        if (!job?.task_id) {
+          throw new Error("Server did not return a processing job id.");
+        }
+
+        setPdfJobMessage("Parsing PDF, generating embeddings, and publishing tender...");
+        const result = await pollTenderPdfJob(job.task_id);
+        setCreatedTenderResult(result);
+        clearFormAndDraft();
+        await refreshTokenBalance();
+        setPdfJobMessage(null);
+        setIsSuccessModalOpen(true);
+        return;
+      }
+
       if (res.ok) {
         const resJson = await res.json().catch(() => null);
-        setCreatedTenderResult(resJson);
-        setIsSuccessModalOpen(true);
-      } else {
-        const errorJson = await res.json().catch(() => null);
-        const errorMsg = errorJson?.detail || "Failed to publish tender from PDF.";
-        setFormError(errorMsg);
-        if (res.status === 400 && typeof errorMsg === "string" && errorMsg.toLowerCase().includes("token")) {
-          setShowManageTokens(true);
+        if (resJson) {
+          setCreatedTenderResult(resJson);
         }
+        clearFormAndDraft();
+        await refreshTokenBalance();
+        setIsSuccessModalOpen(true);
+        return;
+      }
+
+      const errorMsg = await parseApiError(res, "Failed to publish tender from PDF.");
+      setFormError(errorMsg);
+      if (res.status === 400 && errorMsg.toLowerCase().includes("token")) {
+        setShowManageTokens(true);
       }
     } catch (e: any) {
       setFormError(e.message || "Error creating tender from PDF.");
     } finally {
+      setIsPublishingPdf(false);
       setIsSubmitting(false);
+      setPdfJobMessage(null);
     }
   };
 
@@ -361,12 +480,13 @@ export default function NewTenderPage() {
         if (response.ok) {
             const resJson = await response.json().catch(() => null);
             setCreatedTenderResult(resJson);
+            clearFormAndDraft();
+            await refreshTokenBalance();
             setIsSuccessModalOpen(true);
         } else {
-            const errorJson = await response.json().catch(() => null);
-            const errorMsg = errorJson?.detail || "Failed to publish tender.";
+            const errorMsg = await parseApiError(response, "Failed to publish tender.");
             setFormError(errorMsg);
-            if (response.status === 400 && typeof errorMsg === 'string' && errorMsg.toLowerCase().includes('token')) {
+            if (response.status === 400 && errorMsg.toLowerCase().includes('token')) {
                 setShowManageTokens(true);
             }
         }
@@ -383,13 +503,28 @@ export default function NewTenderPage() {
 
   const inputClass = "w-full px-4 py-3 border border-slate-300 rounded-xl bg-white text-navy-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-all duration-200";
 
+  const publishedTitle =
+    (createdTenderResult?.title as string | undefined) || formData.title;
+  const publishedNature =
+    (createdTenderResult?.procurement_nature as string | undefined) ||
+    formData.procurementNature;
+  const publishedMethod =
+    (createdTenderResult?.procurement_method as string | undefined) ||
+    formData.procurementMethod;
+  const publishedBudget =
+    createdTenderResult?.budget_max != null
+      ? String(createdTenderResult.budget_max)
+      : formData.budget;
+  const publishedCategory =
+    (createdTenderResult?.category as string | undefined) || formData.category;
+
   return (
     <main className="w-full min-h-screen py-12 px-4 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800 relative overflow-x-hidden">
       <div className="absolute top-1/3 right-1/4 w-72 h-72 bg-accent-500/5 rounded-full blur-3xl" />
       
       <div className="relative z-10 max-w-3xl mx-auto w-full animate-fade-in">
         {/* Back button */}
-        <button onClick={handleCancel} className="mb-6 flex items-center gap-2 text-slate-400 hover:text-white transition-colors duration-200 cursor-pointer">
+        <button type="button" onClick={handleCancel} className="mb-6 flex items-center gap-2 text-slate-400 hover:text-white transition-colors duration-200 cursor-pointer">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
@@ -431,6 +566,18 @@ export default function NewTenderPage() {
             </div>
           )}
 
+          {draftRestoredMessage && (
+            <div className="m-8 mb-0 p-4 bg-sky-50 border-2 border-sky-200 rounded-xl flex items-start gap-3 animate-fade-in text-sky-900 text-sm">
+              <svg className="w-5 h-5 text-sky-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <p className="font-bold text-sky-950">Draft Restored</p>
+                <p className="text-xs text-sky-800 mt-0.5">{draftRestoredMessage}</p>
+              </div>
+            </div>
+          )}
+
           {/* PDF AI Success Notice */}
           {pdfSuccessMessage && (
             <div className="m-8 mb-0 p-4 bg-emerald-50 border-2 border-emerald-300 rounded-xl flex items-start gap-3 animate-fade-in text-emerald-900 text-sm">
@@ -446,8 +593,21 @@ export default function NewTenderPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="p-8 space-y-8">
-            {/* ── AI PDF Import Card ───────── */}
+          {pdfJobMessage && (
+            <div className="m-8 mb-0 p-4 bg-indigo-50 border-2 border-indigo-200 rounded-xl flex items-start gap-3 animate-fade-in text-indigo-900 text-sm">
+              <svg className="animate-spin h-5 w-5 text-indigo-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              <div>
+                <p className="font-bold text-indigo-950">Processing PDF Tender</p>
+                <p className="text-xs text-indigo-800 mt-0.5">{pdfJobMessage}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="px-8 pt-8">
+            {/* ── AI PDF Import Card (outside form to avoid accidental submit/navigation) ───────── */}
             <div className="p-6 bg-gradient-to-br from-indigo-50/90 via-sky-50/60 to-purple-50/80 border-2 border-indigo-200/80 rounded-2xl shadow-sm transition-all duration-200">
               <div className="flex items-start justify-between gap-4 mb-4">
                 <div className="flex items-center gap-3">
@@ -472,7 +632,7 @@ export default function NewTenderPage() {
 
               <div className="flex flex-col sm:flex-row items-center gap-3">
                 <label className={`flex-1 w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed rounded-xl cursor-pointer transition ${
-                  isExtractingPdf
+                  isExtractingPdf || isPublishingPdf
                     ? "bg-slate-100 border-slate-300 text-slate-400 cursor-not-allowed"
                     : "bg-white border-indigo-300 hover:border-indigo-500 text-indigo-900 hover:bg-indigo-50/50 shadow-sm"
                 }`}>
@@ -480,7 +640,7 @@ export default function NewTenderPage() {
                     type="file"
                     accept=".pdf,application/pdf"
                     className="hidden"
-                    disabled={isExtractingPdf || isSubmitting}
+                    disabled={isExtractingPdf || isSubmitting || isPublishingPdf}
                     onChange={handlePdfFileSelected}
                   />
                   {isExtractingPdf ? (
@@ -501,26 +661,44 @@ export default function NewTenderPage() {
                   )}
                 </label>
 
-                {/* 1-Click Instant Upload button */}
-                <label className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-3 bg-gradient-to-r from-indigo-600 to-navy-900 hover:from-indigo-700 hover:to-navy-800 text-white rounded-xl text-xs font-bold cursor-pointer transition shadow-md flex-shrink-0">
+                <label className={`w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl text-xs font-bold transition shadow-md flex-shrink-0 ${
+                  isPublishingPdf
+                    ? "bg-slate-400 text-white cursor-not-allowed"
+                    : "bg-gradient-to-r from-indigo-600 to-navy-900 hover:from-indigo-700 hover:to-navy-800 text-white cursor-pointer"
+                }`}>
                   <input
                     type="file"
                     accept=".pdf,application/pdf"
                     className="hidden"
-                    disabled={isExtractingPdf || isSubmitting}
+                    disabled={isExtractingPdf || isSubmitting || isPublishingPdf}
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) handleDirect1ClickCreate(file);
+                      e.currentTarget.value = "";
                     }}
                   />
-                  <svg className="w-4 h-4 text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  <span>1-Click Publish PDF</span>
+                  {isPublishingPdf ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      <span>Publishing PDF...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4 text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      <span>1-Click Publish PDF</span>
+                    </>
+                  )}
                 </label>
               </div>
             </div>
+          </div>
 
+          <form onSubmit={handleSubmit} className="p-8 space-y-8">
             {/* ── Token Cost & Balance Banner ───────── */}
             <div className={`p-4 rounded-2xl border transition-all duration-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
               tokenBalance < tenderPublishCost
@@ -828,7 +1006,7 @@ export default function NewTenderPage() {
                 className="flex-1 px-6 py-3.5 bg-slate-100 text-navy-900 font-semibold rounded-xl hover:bg-slate-200 transition border border-slate-200 text-sm cursor-pointer">
                 Cancel
               </button>
-              <button type="submit" disabled={isSubmitting || isExtractingPdf}
+              <button type="submit" disabled={isSubmitting || isExtractingPdf || isPublishingPdf}
                 className="flex-1 px-6 py-3.5 bg-gradient-to-r from-navy-900 to-navy-800 text-white font-bold rounded-xl hover:from-navy-800 hover:to-navy-700 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 text-sm cursor-pointer disabled:opacity-50">
                 {isSubmitting ? (
                   <>
@@ -908,20 +1086,20 @@ export default function NewTenderPage() {
           <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 mb-6 text-left space-y-3">
             <div className="flex justify-between items-center pb-2.5 border-b border-slate-200">
               <span className="text-xs text-slate-500 font-semibold uppercase">Title</span>
-              <span className="text-xs font-bold text-navy-900 truncate max-w-[240px]">{formData.title}</span>
+              <span className="text-xs font-bold text-navy-900 truncate max-w-[240px]">{publishedTitle}</span>
             </div>
             <div className="flex justify-between items-center pb-2.5 border-b border-slate-200">
               <span className="text-xs text-slate-500 font-semibold uppercase">Nature / Method</span>
-              <span className="text-xs font-bold text-navy-900">{formData.procurementNature} ({formData.procurementMethod})</span>
+              <span className="text-xs font-bold text-navy-900">{publishedNature} ({publishedMethod})</span>
             </div>
             <div className="flex justify-between items-center pb-2.5 border-b border-slate-200">
               <span className="text-xs text-slate-500 font-semibold uppercase">Budget Ceiling</span>
-              <span className="text-base font-black text-navy-900">৳ {parseFloat(formData.budget || '0').toLocaleString()}</span>
+              <span className="text-base font-black text-navy-900">৳ {parseFloat(publishedBudget || '0').toLocaleString()}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-xs text-slate-500 font-semibold uppercase">Category</span>
               <span className="px-2.5 py-0.5 bg-accent-50 text-accent-700 text-xs font-bold rounded-full border border-accent-200 capitalize">
-                {formData.category || 'General'}
+                {publishedCategory || 'General'}
               </span>
             </div>
           </div>

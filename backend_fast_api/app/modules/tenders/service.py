@@ -119,7 +119,7 @@ async def publish_tender_with_documents(
         embedding_str = f"[{','.join(str(float(x)) for x in tender_data.embedding)}]"
     elif tender_data.description:
         try:
-            vec = vectorize_text(tender_data.description)
+            vec = await vectorize_text(tender_data.description)
             if vec and len(vec) == 384:
                 embedding_str = f"[{','.join(str(float(x)) for x in vec)}]"
         except Exception as e:
@@ -210,20 +210,15 @@ async def publish_tender_with_documents(
     return ret
 
 
-async def create_tender_from_pdf_file(
+async def create_tender_from_parsed_pdf(
     connection: asyncpg.Connection,
     buyer_id: int,
     org_user_id: int,
     user_id: int,
     pdf_path: str,
-    original_filename: str = "tender.pdf"
+    original_filename: str,
+    parsed,
 ) -> dict:
-    """
-    Parses the tender PDF, computes the 384-d vector embedding,
-    creates the tender in Published state, deducts tokens, and schedules document upload.
-    """
-    parsed = await parse_and_embed_tender_pdf(pdf_path)
-
     tender_req = TenderCreateRequest(
         title=parsed.title or "Untitled Tender",
         description=parsed.description or parsed.title or "No description provided",
@@ -237,12 +232,12 @@ async def create_tender_from_pdf_file(
         submission_deadline=parsed.submission_deadline,
         pre_bid_meeting=parsed.pre_bid_meeting,
         tender_opening_date=parsed.tender_opening_date,
-        embedding=parsed.embedding
+        embedding=parsed.embedding,
     )
 
     files_data = [{
         "local_path": pdf_path,
-        "custom_name": original_filename
+        "custom_name": original_filename,
     }]
 
     return await publish_tender_with_documents(
@@ -251,7 +246,30 @@ async def create_tender_from_pdf_file(
         org_user_id=org_user_id,
         user_id=user_id,
         tender_data=tender_req,
-        files_data=files_data
+        files_data=files_data,
+    )
+
+
+async def create_tender_from_pdf_file(
+    connection: asyncpg.Connection,
+    buyer_id: int,
+    org_user_id: int,
+    user_id: int,
+    pdf_path: str,
+    original_filename: str = "tender.pdf",
+) -> dict:
+    """
+    Parses the tender PDF via ML service, then creates the tender in Published state.
+    """
+    parsed = await parse_and_embed_tender_pdf(pdf_path)
+    return await create_tender_from_parsed_pdf(
+        connection=connection,
+        buyer_id=buyer_id,
+        org_user_id=org_user_id,
+        user_id=user_id,
+        pdf_path=pdf_path,
+        original_filename=original_filename,
+        parsed=parsed,
     )
 
 

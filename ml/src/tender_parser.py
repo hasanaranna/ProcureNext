@@ -9,7 +9,8 @@ import logging
 import hashlib
 from datetime import datetime
 from typing import Optional, List, Union
-from pydantic import BaseModel, Field
+
+from src.schemas import ProcurementDocument
 try:
     import pypdf as PyPDF2
 except ImportError:
@@ -19,50 +20,6 @@ except ImportError:
         PyPDF2 = None
 
 logger = logging.getLogger(__name__)
-
-# --------------------------------------------------
-# 1. Structured output schema (matching bid_eval.ipynb)
-# --------------------------------------------------
-
-class ProcurementDocument(BaseModel):
-    procurement_nature: str = Field(
-        default="Goods",
-        description="The nature/type of the procurement."
-    )
-
-    procurement_method: str = Field(
-        default="Open Tendering Method",
-        description="The procurement method used."
-    )
-
-    title: str = Field(
-        default="",
-        description="The title of the procurement/tender."
-    )
-
-    category: str = Field(
-        default="Not applicable",
-        description="The category of the procurement."
-    )
-
-    eligibility_of_tenderer: str = Field(
-        default="",
-        description="Eligibility requirements for the tenderer."
-    )
-
-    description: str = Field(
-        default="",
-        description="Brief description of the works."
-    )
-
-    # Extended extracted metadata
-    budget_min: Optional[float] = None
-    budget_max: Optional[float] = None
-    tender_public_date: Optional[datetime] = None
-    submission_deadline: Optional[datetime] = None
-    pre_bid_meeting: Optional[datetime] = None
-    tender_opening_date: Optional[datetime] = None
-    embedding: Optional[List[float]] = None
 
 SYSTEM_PROMPT = """
 You are a Document Intelligence Agent.
@@ -287,7 +244,7 @@ def parse_and_embed_tender_pdf(pdf_source: Union[str, bytes, bytearray, io.Bytes
             from langchain.agents import create_agent
 
             agent_llm = ChatGroq(
-                model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+                model=os.getenv("GROQ_MODEL", "openai/gpt-oss-120b"),
                 api_key=groq_api_key,
                 temperature=0.1,
                 stop=None

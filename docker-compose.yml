@@ -25,21 +25,37 @@ services:
       PORT: 8000
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
-      PYTHONPATH: /app:/ml
+      ML_SERVICE_URL: http://ml:8001
+      ML_SERVICE_TIMEOUT: 120
     volumes:
       - ./backend_fast_api:/app:z
-      - ./ml:/ml:z
-      - ~/.cache/huggingface:/root/.cache/huggingface:z
+      - ./backend_fast_api/uploads:/app/uploads:z
     command: ["uvicorn", "app.main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"]
     depends_on:
       - redis
       - db
+      - ml
 
   redis:
     image: redis:7-alpine
     container_name: redis-cache
     ports:
       - "6380:6379"
+
+  ml:
+    build:
+      context: ./ml
+      dockerfile: Dockerfile
+    container_name: ml-service
+    ports:
+      - "8001:8001"
+    env_file:
+      - ./backend_fast_api/.env
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface:z
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
 
   celery_worker:
     build:
@@ -51,15 +67,16 @@ services:
     environment:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
-      PYTHONPATH: /app:/ml
+      ML_SERVICE_URL: http://ml:8001
+      ML_SERVICE_TIMEOUT: 120
     volumes:
       - ./backend_fast_api:/app:z
-      - ./ml:/ml:z
-      - ~/.cache/huggingface:/root/.cache/huggingface:z
+      - ./backend_fast_api/uploads:/app/uploads:z
     command: ["celery", "-A", "app.tasks.celery_app.celery_app", "worker", "--loglevel=info"]
     depends_on:
       - redis
       - db
+      - ml
 
   frontend:
     build: ./frontend # Builds image from Dockerfile

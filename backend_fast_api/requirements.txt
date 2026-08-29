@@ -41,14 +41,8 @@ boto3
 # --- Email ---
 fastapi-mail
 
-# --- PDF & ML Intelligence (Embeddings & Extraction) ---
-python-multipart
+# --- File uploads ---
 aiofiles
-pypdf
-sentence-transformers
-groq
-langchain
-langchain-groq
 
 # --- WebSocket support (for real-time notifications/chat) ---
 websockets

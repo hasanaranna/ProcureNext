@@ -604,7 +604,7 @@ export default function HomePage() {
                           className="px-4 py-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold hover:bg-emerald-100 transition-all text-sm flex items-center gap-1.5 shadow-sm">
                           📋 Ongoing Tenders
                         </button>
-                        <button onClick={() => router.push('/new-tender')}
+                        <button type="button" onClick={() => router.push('/new-tender')}
                           className="px-6 py-2 rounded-xl bg-gradient-to-r from-accent-500 to-accent-600 text-white font-bold hover:from-accent-600 hover:to-accent-700 transition-all shadow-lg hover:shadow-xl hover:scale-[1.02] text-sm">
                           + Create Tender
                         </button>
@@ -819,6 +819,7 @@ export default function HomePage() {
                   Award: <span className="text-lg">🏆</span>,
                   Deadline: <span className="text-lg">⏰</span>,
                   Enlist: <span className="text-lg">🤝</span>,
+                  TenderUpdate: <span className="text-lg">📋</span>,
                   System: <span className="text-lg">⚠️</span>,
                   Verification: <span className="text-lg">✅</span>,
                 };

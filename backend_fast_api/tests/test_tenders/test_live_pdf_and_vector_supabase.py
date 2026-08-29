@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 from app.core.database_url import get_database_url
 from app.modules.tenders.service import create_tender_from_pdf_file
-from app.services.tender_parser import parse_and_embed_tender_pdf
+from app.services.ml_client import parse_and_embed_tender_pdf_sync
 
 SAMPLE_PDF_PATH = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..", "..", "documents", "3.pdf")
@@ -23,6 +23,8 @@ async def test_live_supabase_pdf_tender_creation_and_vector384():
     db_url = get_database_url()
     if not db_url or "localhost" in db_url or "127.0.0.1" in db_url:
         pytest.skip("Skipping live database test in local/CI environment without active database.")
+    if not os.getenv("ML_SERVICE_URL"):
+        pytest.skip("Skipping live ML test because ML_SERVICE_URL is not configured.")
 
     ssl_ctx = ssl.create_default_context()
     ssl_ctx.check_hostname = False
@@ -105,7 +107,7 @@ async def test_live_supabase_pdf_tender_creation_and_vector384():
         assert row["embedding"] is not None
 
         # 4. Test pgvector vector similarity query on 384-d vector
-        parsed = parse_and_embed_tender_pdf(SAMPLE_PDF_PATH)
+        parsed = parse_and_embed_tender_pdf_sync(SAMPLE_PDF_PATH)
         query_vec_str = f"[{','.join(str(float(x)) for x in parsed.embedding)}]"
 
         vec_match = await conn.fetchrow(
