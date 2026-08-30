@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import ModalShell from '@/components/ModalShell';
+import BidEvaluationPanel from '@/components/BidEvaluationPanel';
 
 interface BidDocument {
   bid_doc_id: number;
@@ -110,7 +111,7 @@ export default function ViewMyTenderPage() {
   const params = useParams();
   const tenderId = params.id as string;
 
-  const [activeTab, setActiveTab] = useState<'bids' | 'compare' | 'recommended'>('bids');
+  const [activeTab, setActiveTab] = useState<'bids' | 'compare' | 'recommended' | 'evaluation'>('bids');
   const [fadeIn, setFadeIn] = useState(true);
   
   const [tender, setTender] = useState<Tender | null>(null);
@@ -257,7 +258,7 @@ export default function ViewMyTenderPage() {
     }
   };
 
-  const handleTabSwitch = (tab: 'bids' | 'compare' | 'recommended') => {
+  const handleTabSwitch = (tab: 'bids' | 'compare' | 'recommended' | 'evaluation') => {
     if (tab === activeTab) return;
     setFadeIn(false);
     setTimeout(() => {
@@ -598,6 +599,14 @@ export default function ViewMyTenderPage() {
               }`}
             >
               🌟 Recommended Sellers
+            </button>
+            <button
+              onClick={() => handleTabSwitch('evaluation')}
+              className={`px-5 py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-200 flex items-center gap-1.5 ${
+                activeTab === 'evaluation' ? 'bg-white text-navy-900 shadow-md' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              🧠 Smart Evaluation
             </button>
           </div>
         </div>
@@ -1144,6 +1153,10 @@ export default function ViewMyTenderPage() {
                 <p className="text-slate-300 font-medium">Smart AI recommendations will appear here as more vendors join.</p>
               </div>
             </div>
+          )}
+
+          {activeTab === 'evaluation' && (
+            <BidEvaluationPanel tenderId={tenderId} bidsCount={bids.length} />
           )}
 
         </div>
