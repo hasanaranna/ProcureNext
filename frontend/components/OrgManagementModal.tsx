@@ -36,8 +36,8 @@ export default function OrgManagementModal({ isOpen, onClose }: OrgManagementMod
         <div className="flex justify-center py-4 flex-shrink-0 border-b border-slate-200 bg-white">
           <SlidingToggle
             options={[
-              { value: 'invitations', label: '📨 Invitations' },
-              { value: 'roles', label: '🔑 Role Assignment' },
+              { value: 'invitations', label: 'Invitations' },
+              { value: 'roles', label: 'Role Assignment' },
             ]}
             value={section}
             onChange={(v) => setSection(v as 'invitations' | 'roles')}
