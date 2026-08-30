@@ -124,6 +124,7 @@ class TenderDetailResponse(BaseModel):
     created_at: datetime
     documents: List[TenderDocumentItem] = []
     required_documents: List[RequiredDocumentItem] = []
+    can_manage_document_access: Optional[bool] = None
 
     class Config:
         from_attributes = True

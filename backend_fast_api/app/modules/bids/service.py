@@ -65,7 +65,7 @@ async def get_bid_by_tender_and_vendor(
     bid_dict = dict(bid_row)
 
     docs_query = """
-        SELECT bd.bid_doc_id, bd.file_path, COALESCE(trd.custom_doc_name, dt.type_name, 'Document') as document_type
+        SELECT bd.bid_doc_id, bd.file_path, COALESCE(trd.custom_doc_name, dt.type_name, 'Document') as document_type, trd.allowed_roles
         FROM bid_documents bd
         LEFT JOIN public.tender_required_documents trd ON bd.req_doc_id = trd.req_doc_id
         LEFT JOIN document_types dt ON bd.req_doc_id = dt.type_id
@@ -80,6 +80,34 @@ async def get_bid_document_by_id(connection: asyncpg.Connection, doc_id: int) ->
     """Fetch bid document by its ID."""
     query = "SELECT * FROM bid_documents WHERE bid_doc_id = $1"
     row = await connection.fetchrow(query, doc_id)
+    return dict(row) if row else None
+
+async def get_bid_document_details_for_download(
+    connection: asyncpg.Connection, 
+    bid_doc_id: int
+) -> dict | None:
+    """
+    Fetch all details required to download and dynamically name a bid document.
+    Includes the file_path, vendor organization name, document type name,
+    and authorization references (buyer_id, vendor_org_id), as well as allowed_roles.
+    """
+    query = """
+        SELECT 
+            bd.file_path, 
+            b.vendor_org_id,
+            t.buyer_id,
+            o.organization_name as vendor_name, 
+            COALESCE(trd.custom_doc_name, dt.type_name, 'Document') as document_type,
+            trd.allowed_roles
+        FROM bid_documents bd
+        JOIN bids b ON bd.bid_id = b.bid_id
+        JOIN tenders t ON b.tender_id = t.tender_id
+        JOIN organizations o ON b.vendor_org_id = o.organization_id
+        LEFT JOIN public.tender_required_documents trd ON bd.req_doc_id = trd.req_doc_id
+        LEFT JOIN document_types dt ON bd.req_doc_id = dt.type_id
+        WHERE bd.bid_doc_id = $1
+    """
+    row = await connection.fetchrow(query, bid_doc_id)
     return dict(row) if row else None
 
 async def get_bids_for_buyer_tender(
@@ -114,7 +142,7 @@ async def get_bids_for_buyer_tender(
 
     # Fetch documents for these bids
     docs_query = """
-        SELECT bd.bid_id, bd.bid_doc_id, bd.file_path, COALESCE(trd.custom_doc_name, dt.type_name, 'Document') as document_type
+        SELECT bd.bid_id, bd.bid_doc_id, bd.file_path, COALESCE(trd.custom_doc_name, dt.type_name, 'Document') as document_type, trd.allowed_roles
         FROM bid_documents bd
         LEFT JOIN public.tender_required_documents trd ON bd.req_doc_id = trd.req_doc_id
         LEFT JOIN document_types dt ON bd.req_doc_id = dt.type_id

@@ -9,6 +9,7 @@ interface BidDocument {
   bid_id: number;
   file_path: string;
   document_type: string;
+  has_access?: boolean;
 }
 
 interface Bid {
@@ -49,6 +50,7 @@ interface Tender {
   budget_min: string;
   budget_max: string;
   required_documents?: RequiredDocument[];
+  can_manage_document_access?: boolean;
 }
 
 export default function ViewMyTenderPage() {
@@ -72,6 +74,9 @@ export default function ViewMyTenderPage() {
   const [reqDocs, setReqDocs] = useState<RequiredDocument[]>([]);
   const [savingAccess, setSavingAccess] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+
+  const [restrictedDocAlert, setRestrictedDocAlert] = useState<{ isOpen: boolean; docName: string }>({ isOpen: false, docName: '' });
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!tenderId) return;
@@ -140,7 +145,21 @@ export default function ViewMyTenderPage() {
       if (tender) {
         setTender({ ...tender, required_documents: reqDocs });
       }
+      
+      // Re-fetch bids to update document access states reactively
+      try {
+        const bidsRes = await fetch(`/api/bids/buyer/tender/${tenderId}`);
+        if (bidsRes.ok) {
+          const bidsData = await bidsRes.json();
+          setBids(bidsData);
+        }
+      } catch (e) {
+        console.error("Failed to refetch bids:", e);
+      }
+
       setShowManageAccess(false);
+      setToastMessage("Document access permissions updated successfully");
+      setTimeout(() => setToastMessage(null), 3000);
     } catch (err: any) {
       alert(err.message || "Failed to update document access");
     } finally {
@@ -165,9 +184,13 @@ export default function ViewMyTenderPage() {
         if (data.url) {
           window.open(data.url, '_blank');
         }
+      } else {
+        const errorData = await res.json();
+        alert(errorData.detail || 'Access Denied');
       }
     } catch (e) {
       console.error('Failed to view document', e);
+      alert('Failed to view document');
     }
   };
 
@@ -271,25 +294,27 @@ export default function ViewMyTenderPage() {
         </div>
 
         {/* Manage Document Access Button - OUTSIDE the white box */}
-        <div className="flex justify-end mb-6">
-          <button
-            type="button"
-            onClick={() => setShowManageAccess(!showManageAccess)}
-            className={`flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-xl border transition-all duration-200 shadow-md ${
-              showManageAccess
-                ? 'bg-accent-500/20 text-accent-300 border-accent-500/40'
-                : 'bg-navy-900/80 text-slate-300 border-white/10 hover:bg-navy-800 hover:text-white'
-            }`}
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-            Manage Document Access {showManageAccess ? '▲' : '▼'}
-          </button>
-        </div>
+        {tender?.can_manage_document_access && (
+          <div className="flex justify-end mb-6">
+            <button
+              type="button"
+              onClick={() => setShowManageAccess(!showManageAccess)}
+              className={`flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-xl border transition-all duration-200 shadow-md ${
+                showManageAccess
+                  ? 'bg-accent-500/20 text-accent-300 border-accent-500/40'
+                  : 'bg-navy-900/80 text-slate-300 border-white/10 hover:bg-navy-800 hover:text-white'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              Manage Document Access {showManageAccess ? '▲' : '▼'}
+            </button>
+          </div>
+        )}
 
         {/* Expandable Document Access Panel - OUTSIDE the Tender Details Card */}
-        {showManageAccess && (
+        {tender?.can_manage_document_access && showManageAccess && (
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-8 mb-8 animate-fade-in">
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-200">
               <h3 className="text-sm font-bold text-navy-900 uppercase tracking-wide">Required Document Permissions</h3>
@@ -445,15 +470,28 @@ export default function ViewMyTenderPage() {
                         {bid.documents && bid.documents.length > 0 && (
                           <div className="mb-4 flex flex-wrap gap-2">
                             {bid.documents.map((doc) => (
-                              <div key={doc.bid_doc_id} className="rounded-full px-3 py-1.5 flex items-center gap-2 border border-slate-200 bg-slate-50">
-                                <svg className="w-4 h-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
-                                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
-                                </svg>
-                                <span className="text-xs font-medium text-navy-900">{doc.document_type}</span>
-                                <button onClick={() => handleViewDocument(doc.bid_doc_id)}
-                                  className="ml-1 text-accent-600 hover:text-accent-700 text-xs font-semibold transition">
-                                  View
-                                </button>
+                              <div key={doc.bid_doc_id} className={`rounded-full px-3 py-1.5 flex items-center gap-2 border ${doc.has_access !== false ? 'border-slate-200 bg-slate-50' : 'border-slate-300 bg-slate-100 opacity-80'}`}>
+                                {doc.has_access !== false ? (
+                                  <svg className="w-4 h-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
+                                  </svg>
+                                ) : (
+                                  <span className="text-slate-500 text-sm">🔒</span>
+                                )}
+                                <span className={`text-xs font-medium ${doc.has_access !== false ? 'text-navy-900' : 'text-slate-500 italic'}`}>
+                                  {doc.document_type} {doc.has_access === false && '(Restricted)'}
+                                </span>
+                                {doc.has_access !== false ? (
+                                  <button onClick={() => handleViewDocument(doc.bid_doc_id)}
+                                    className="ml-1 text-accent-600 hover:text-accent-700 text-xs font-semibold transition">
+                                    View
+                                  </button>
+                                ) : (
+                                  <button onClick={() => setRestrictedDocAlert({ isOpen: true, docName: doc.document_type })}
+                                    className="ml-1 text-slate-400 hover:text-slate-500 text-xs font-semibold transition cursor-pointer">
+                                    View
+                                  </button>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -556,6 +594,43 @@ export default function ViewMyTenderPage() {
           </div>
         </div>
       </ModalShell>
+
+      {/* Restricted Document Access Modal */}
+      <ModalShell
+        isOpen={restrictedDocAlert.isOpen}
+        onClose={() => setRestrictedDocAlert({ isOpen: false, docName: '' })}
+        maxWidth="max-w-md"
+      >
+        <div className="p-8">
+          <div className="w-14 h-14 mx-auto mb-5 rounded-2xl bg-red-50 flex items-center justify-center">
+            <span className="text-2xl">🔒</span>
+          </div>
+          <h3 className="text-xl font-black text-navy-900 mb-2 text-center">Access Restricted</h3>
+          <p className="text-slate-600 mb-6 text-center text-sm">
+            You do not have authorization to view <strong className="text-navy-900">{restrictedDocAlert.docName}</strong>. This document requires <strong className="text-navy-900">Owner</strong> privileges. Contact your administrator or tender manager to request access.
+          </p>
+          <div className="flex justify-center">
+            <button
+              onClick={() => setRestrictedDocAlert({ isOpen: false, docName: '' })}
+              className="px-6 py-2.5 rounded-xl bg-slate-100 text-navy-900 font-semibold hover:bg-slate-200 transition border border-slate-200"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </ModalShell>
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 animate-fade-in">
+          <div className="bg-emerald-50 border border-emerald-200 shadow-xl rounded-xl px-5 py-3 flex items-center gap-3">
+            <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <p className="text-emerald-800 text-sm font-bold">{toastMessage}</p>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

@@ -164,6 +164,8 @@ async def get_tender_detail(
     tender_query = """
         SELECT
             t.tender_id,
+            t.created_by,
+            t.buyer_id,
             t.title,
             t.description,
             t.status,

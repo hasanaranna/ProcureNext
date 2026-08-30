@@ -70,6 +70,35 @@ async def upload_file(upload: UploadFile, prefix: str) -> str:
     return object_path
 
 
+async def download_file_bytes(object_path: str) -> tuple[bytes, str]:
+    """
+    Download file bytes directly from Supabase Storage using service role key.
+    Returns a tuple of (file_bytes, content_type).
+    """
+    if not object_path:
+        raise HTTPException(status_code=400, detail="Object path is required.")
+
+    supabase_url, service_role_key = _get_supabase_config()
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        response = await client.get(
+            f"{supabase_url}/storage/v1/object/{BUCKET_NAME}/{object_path}",
+            headers={
+                "Authorization": f"Bearer {service_role_key}",
+                "apikey": service_role_key,
+            },
+        )
+
+    if response.status_code >= 400:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Failed to download '{object_path}' from Supabase Storage: {response.text}",
+        )
+
+    content_type = response.headers.get("Content-Type", "application/octet-stream")
+    return response.content, content_type
+
+
 async def generate_signed_url(object_path: str, expires_in: int = 3600) -> str:
     """Generate a short-lived signed URL for a private bucket object.
 

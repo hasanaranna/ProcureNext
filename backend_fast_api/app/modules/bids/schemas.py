@@ -12,6 +12,8 @@ class BidDocumentInfo(BaseModel):
     bid_doc_id: int
     file_path: Optional[str] = None
     document_type: str
+    allowed_roles: Optional[list[str]] = None
+    has_access: Optional[bool] = None
 
     class Config:
         from_attributes = True

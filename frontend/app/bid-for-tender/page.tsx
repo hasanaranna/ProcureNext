@@ -47,6 +47,7 @@ interface BidDocument {
   bid_doc_id: number;
   file_path: string | null;
   document_type: string;
+  has_access?: boolean;
 }
 
 interface ExistingBid {
@@ -84,6 +85,8 @@ function BidForTenderContent() {
   });
   // Dynamic doc file state: keyed by req_doc_id
   const [docFiles, setDocFiles] = useState<Record<number, File | null>>({});
+
+  const [restrictedDocAlert, setRestrictedDocAlert] = useState<{ isOpen: boolean; docName: string }>({ isOpen: false, docName: '' });
 
   useEffect(() => {
     if (!tenderId) {
@@ -361,25 +364,42 @@ function BidForTenderContent() {
                   <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Submitted Documents</h3>
                   <div className="space-y-3">
                     {existingBid.documents?.map((doc, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200">
+                      <div key={idx} className={`flex items-center justify-between p-3 rounded-xl border ${doc.has_access !== false ? 'bg-slate-50 border-slate-200' : 'bg-slate-100 border-slate-300 opacity-80'}`}>
                         <div className="flex items-center gap-3">
-                          <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
-                            <path d="M14 2v6h6" />
-                          </svg>
-                          <span className="font-semibold text-navy-900">{doc.document_type}</span>
+                          {doc.has_access !== false ? (
+                            <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
+                              <path d="M14 2v6h6" />
+                            </svg>
+                          ) : (
+                            <span className="text-slate-500 text-lg">🔒</span>
+                          )}
+                          <span className={`font-semibold ${doc.has_access !== false ? 'text-navy-900' : 'text-slate-500 italic'}`}>
+                            {doc.document_type} {doc.has_access === false && '(Restricted)'}
+                          </span>
                         </div>
-                        <button type="button"
-                          onClick={async (e) => {
-                            e.preventDefault();
-                            try {
-                              const res = await fetch(`/api/bids/documents/${doc.bid_doc_id}/view`);
-                              if (res.ok) { const data = await res.json(); window.open(data.url, '_blank'); }
-                            } catch (err) { console.error('Failed to open document:', err); }
-                          }}
-                          className="text-accent-600 hover:text-accent-700 text-sm font-semibold transition px-2 py-1">
-                          View
-                        </button>
+                        {doc.has_access !== false ? (
+                          <button type="button"
+                            onClick={async (e) => {
+                              e.preventDefault();
+                              try {
+                                const res = await fetch(`/api/bids/documents/${doc.bid_doc_id}/view`);
+                                if (res.ok) { const data = await res.json(); window.open(data.url, '_blank'); }
+                              } catch (err) { console.error('Failed to open document:', err); }
+                            }}
+                            className="text-accent-600 hover:text-accent-700 text-sm font-semibold transition px-2 py-1">
+                            View
+                          </button>
+                        ) : (
+                          <button type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setRestrictedDocAlert({ isOpen: true, docName: doc.document_type });
+                            }}
+                            className="text-slate-400 hover:text-slate-500 text-sm font-semibold transition px-2 py-1 cursor-pointer">
+                            View
+                          </button>
+                        )}
                       </div>
                     ))}
                     {!existingBid.documents?.length && (
@@ -535,6 +555,31 @@ function BidForTenderContent() {
           </div>
         )}
       </div>
+
+      {/* Restricted Document Access Modal */}
+      {restrictedDocAlert.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-900/40 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full animate-scale-in">
+            <div className="p-8">
+              <div className="w-14 h-14 mx-auto mb-5 rounded-2xl bg-red-50 flex items-center justify-center">
+                <span className="text-2xl">🔒</span>
+              </div>
+              <h3 className="text-xl font-black text-navy-900 mb-2 text-center">Access Restricted</h3>
+              <p className="text-slate-600 mb-6 text-center text-sm">
+                You do not have authorization to view <strong className="text-navy-900">{restrictedDocAlert.docName}</strong>. This document requires <strong className="text-navy-900">Owner</strong> privileges. Contact your administrator or tender manager to request access.
+              </p>
+              <div className="flex justify-center">
+                <button
+                  onClick={() => setRestrictedDocAlert({ isOpen: false, docName: '' })}
+                  className="px-6 py-2.5 rounded-xl bg-slate-100 text-navy-900 font-semibold hover:bg-slate-200 transition border border-slate-200"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

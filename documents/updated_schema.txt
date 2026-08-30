@@ -203,7 +203,7 @@ CREATE TABLE public.bids (
 CREATE TABLE public.bid_documents (
   bid_doc_id integer NOT NULL DEFAULT nextval('bid_documents_bid_doc_id_seq'::regclass),
   bid_id integer NOT NULL,
-  req_doc_id_type_id integer NOT NULL,
+  req_doc_id integer NOT NULL,
   file_path text,
   uploaded_at timestamp without time zone DEFAULT now(),
   CONSTRAINT bid_documents_pkey PRIMARY KEY (bid_doc_id),

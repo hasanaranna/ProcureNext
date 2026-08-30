@@ -79,6 +79,7 @@ import uuid
 import shutil
 from typing import List
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
+from fastapi.responses import JSONResponse
 from app.core.db import get_db_connection
 from app.modules.auth.dependencies import get_current_user_org
 from app.modules.tenders.schemas import TenderCreateRequest, TenderResponse, TenderListItem, TenderDetailResponse, UpdateTenderReqDocAccessRequest
@@ -199,6 +200,26 @@ async def get_tender_details(
             tender = await get_tender_detail(connection, tender_id)
             if tender is None:
                 raise HTTPException(status_code=404, detail="Tender not found")
+                
+            buyer_id = tender["buyer_id"]
+            org_row = await connection.fetchrow(
+                "SELECT primary_contact FROM organizations WHERE organization_id = $1",
+                buyer_id
+            )
+            primary_contact = org_row["primary_contact"] if org_row else None
+            
+            user_id = current_user.get("user_id")
+            org_user_id = current_user.get("org_user_id")
+            role_in_org = current_user.get("role_in_org")
+            
+            can_manage = False
+            if org_user_id == tender["created_by"]:
+                can_manage = True
+            elif user_id == primary_contact or role_in_org == "Owner":
+                can_manage = True
+                
+            tender["can_manage_document_access"] = can_manage
+            
             return tender
     except HTTPException:
         raise
@@ -248,6 +269,42 @@ async def update_required_document_access(
     """
     try:
         async with get_db_connection() as connection:
+            row = await connection.fetchrow(
+                "SELECT created_by, buyer_id FROM tenders WHERE tender_id = $1", 
+                tender_id
+            )
+            if not row:
+                raise HTTPException(status_code=404, detail="Tender not found")
+                
+            tender_created_by = row["created_by"]
+            buyer_id = row["buyer_id"]
+            
+            org_row = await connection.fetchrow(
+                "SELECT primary_contact FROM organizations WHERE organization_id = $1",
+                buyer_id
+            )
+            primary_contact = org_row["primary_contact"] if org_row else None
+            
+            user_id = current_user.get("user_id")
+            org_user_id = current_user.get("org_user_id")
+            role_in_org = current_user.get("role_in_org")
+            
+            is_authorized = False
+            if org_user_id == tender_created_by:
+                is_authorized = True
+            elif user_id == primary_contact or role_in_org == "Owner":
+                is_authorized = True
+                
+            if not is_authorized:
+                return JSONResponse(
+                    status_code=403,
+                    content={
+                        "status": 403,
+                        "code": "ACCESS_DENIED",
+                        "message": "Permission denied. Only the tender creator or organization owner can modify document access settings."
+                    }
+                )
+
             updates = [item.dict() for item in payload.documents]
             await update_tender_required_document_roles(connection, tender_id, updates)
             return {"message": "Document access updated successfully"}
