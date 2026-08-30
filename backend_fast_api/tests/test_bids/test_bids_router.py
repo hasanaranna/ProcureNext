@@ -227,13 +227,13 @@ class TestBidSubmission:
 
     @pytest.mark.asyncio
     @patch("app.modules.bids.router.get_db_connection")
-    @patch("app.modules.bids.router.get_bid_document_by_id")
+    @patch("app.modules.bids.router.get_bid_document_details_for_download")
     @patch("app.modules.bids.router.generate_signed_url")
     async def test_view_bid_document_success(
         self, mock_generate_signed_url, mock_get_doc, mock_db, client, auth_headers
     ):
         """Should return a signed URL for an existing bid document."""
-        app.dependency_overrides[get_current_user_org] = lambda: {"organization_id": 1}
+        app.dependency_overrides[get_current_user_org] = lambda: {"organization_id": 1, "role_in_org": "Owner"}
         mock_conn = AsyncMock()
         mock_db.side_effect = _mock_db_ctx(mock_conn)
 
@@ -241,7 +241,10 @@ class TestBidSubmission:
             "bid_doc_id": 1,
             "bid_id": 1,
             "doc_type_id": 1,
-            "file_path": "bids/1/file.pdf"
+            "file_path": "bids/1/file.pdf",
+            "vendor_org_id": 1,
+            "buyer_id": 2,
+            "allowed_roles": ["Owner"]
         }
         mock_generate_signed_url.return_value = "https://signed.url/file.pdf"
 
@@ -251,16 +254,18 @@ class TestBidSubmission:
 
     @pytest.mark.asyncio
     @patch("app.modules.bids.router.get_db_connection")
+    @patch("app.modules.bids.router.get_bid_document_details_for_download")
     @patch("app.modules.bids.router.get_bid_document_by_id")
     async def test_view_bid_document_not_found(
-        self, mock_get_doc, mock_db, client, auth_headers
+        self, mock_get_by_id, mock_get_doc, mock_db, client, auth_headers
     ):
         """Should return 404 if bid document does not exist."""
-        app.dependency_overrides[get_current_user_org] = lambda: {"organization_id": 1}
+        app.dependency_overrides[get_current_user_org] = lambda: {"organization_id": 1, "role_in_org": "Owner"}
         mock_conn = AsyncMock()
         mock_db.side_effect = _mock_db_ctx(mock_conn)
 
         mock_get_doc.return_value = None
+        mock_get_by_id.return_value = None
 
         resp = await client.get("/bids/documents/999/view", headers=auth_headers)
         assert resp.status_code == 404

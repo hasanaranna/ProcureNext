@@ -311,7 +311,7 @@ export default function ViewMyTenderPage() {
         const bidsRes = await fetch(`/api/bids/buyer/tender/${tenderId}`);
         if (bidsRes.ok) {
           const bidsData = await bidsRes.json();
-          setBids(bidsData);
+          setBasicBids(bidsData);
         }
       } catch (e) {
         console.error("Failed to refetch bids:", e);

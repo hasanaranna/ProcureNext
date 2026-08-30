@@ -207,11 +207,16 @@ async def view_bid_document(
         async with get_db_connection() as connection:
             doc_details = await get_bid_document_details_for_download(connection, doc_id)
             if not doc_details:
+                doc_details = await get_bid_document_by_id(connection, doc_id)
+            if not doc_details:
                 raise HTTPException(status_code=404, detail="Document not found")
             
             # Authorization Check for Org
-            if user_org_id != doc_details["vendor_org_id"] and user_org_id != doc_details["buyer_id"]:
-                raise HTTPException(status_code=403, detail="Not authorized to access this document.")
+            vendor_org_id = doc_details.get("vendor_org_id")
+            buyer_id = doc_details.get("buyer_id")
+            if vendor_org_id is not None or buyer_id is not None:
+                if user_org_id != vendor_org_id and user_org_id != buyer_id:
+                    raise HTTPException(status_code=403, detail="Not authorized to access this document.")
                 
             # RBAC Check for Role
             allowed_roles = doc_details.get("allowed_roles")
