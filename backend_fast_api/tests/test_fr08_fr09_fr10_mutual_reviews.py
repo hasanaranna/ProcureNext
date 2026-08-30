@@ -8,7 +8,7 @@
 # ============================================================================
 
 import unittest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # ============================================================================
 # A. FR-08: VALIDATING TENDER CREATION LOGIC (SINGLE VS PACKAGED)
@@ -28,8 +28,11 @@ def validate_tender_payload(payload: dict) -> bool:
 
     deadline_str = payload.get("submission_deadline")
     if deadline_str:
-        deadline = datetime.fromisoformat(deadline_str.replace("Z", ""))
-        if deadline <= datetime.utcnow():
+        clean_str = deadline_str.replace("Z", "+00:00")
+        deadline = datetime.fromisoformat(clean_str)
+        if deadline.tzinfo is None:
+            deadline = deadline.replace(tzinfo=timezone.utc)
+        if deadline <= datetime.now(timezone.utc):
             raise ValueError("submission_deadline must be a future date.")
 
     package_type = payload.get("package_type", "SingleItem")
@@ -53,7 +56,7 @@ class TestFR08TenderCreation(unittest.TestCase):
             "package_type": "SingleItem",
             "budget_min": 10000.0,
             "budget_max": 25000.0,
-            "submission_deadline": (datetime.utcnow() + timedelta(days=14)).isoformat() + "Z",
+            "submission_deadline": (datetime.now(timezone.utc) + timedelta(days=14)).isoformat(),
             "items": [
                 {"lot_number": "LOT-1", "item_name": "Surgical Gloves", "quantity": 1000, "unit_of_measure": "Boxes"}
             ]
@@ -66,7 +69,7 @@ class TestFR08TenderCreation(unittest.TestCase):
             "package_type": "PackagedLots",
             "budget_min": 500000.0,
             "budget_max": 900000.0,
-            "submission_deadline": (datetime.utcnow() + timedelta(days=21)).isoformat() + "Z",
+            "submission_deadline": (datetime.now(timezone.utc) + timedelta(days=21)).isoformat(),
             "items": [
                 {"lot_number": "LOT-1", "item_name": "Portland Cement", "quantity": 2000, "unit_of_measure": "Bags"},
                 {"lot_number": "LOT-2", "item_name": "Deformed Steel Rod", "quantity": 25, "unit_of_measure": "Tons"}
@@ -78,7 +81,7 @@ class TestFR08TenderCreation(unittest.TestCase):
         payload = {
             "title": "Invalid Packaged Tender",
             "package_type": "PackagedLots",
-            "submission_deadline": (datetime.utcnow() + timedelta(days=5)).isoformat() + "Z",
+            "submission_deadline": (datetime.now(timezone.utc) + timedelta(days=5)).isoformat(),
             "items": [
                 {"lot_number": "LOT-1", "item_name": "Portland Cement", "quantity": 2000, "unit_of_measure": "Bags"}
             ]
@@ -92,7 +95,7 @@ class TestFR08TenderCreation(unittest.TestCase):
             "title": "Inverted Budget Tender",
             "budget_min": 50000.0,
             "budget_max": 20000.0,
-            "submission_deadline": (datetime.utcnow() + timedelta(days=5)).isoformat() + "Z",
+            "submission_deadline": (datetime.now(timezone.utc) + timedelta(days=5)).isoformat(),
         }
         with self.assertRaises(ValueError) as ctx:
             validate_tender_payload(payload)

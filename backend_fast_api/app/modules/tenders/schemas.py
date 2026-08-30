@@ -126,6 +126,10 @@ class TenderResponse(BaseModel):
     tender_public_date: Optional[datetime] = None
     pre_bid_meeting: Optional[datetime] = None
     tender_opening_date: Optional[datetime] = None
+    package_type: Optional[str] = "SingleItem"
+    bid_bond_amount: Optional[float] = None
+    scheduled_publish_at: Optional[datetime] = None
+    visibility_type: Optional[str] = "Public"
     created_at: datetime
 
 class TenderPdfExtractResponse(BaseModel):

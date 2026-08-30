@@ -292,6 +292,9 @@ async def publish_with_documents(
                 files_data=files_data
             )
             return new_tender
+    except ValueError as ve:
+        _cleanup_local_files(files_data)
+        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         _cleanup_local_files(files_data)
         if isinstance(e, HTTPException):
@@ -437,11 +440,13 @@ async def get_tender_details(
             if tender is None:
                 raise HTTPException(status_code=404, detail="Tender not found")
                 
-            buyer_id = tender["buyer_id"]
-            org_row = await connection.fetchrow(
-                "SELECT primary_contact FROM organizations WHERE organization_id = $1",
-                buyer_id
-            )
+            buyer_id = tender.get("buyer_id")
+            org_row = None
+            if buyer_id:
+                org_row = await connection.fetchrow(
+                    "SELECT primary_contact FROM organizations WHERE organization_id = $1",
+                    buyer_id
+                )
             primary_contact = org_row["primary_contact"] if org_row else None
             
             user_id = current_user.get("user_id")
@@ -449,7 +454,7 @@ async def get_tender_details(
             role_in_org = current_user.get("role_in_org")
             
             can_manage = False
-            if org_user_id == tender["created_by"]:
+            if org_user_id and org_user_id == tender.get("created_by"):
                 can_manage = True
             elif user_id == primary_contact or role_in_org == "Owner":
                 can_manage = True
@@ -481,6 +486,8 @@ async def get_tender_vendor_recommendations(
             return await get_vendor_recommendations_for_tender(connection, tender_id, buyer_org_id)
     except KeyError:
         raise HTTPException(status_code=404, detail="Tender not found.")
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch recommendations: {e}")
 
