@@ -97,10 +97,60 @@ export default function NewTenderPage() {
 
   const [formData, setFormData] = useState(initialFormState.formData);
 
+  // FR-08: Packaging, Bid Bond & Visibility State
+  const [packageType, setPackageType] = useState<"SingleItem" | "PackagedLots">("SingleItem");
+  const [bidBondAmount, setBidBondAmount] = useState<string>("");
+  const [visibilityType, setVisibilityType] = useState<"Public" | "Exclusive">("Public");
+  const [scheduledPublishAt, setScheduledPublishAt] = useState<string>("");
+  const [tenderItems, setTenderItems] = useState<{
+    lot_number: string;
+    item_name: string;
+    quantity: number;
+    unit_of_measure: string;
+    estimated_unit_price: string;
+    specifications: string;
+  }[]>([
+    { lot_number: "LOT-1", item_name: "", quantity: 1, unit_of_measure: "Units", estimated_unit_price: "", specifications: "" }
+  ]);
+
+  const handleAddLotItem = () => {
+    setTenderItems(prev => [
+      ...prev,
+      {
+        lot_number: `LOT-${prev.length + 1}`,
+        item_name: "",
+        quantity: 1,
+        unit_of_measure: "Units",
+        estimated_unit_price: "",
+        specifications: ""
+      }
+    ]);
+  };
+
+  const handleRemoveLotItem = (index: number) => {
+    if (tenderItems.length <= 1) return;
+    setTenderItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateLotItem = (index: number, field: string, value: any) => {
+    setTenderItems(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
   const clearFormAndLocalSave = () => {
     skipLocalSaveRef.current = true;
     clearTenderDraft();
     setFormData({ ...EMPTY_FORM_DATA });
+    setPackageType("SingleItem");
+    setBidBondAmount("");
+    setVisibilityType("Public");
+    setScheduledPublishAt("");
+    setTenderItems([
+      { lot_number: "LOT-1", item_name: "", quantity: 1, unit_of_measure: "Units", estimated_unit_price: "", specifications: "" }
+    ]);
     setSellerDocs([]);
     setFileCount(1);
     setCustomFiles([{ name: "", file: null }]);
@@ -406,23 +456,40 @@ export default function NewTenderPage() {
     }
   };
 
-  const buildTenderPayload = () => ({
-    title: formData.title,
-    description: formData.description,
-    procurement_nature: formData.procurementNature || "Goods",
-    procurement_method: formData.procurementMethod || "OTM",
-    eligibility_of_tenderer: formData.eligibilityOfTenderer || null,
-    budget_max: parseFloat(formData.budget) || null,
-    submission_deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null,
-    visibility_type: "Public",
-    security_required: false,
-    category: formData.category || null,
-    tender_public_date: formData.tenderPublicDate ? new Date(formData.tenderPublicDate).toISOString() : null,
-    pre_bid_meeting: formData.preBidMeeting ? new Date(formData.preBidMeeting).toISOString() : null,
-    tender_opening_date: formData.tenderOpeningDate ? new Date(formData.tenderOpeningDate).toISOString() : null,
-    required_seller_docs: sellerDocs.length > 0 ? sellerDocs : null,
-    embedding: extractedEmbedding,
-  });
+  const buildTenderPayload = () => {
+    const validItems = tenderItems
+      .filter(ti => ti.item_name.trim())
+      .map(ti => ({
+        lot_number: ti.lot_number.trim() || "LOT-1",
+        item_name: ti.item_name.trim(),
+        specifications: ti.specifications.trim() || null,
+        quantity: Number(ti.quantity) || 1,
+        unit_of_measure: ti.unit_of_measure.trim() || "Units",
+        estimated_unit_price: ti.estimated_unit_price ? parseFloat(ti.estimated_unit_price) : null
+      }));
+
+    return {
+      title: formData.title,
+      description: formData.description,
+      procurement_nature: formData.procurementNature || "Goods",
+      procurement_method: formData.procurementMethod || "OTM",
+      eligibility_of_tenderer: formData.eligibilityOfTenderer || null,
+      package_type: packageType,
+      budget_max: parseFloat(formData.budget) || null,
+      bid_bond_amount: parseFloat(bidBondAmount) || 0.0,
+      submission_deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null,
+      visibility_type: visibilityType,
+      security_required: Boolean(parseFloat(bidBondAmount) > 0),
+      category: formData.category || null,
+      tender_public_date: formData.tenderPublicDate ? new Date(formData.tenderPublicDate).toISOString() : null,
+      pre_bid_meeting: formData.preBidMeeting ? new Date(formData.preBidMeeting).toISOString() : null,
+      tender_opening_date: formData.tenderOpeningDate ? new Date(formData.tenderOpeningDate).toISOString() : null,
+      scheduled_publish_at: scheduledPublishAt ? new Date(scheduledPublishAt).toISOString() : null,
+      required_seller_docs: sellerDocs.length > 0 ? sellerDocs : null,
+      embedding: extractedEmbedding,
+      items: validItems.length > 0 ? validItems : null,
+    };
+  };
 
   const buildTenderFormData = () => {
     const tenderData = buildTenderPayload();
@@ -488,8 +555,13 @@ export default function NewTenderPage() {
       setShowManageTokens(true);
       return;
     }
-    
-    // Map to the backend schema TenderCreateRequest
+
+    const validItems = tenderItems.filter(ti => ti.item_name.trim());
+    if (packageType === "PackagedLots" && validItems.length < 2) {
+      setFormError("Packaged lots tenders must include at least two items/lots (e.g. Cement and Steel Rod).");
+      return;
+    }
+
     const data = buildTenderFormData();
     setIsSubmitting(true);
     setFormError(null);
@@ -811,15 +883,189 @@ export default function NewTenderPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="budget" className="block text-sm font-semibold text-navy-900 mb-1.5">Budget Ceiling / Security Amount (BDT)</label>
+                  <label htmlFor="budget" className="block text-sm font-semibold text-navy-900 mb-1.5">Budget Ceiling / Estimated Value (BDT)</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">৳</span>
                     <input type="number" id="budget" name="budget" value={formData.budget} onChange={handleChange} placeholder="e.g. 3900000" min="0" className={`${inputClass} pl-10`} />
                   </div>
                 </div>
                 <div>
+                  <label htmlFor="bidBond" className="block text-sm font-semibold text-navy-900 mb-1.5">Bid-Bond Security Amount (BDT)</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">৳</span>
+                    <input type="number" id="bidBond" name="bidBond" value={bidBondAmount} onChange={(e) => setBidBondAmount(e.target.value)} placeholder="e.g. 75000" min="0" className={`${inputClass} pl-10`} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-navy-900 mb-1.5">Tender Visibility <span className="text-red-500">*</span></label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setVisibilityType("Public")}
+                      className={`p-3 rounded-xl border text-left font-semibold text-xs transition-all ${
+                        visibilityType === "Public"
+                          ? "bg-navy-900 text-white border-navy-900 shadow-md"
+                          : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      🌍 Public Tender
+                      <span className="block text-[10px] font-normal opacity-80 mt-0.5">Open to all verified vendors</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setVisibilityType("Exclusive")}
+                      className={`p-3 rounded-xl border text-left font-semibold text-xs transition-all ${
+                        visibilityType === "Exclusive"
+                          ? "bg-navy-900 text-white border-navy-900 shadow-md"
+                          : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      🔒 Enlisted Only
+                      <span className="block text-[10px] font-normal opacity-80 mt-0.5">Restricted to your enlisted vendors</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div>
                   <label htmlFor="deadline" className="block text-sm font-semibold text-navy-900 mb-1.5">Submission Deadline <span className="text-red-500">*</span></label>
                   <input type="date" id="deadline" name="deadline" value={formData.deadline} onChange={handleChange} required className={inputClass} />
+                </div>
+              </div>
+
+              {/* ── Packaging Mode & Lot Items Builder (FR-08) ───────────── */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200">
+                  <div>
+                    <h4 className="text-sm font-bold text-navy-900">Tender Packaging & Lot Items</h4>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Choose whether this is a single item or packaged tender containing multiple items/lots (e.g. Cement and Rod).
+                    </p>
+                  </div>
+                  <div className="inline-flex rounded-xl bg-white border border-slate-200 p-1 shadow-sm flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPackageType("SingleItem");
+                        if (tenderItems.length > 1) {
+                          setTenderItems([tenderItems[0]]);
+                        }
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                        packageType === "SingleItem"
+                          ? "bg-navy-900 text-white shadow"
+                          : "text-slate-600 hover:text-navy-900"
+                      }`}
+                    >
+                      Single Item
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPackageType("PackagedLots");
+                        if (tenderItems.length < 2) {
+                          handleAddLotItem();
+                        }
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                        packageType === "PackagedLots"
+                          ? "bg-navy-900 text-white shadow"
+                          : "text-slate-600 hover:text-navy-900"
+                      }`}
+                    >
+                      📦 Packaged Lots
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {tenderItems.map((item, idx) => (
+                    <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="px-2.5 py-0.5 bg-navy-100 text-navy-900 font-black text-xs rounded-md">
+                          {item.lot_number || `LOT-${idx + 1}`}
+                        </span>
+                        {packageType === "PackagedLots" && tenderItems.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveLotItem(idx)}
+                            className="text-xs text-red-600 hover:text-red-700 font-bold transition"
+                          >
+                            Remove Lot
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                        <div className="sm:col-span-2">
+                          <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Item / Lot Name <span className="text-red-500">*</span></label>
+                          <input
+                            type="text"
+                            value={item.item_name}
+                            onChange={(e) => handleUpdateLotItem(idx, "item_name", e.target.value)}
+                            placeholder={idx === 0 ? "e.g. Portland Composite Cement" : "e.g. 60-Grade Deformed Rebar"}
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Quantity</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) => handleUpdateLotItem(idx, "quantity", e.target.value)}
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Unit of Measure</label>
+                          <input
+                            type="text"
+                            value={item.unit_of_measure}
+                            onChange={(e) => handleUpdateLotItem(idx, "unit_of_measure", e.target.value)}
+                            placeholder="e.g. Bags, Tons, Units"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Estimated Unit Price (BDT, Optional)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={item.estimated_unit_price}
+                            onChange={(e) => handleUpdateLotItem(idx, "estimated_unit_price", e.target.value)}
+                            placeholder="e.g. 550"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Specifications (Optional)</label>
+                          <input
+                            type="text"
+                            value={item.specifications}
+                            onChange={(e) => handleUpdateLotItem(idx, "specifications", e.target.value)}
+                            placeholder="e.g. BSTI BDS EN 197-1 certified"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {packageType === "PackagedLots" && (
+                    <button
+                      type="button"
+                      onClick={handleAddLotItem}
+                      className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-navy-900 font-bold text-xs rounded-xl transition border border-dashed border-slate-300 flex items-center justify-center gap-1.5"
+                    >
+                      + Add Another Lot / Item (e.g. Cement + Rod)
+                    </button>
+                  )}
                 </div>
               </div>
 

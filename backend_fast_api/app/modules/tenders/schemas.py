@@ -31,10 +31,34 @@
 # - TenderAmendmentResponse: amendment details
 # ============================================================
 
+from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
 from datetime import datetime
 from app.modules.tenders.models import TenderVisibility, TenderStatus
+
+class TenderPackageType(str, Enum):
+    SingleItem = "SingleItem"
+    PackagedLots = "PackagedLots"
+
+class TenderItemCreate(BaseModel):
+    lot_number: str = "LOT-1"
+    item_name: str
+    specifications: Optional[str] = None
+    quantity: float
+    unit_of_measure: str
+    estimated_unit_price: Optional[float] = None
+
+class TenderItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    item_id: int
+    tender_id: int
+    lot_number: str
+    item_name: str
+    specifications: Optional[str] = None
+    quantity: float
+    unit_of_measure: str
+    estimated_unit_price: Optional[float] = None
 
 class TenderCreateRequest(BaseModel):
     title: str
@@ -48,8 +72,10 @@ class TenderCreateRequest(BaseModel):
     eligibility_of_tenderer: Optional[str] = None
     embedding: Optional[List[float]] = None
     visibility_type: TenderVisibility = TenderVisibility.Public
+    package_type: TenderPackageType = TenderPackageType.SingleItem
     budget_min: Optional[float] = None
     budget_max: Optional[float] = None
+    bid_bond_amount: Optional[float] = 0.0
     security_required: bool = False
     security_valid_until: Optional[datetime] = None
     proposal_valid_until: Optional[datetime] = None
@@ -57,7 +83,9 @@ class TenderCreateRequest(BaseModel):
     tender_public_date: Optional[datetime] = None
     pre_bid_meeting: Optional[datetime] = None
     tender_opening_date: Optional[datetime] = None
+    scheduled_publish_at: Optional[datetime] = None
     required_seller_docs: Optional[List[dict]] = None  # [{name: str, allowed_roles: [str]}]
+    items: Optional[List[TenderItemCreate]] = None
 
 class TenderUpdateRequest(BaseModel):
     title: Optional[str] = None
@@ -98,6 +126,10 @@ class TenderResponse(BaseModel):
     tender_public_date: Optional[datetime] = None
     pre_bid_meeting: Optional[datetime] = None
     tender_opening_date: Optional[datetime] = None
+    package_type: Optional[str] = "SingleItem"
+    bid_bond_amount: Optional[float] = None
+    scheduled_publish_at: Optional[datetime] = None
+    visibility_type: Optional[str] = "Public"
     created_at: datetime
 
 class TenderPdfExtractResponse(BaseModel):
@@ -182,6 +214,7 @@ class TenderDetailResponse(BaseModel):
     created_at: datetime
     documents: List[TenderDocumentItem] = []
     required_documents: List[RequiredDocumentItem] = []
+    can_manage_document_access: Optional[bool] = None
     bid_count: int = 0
 
 class TenderDocumentResponse(BaseModel):
@@ -217,6 +250,8 @@ class OngoingTenderListItem(BaseModel):
     vendor_org_id: int
     vendor_org_name: str
     role_in_tender: Optional[str] = None
+    contract_id: Optional[int] = None
+    contract_status: Optional[str] = "Active"
 
 
 class OngoingTenderBidDocument(BaseModel):
@@ -258,6 +293,9 @@ class OngoingTenderDetail(BaseModel):
     vendor_org_address: Optional[str] = None
     vendor_org_website: Optional[str] = None
     eligibility_of_tenderer: Optional[str] = None
+    contract_id: Optional[int] = None
+    contract_status: Optional[str] = "Active"
+    role_in_tender: Optional[str] = "vendor"
     tender_documents: List[TenderDocumentItem] = []
     bid_documents: List[OngoingTenderBidDocument] = []
 
@@ -319,4 +357,25 @@ class PublicTenderDetailResponse(BaseModel):
     submission_deadline: Optional[datetime] = None
     created_at: datetime
     required_documents: List[PublicRequiredDocItem] = []
+
+
+class VendorRecommendationItem(BaseModel):
+    vendor_id: int
+    vendor_name: str
+    vendor_address: Optional[str] = None
+    vendor_verification_status: Optional[str] = None
+    match_score: float
+    category_match: bool
+    is_enlisted: bool
+    avg_seller_rating: float
+    total_reviews_count: int
+    certifications: List[str] = []
+    reasons: List[str] = []
+
+
+class VendorRecommendationResponse(BaseModel):
+    tender_id: int
+    tender_title: str
+    total_recommendations: int
+    recommendations: List[VendorRecommendationItem]
 

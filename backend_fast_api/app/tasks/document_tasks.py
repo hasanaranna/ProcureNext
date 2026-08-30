@@ -133,9 +133,9 @@ async def _async_bid_upload(bid_id: int, files_data: list[dict]):
 
             uploaded_path = None
             try:
-                # 1. Look up req_doc_id from tender_required_documents
-                req_doc_id = None
-                if tender_id:
+                # 1. Direct req_doc_id check or lookup from tender_required_documents
+                req_doc_id = file_info.get("req_doc_id")
+                if req_doc_id is None and tender_id:
                     req_row = await conn.fetchrow("""
                         SELECT trd.req_doc_id 
                         FROM tender_required_documents trd 

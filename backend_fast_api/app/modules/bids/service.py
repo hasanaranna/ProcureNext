@@ -135,7 +135,9 @@ async def get_bid_by_tender_and_vendor(
         SELECT 
             bd.bid_doc_id, 
             bd.file_path, 
-            COALESCE(dt.type_name, trd.custom_doc_name, 'Document') AS document_type
+            COALESCE(dt.type_name, trd.custom_doc_name, 'Document') AS document_type,
+            trd.allowed_roles,
+            bd.req_doc_id
         FROM bid_documents bd
         LEFT JOIN tender_required_documents trd ON bd.req_doc_id = trd.req_doc_id
         LEFT JOIN document_types dt ON trd.doc_type_id = dt.type_id
@@ -150,6 +152,34 @@ async def get_bid_document_by_id(connection: asyncpg.Connection, doc_id: int) ->
     """Fetch bid document by its ID."""
     query = "SELECT * FROM bid_documents WHERE bid_doc_id = $1"
     row = await connection.fetchrow(query, doc_id)
+    return dict(row) if row else None
+
+async def get_bid_document_details_for_download(
+    connection: asyncpg.Connection, 
+    bid_doc_id: int
+) -> dict | None:
+    """
+    Fetch all details required to download and dynamically name a bid document.
+    Includes the file_path, vendor organization name, document type name,
+    and authorization references (buyer_id, vendor_org_id), as well as allowed_roles.
+    """
+    query = """
+        SELECT 
+            bd.file_path, 
+            b.vendor_org_id,
+            t.buyer_id,
+            o.organization_name as vendor_name, 
+            COALESCE(trd.custom_doc_name, dt.type_name, 'Document') as document_type,
+            trd.allowed_roles
+        FROM bid_documents bd
+        JOIN bids b ON bd.bid_id = b.bid_id
+        JOIN tenders t ON b.tender_id = t.tender_id
+        JOIN organizations o ON b.vendor_org_id = o.organization_id
+        LEFT JOIN public.tender_required_documents trd ON bd.req_doc_id = trd.req_doc_id
+        LEFT JOIN document_types dt ON bd.req_doc_id = dt.type_id
+        WHERE bd.bid_doc_id = $1
+    """
+    row = await connection.fetchrow(query, bid_doc_id)
     return dict(row) if row else None
 
 async def get_bids_for_buyer_tender(
@@ -188,7 +218,9 @@ async def get_bids_for_buyer_tender(
             bd.bid_id, 
             bd.bid_doc_id, 
             bd.file_path, 
-            COALESCE(dt.type_name, trd.custom_doc_name, 'Document') AS document_type
+            COALESCE(dt.type_name, trd.custom_doc_name, 'Document') AS document_type,
+            trd.allowed_roles,
+            bd.req_doc_id
         FROM bid_documents bd
         LEFT JOIN tender_required_documents trd ON bd.req_doc_id = trd.req_doc_id
         LEFT JOIN document_types dt ON trd.doc_type_id = dt.type_id
@@ -622,7 +654,8 @@ async def get_tender_bid_comparison(
     """
     # 1. Verify tender ownership
     tender_row = await connection.fetchrow("""
-        SELECT tender_id, title, status, budget_min, budget_max, buyer_id
+        SELECT tender_id, title, status, budget_min, budget_max, buyer_id, 
+               COALESCE(package_type::text, 'SingleItem') AS package_type
         FROM tenders
         WHERE tender_id = $1 AND buyer_id = $2
     """, tender_id, buyer_org_id)
@@ -635,6 +668,15 @@ async def get_tender_bid_comparison(
 
     budget_min = float(tender_row["budget_min"]) if tender_row["budget_min"] is not None else None
     budget_max = float(tender_row["budget_max"]) if tender_row["budget_max"] is not None else None
+
+    # Fetch tender lots / items if any
+    lots_rows = await connection.fetch("""
+        SELECT item_id, lot_number, item_name, specifications, quantity, unit_of_measure, estimated_unit_price
+        FROM tender_items
+        WHERE tender_id = $1
+        ORDER BY item_id
+    """, tender_id)
+    lots = [dict(r) for r in lots_rows]
 
     # 2. Fetch tender required documents
     req_docs_rows = await connection.fetch("""
@@ -731,6 +773,29 @@ async def get_tender_bid_comparison(
                 secs_by_bid[b_id] = []
             secs_by_bid[b_id].append(dict(sec))
 
+    # 5b. Fetch bid items (lot pricing)
+    bid_items_by_bid: dict[int, list[dict]] = {}
+    if bid_ids:
+        try:
+            bid_items_rows = await connection.fetch("""
+                SELECT bi.bid_item_id, bi.bid_id, bi.tender_item_id, ti.lot_number, ti.item_name,
+                       bi.offered_quantity::float as offered_quantity, 
+                       bi.unit_price::float as unit_price, 
+                       bi.total_price::float as total_price, 
+                       bi.compliance_remarks
+                FROM bid_items bi
+                JOIN tender_items ti ON bi.tender_item_id = ti.item_id
+                WHERE bi.bid_id = ANY($1)
+                ORDER BY ti.item_id
+            """, bid_ids)
+            for bi in bid_items_rows:
+                b_id = bi["bid_id"]
+                if b_id not in bid_items_by_bid:
+                    bid_items_by_bid[b_id] = []
+                bid_items_by_bid[b_id].append(dict(bi))
+        except Exception:
+            pass
+
     # 6. Calculate summary metrics
     amounts = [float(b["financial_amount"]) for b in raw_bids if b["financial_amount"] is not None]
     min_amount = min(amounts) if amounts else None
@@ -791,7 +856,8 @@ async def get_tender_bid_comparison(
             "mandatory_docs_satisfied": mandatory_satisfied,
             "documents": b_docs,
             "compliance_matrix": compliance_matrix,
-            "securities": b_secs
+            "securities": b_secs,
+            "lot_pricing": bid_items_by_bid.get(b_id, [])
         })
 
     summary = {
@@ -809,8 +875,10 @@ async def get_tender_bid_comparison(
         "tender_id": tender_id,
         "tender_title": tender_row["title"],
         "tender_status": tender_row["status"],
+        "package_type": tender_row["package_type"],
         "budget_min": budget_min,
         "budget_max": budget_max,
+        "lots": lots,
         "required_documents": required_documents,
         "summary": summary,
         "bids": evaluated_bids

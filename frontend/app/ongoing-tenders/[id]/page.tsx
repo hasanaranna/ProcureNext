@@ -44,6 +44,8 @@ interface OngoingTenderDetail {
   vendor_org_address: string | null;
   vendor_org_website: string | null;
   role_in_tender: 'buyer' | 'vendor' | null;
+  contract_id?: number;
+  contract_status?: string;
   tender_documents: TenderDocument[];
   bid_documents: BidDocument[];
 }
@@ -56,6 +58,21 @@ export default function OngoingTenderDetailPage() {
   const [tender, setTender] = useState<OngoingTenderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Mutual Reviews & Contract Completion State
+  const [contractStatus, setContractStatus] = useState<string>('Active');
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [completingContract, setCompletingContract] = useState(false);
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [overallRating, setOverallRating] = useState(5);
+  const [qualityScore, setQualityScore] = useState(5);
+  const [timelinessScore, setTimelinessScore] = useState(5);
+  const [communicationScore, setCommunicationScore] = useState(5);
+  const [reviewText, setReviewText] = useState('');
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [reviewSuccess, setReviewSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     if (!tenderId) return;
@@ -73,6 +90,12 @@ export default function OngoingTenderDetailPage() {
         }
         const data = await res.json();
         setTender(data);
+        if (data.contract_status) {
+          setContractStatus(data.contract_status);
+        }
+        if (data.contract_id) {
+          fetchReviews(data.contract_id);
+        }
       } catch (err: any) {
         setError(err.message || 'An error occurred while loading ongoing tender');
       } finally {
@@ -82,6 +105,79 @@ export default function OngoingTenderDetailPage() {
 
     fetchDetail();
   }, [tenderId, router]);
+
+  const fetchReviews = async (cid: number) => {
+    try {
+      setLoadingReviews(true);
+      const res = await fetch(`/api/contracts/${cid}/reviews`);
+      if (res.ok) {
+        const d = await res.json();
+        setReviews(d.reviews || []);
+      }
+    } catch (e) {
+      console.error('Failed to load reviews:', e);
+    } finally {
+      setLoadingReviews(false);
+    }
+  };
+
+  const handleCompleteContract = async () => {
+    if (!tender?.contract_id) return;
+    try {
+      setCompletingContract(true);
+      const res = await fetch(`/api/contracts/${tender.contract_id}/complete`, {
+        method: 'POST',
+      });
+      if (res.ok) {
+        setContractStatus('Completed');
+        setReviewSuccess('Contract marked as Completed. Both parties may now submit performance reviews.');
+        setTimeout(() => setReviewSuccess(null), 4000);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.detail || 'Failed to complete contract');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Error completing contract');
+    } finally {
+      setCompletingContract(false);
+    }
+  };
+
+  const handleSubmitReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tender?.contract_id) return;
+    setReviewError(null);
+    setSubmittingReview(true);
+
+    try {
+      const res = await fetch(`/api/contracts/${tender.contract_id}/reviews`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          overall_rating: overallRating,
+          quality_score: qualityScore,
+          timeliness_score: timelinessScore,
+          communication_score: communicationScore,
+          review_text: reviewText.trim()
+        }),
+      });
+
+      if (res.ok) {
+        setReviewSuccess('Review submitted successfully! Thank you for rating.');
+        setShowReviewModal(false);
+        setReviewText('');
+        fetchReviews(tender.contract_id);
+        setTimeout(() => setReviewSuccess(null), 4000);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setReviewError(err.detail || 'Failed to submit review');
+      }
+    } catch (e: any) {
+      setReviewError(e.message || 'Error submitting review');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return 'N/A';
@@ -171,10 +267,17 @@ export default function OngoingTenderDetailPage() {
                 <span className="px-3 py-1 bg-white/10 text-slate-300 rounded-lg text-xs font-mono font-bold">
                   Tender #{tender.tender_id}
                 </span>
-                <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-bold flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  Awarded & Active
-                </span>
+                {contractStatus === 'Completed' ? (
+                  <span className="px-3 py-1 bg-emerald-500/30 text-emerald-200 border border-emerald-400/40 rounded-lg text-xs font-bold flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-300" />
+                    Contract Completed
+                  </span>
+                ) : (
+                  <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-bold flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    Awarded & Active
+                  </span>
+                )}
                 <span className="px-3 py-1 bg-accent-500/20 text-accent-300 border border-accent-500/30 rounded-lg text-xs font-bold">
                   Award ID: #{tender.award_id}
                 </span>
@@ -252,15 +355,27 @@ export default function OngoingTenderDetailPage() {
               <p className="text-xs text-emerald-700">Award recorded in database</p>
             </div>
 
-            <div className="bg-accent-50 border-2 border-accent-400 rounded-2xl p-4 relative shadow-sm">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="w-6 h-6 rounded-full bg-accent-600 text-white text-xs font-bold flex items-center justify-center animate-spin">
-                  ⚙
-                </span>
-                <h4 className="font-bold text-accent-900 text-sm">4. Contract Ongoing</h4>
+            {contractStatus === 'Completed' ? (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 relative shadow-sm">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-bold flex items-center justify-center">
+                    ✓
+                  </span>
+                  <h4 className="font-bold text-emerald-900 text-sm">4. Contract Completed</h4>
+                </div>
+                <p className="text-xs text-emerald-700">Fulfillment finalized & reviews unlocked</p>
               </div>
-              <p className="text-xs text-accent-700">Fulfillment & milestone execution</p>
-            </div>
+            ) : (
+              <div className="bg-accent-50 border-2 border-accent-400 rounded-2xl p-4 relative shadow-sm">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-6 h-6 rounded-full bg-accent-600 text-white text-xs font-bold flex items-center justify-center animate-spin">
+                    ⚙
+                  </span>
+                  <h4 className="font-bold text-accent-900 text-sm">4. Contract Ongoing</h4>
+                </div>
+                <p className="text-xs text-accent-700">Fulfillment & milestone execution</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -326,6 +441,121 @@ export default function OngoingTenderDetailPage() {
                 </p>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* ── Contract Performance & Mutual Reviews (Custom Extension) ───────────── */}
+        <div className="bg-white rounded-3xl p-8 shadow-xl border border-slate-200 mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xl">⭐</span>
+                <h3 className="text-lg font-black text-navy-900">Contract Lifecycle & Mutual Reviews</h3>
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                  contractStatus === 'Completed'
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    : 'bg-blue-100 text-blue-800 border border-blue-300'
+                }`}>
+                  {contractStatus === 'Completed' ? '✓ Completed' : '⚡ Active Contract'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500">
+                Bidirectional 1–5 star reviews upon contract completion. Enforces verified counterparty accountability.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {contractStatus !== 'Completed' && tender.role_in_tender === 'buyer' && (
+                <button
+                  onClick={handleCompleteContract}
+                  disabled={completingContract}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {completingContract ? 'Marking Complete...' : '✓ Mark Contract Completed'}
+                </button>
+              )}
+
+              {contractStatus === 'Completed' && (
+                <button
+                  onClick={() => {
+                    setReviewError(null);
+                    setShowReviewModal(true);
+                  }}
+                  className="px-4 py-2.5 bg-navy-900 hover:bg-navy-800 text-white text-xs font-bold rounded-xl transition shadow flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>⭐</span> Submit Mutual Review
+                </button>
+              )}
+            </div>
+          </div>
+
+          {reviewSuccess && (
+            <div className="mt-4 p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-xl flex items-center gap-2">
+              <span>✓</span> {reviewSuccess}
+            </div>
+          )}
+
+          {contractStatus !== 'Completed' && (
+            <div className="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-center gap-3 text-xs text-slate-600">
+              <span className="text-lg">ℹ️</span>
+              <span>
+                This contract is currently in <strong>Active</strong> progress. Once deliverables are delivered and approved, the Buyer can mark the contract as <strong>Completed</strong> to unlock reciprocal 1–5 star ratings.
+              </span>
+            </div>
+          )}
+
+          {/* Submitted Reviews List */}
+          <div className="mt-6 space-y-4">
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              Recorded Counterparty Reviews ({reviews.length})
+            </h4>
+
+            {loadingReviews ? (
+              <p className="text-xs text-slate-400">Loading mutual reviews...</p>
+            ) : reviews.length === 0 ? (
+              <p className="text-xs text-slate-400 italic">No reviews submitted yet for this contract.</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {reviews.map((rev) => (
+                  <div key={rev.review_id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-amber-500 font-bold text-sm">
+                        {'★'.repeat(rev.overall_rating)}{'☆'.repeat(5 - rev.overall_rating)}
+                        <span className="text-navy-900 text-xs ml-1">({rev.overall_rating}/5.0)</span>
+                      </div>
+                      <span className="px-2 py-0.5 bg-white border border-slate-200 text-[10px] font-bold text-slate-600 rounded-md">
+                        {rev.party_role === 'BuyerToSeller' ? '🛒 Buyer → Seller' : '🏪 Seller → Buyer'}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 text-[10px]">
+                      {rev.quality_score && (
+                        <span className="px-2 py-0.5 bg-white border rounded text-slate-600">
+                          Quality: {rev.quality_score}/5
+                        </span>
+                      )}
+                      {rev.timeliness_score && (
+                        <span className="px-2 py-0.5 bg-white border rounded text-slate-600">
+                          Timeliness: {rev.timeliness_score}/5
+                        </span>
+                      )}
+                      {rev.communication_score && (
+                        <span className="px-2 py-0.5 bg-white border rounded text-slate-600">
+                          Communication: {rev.communication_score}/5
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="text-xs text-slate-700 leading-relaxed bg-white p-3 rounded-xl border border-slate-100">
+                      &quot;{rev.review_text}&quot;
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      Reviewed on {formatDate(rev.created_at)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -421,6 +651,121 @@ export default function OngoingTenderDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Review Modal */}
+      {showReviewModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-slate-200 animate-scale-in">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-200">
+              <h3 className="text-lg font-black text-navy-900 flex items-center gap-2">
+                <span>⭐</span> Submit Mutual Performance Review
+              </h3>
+              <button
+                onClick={() => setShowReviewModal(false)}
+                className="text-slate-400 hover:text-navy-900 font-bold text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            {reviewError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-xl">
+                {reviewError}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmitReview} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">
+                  Overall Rating (1 to 5 Stars) <span className="text-red-500">*</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setOverallRating(star)}
+                      className={`text-2xl transition ${
+                        star <= overallRating ? 'text-amber-400 scale-110' : 'text-slate-200 hover:text-amber-200'
+                      }`}
+                    >
+                      ★
+                    </button>
+                  ))}
+                  <span className="text-xs font-bold text-navy-900 ml-2">
+                    {overallRating} of 5 Stars
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Quality (1-5)</label>
+                  <select
+                    value={qualityScore}
+                    onChange={(e) => setQualityScore(Number(e.target.value))}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold"
+                  >
+                    {[5, 4, 3, 2, 1].map(n => <option key={n} value={n}>{n} Stars</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Timeliness (1-5)</label>
+                  <select
+                    value={timelinessScore}
+                    onChange={(e) => setTimelinessScore(Number(e.target.value))}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold"
+                  >
+                    {[5, 4, 3, 2, 1].map(n => <option key={n} value={n}>{n} Stars</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Communication (1-5)</label>
+                  <select
+                    value={communicationScore}
+                    onChange={(e) => setCommunicationScore(Number(e.target.value))}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold"
+                  >
+                    {[5, 4, 3, 2, 1].map(n => <option key={n} value={n}>{n} Stars</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">
+                  Detailed Feedback Review <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  required
+                  minLength={5}
+                  rows={4}
+                  value={reviewText}
+                  onChange={(e) => setReviewText(e.target.value)}
+                  placeholder="Describe counterparty responsiveness, delivery quality, compliance with specifications..."
+                  className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs text-navy-900 resize-none focus:outline-none focus:ring-2 focus:ring-navy-900"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setShowReviewModal(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingReview}
+                  className="px-5 py-2 bg-navy-900 hover:bg-navy-800 text-white text-xs font-bold rounded-xl transition shadow disabled:opacity-50"
+                >
+                  {submittingReview ? 'Submitting...' : 'Submit Review'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

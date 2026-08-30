@@ -79,6 +79,7 @@ import uuid
 import shutil
 from typing import List, Optional
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Query, status
+from fastapi.responses import JSONResponse
 from celery.result import AsyncResult
 from app.core.db import get_db_connection
 from app.modules.auth.dependencies import get_current_user_org
@@ -96,6 +97,7 @@ from app.modules.tenders.schemas import (
     TenderPdfExtractResponse,
     TenderPdfJobResponse,
     TenderPdfJobStatus,
+    VendorRecommendationResponse,
 )
 from app.modules.tenders.service import (
     publish_tender_with_documents,
@@ -113,6 +115,7 @@ from app.modules.tenders.service import (
     delete_tender_document,
     get_public_active_tenders,
     get_public_tender_detail,
+    get_vendor_recommendations_for_tender,
 )
 from app.services.ml_client import parse_and_embed_tender_pdf
 from app.tasks.celery_app import celery_app
@@ -289,6 +292,9 @@ async def publish_with_documents(
                 files_data=files_data
             )
             return new_tender
+    except ValueError as ve:
+        _cleanup_local_files(files_data)
+        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         _cleanup_local_files(files_data)
         if isinstance(e, HTTPException):
@@ -433,11 +439,57 @@ async def get_tender_details(
             tender = await get_tender_detail(connection, tender_id)
             if tender is None:
                 raise HTTPException(status_code=404, detail="Tender not found")
+                
+            buyer_id = tender.get("buyer_id")
+            org_row = None
+            if buyer_id:
+                org_row = await connection.fetchrow(
+                    "SELECT primary_contact FROM organizations WHERE organization_id = $1",
+                    buyer_id
+                )
+            primary_contact = org_row["primary_contact"] if org_row else None
+            
+            user_id = current_user.get("user_id")
+            org_user_id = current_user.get("org_user_id")
+            role_in_org = current_user.get("role_in_org")
+            
+            can_manage = False
+            if org_user_id and org_user_id == tender.get("created_by"):
+                can_manage = True
+            elif user_id == primary_contact or role_in_org == "Owner":
+                can_manage = True
+                
+            tender["can_manage_document_access"] = can_manage
+            
             return tender
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
+@router.get("/{tender_id}/recommendations", response_model=VendorRecommendationResponse)
+async def get_tender_vendor_recommendations(
+    tender_id: int,
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    FR-09: Fetch explainable recommendations of top matching vendors for a tender.
+    Buyer only. Evaluates category capabilities, mutual ratings, certifications, and enlistment.
+    """
+    buyer_org_id = current_user.get("organization_id")
+    if not buyer_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            return await get_vendor_recommendations_for_tender(connection, tender_id, buyer_org_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Tender not found.")
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch recommendations: {e}")
 
 
 @router.get("/documents/{doc_id}/view")
@@ -482,6 +534,42 @@ async def update_required_document_access(
     """
     try:
         async with get_db_connection() as connection:
+            row = await connection.fetchrow(
+                "SELECT created_by, buyer_id FROM tenders WHERE tender_id = $1", 
+                tender_id
+            )
+            if not row:
+                raise HTTPException(status_code=404, detail="Tender not found")
+                
+            tender_created_by = row["created_by"]
+            buyer_id = row["buyer_id"]
+            
+            org_row = await connection.fetchrow(
+                "SELECT primary_contact FROM organizations WHERE organization_id = $1",
+                buyer_id
+            )
+            primary_contact = org_row["primary_contact"] if org_row else None
+            
+            user_id = current_user.get("user_id")
+            org_user_id = current_user.get("org_user_id")
+            role_in_org = current_user.get("role_in_org")
+            
+            is_authorized = False
+            if org_user_id == tender_created_by:
+                is_authorized = True
+            elif user_id == primary_contact or role_in_org == "Owner":
+                is_authorized = True
+                
+            if not is_authorized:
+                return JSONResponse(
+                    status_code=403,
+                    content={
+                        "status": 403,
+                        "code": "ACCESS_DENIED",
+                        "message": "Permission denied. Only the tender creator or organization owner can modify document access settings."
+                    }
+                )
+
             updates = [item.dict() for item in payload.documents]
             await update_tender_required_document_roles(connection, tender_id, updates)
             return {"message": "Document access updated successfully"}

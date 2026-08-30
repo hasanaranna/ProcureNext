@@ -7,7 +7,8 @@ import json
 import uuid
 import shutil
 from typing import List
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status, Response
+from fastapi.responses import JSONResponse
 from app.core.db import get_db_connection
 from app.modules.auth.dependencies import get_current_user_org
 from app.modules.bids.evaluation_schemas import EvaluationRunResponse, EvaluationRunWithResults
@@ -26,15 +27,17 @@ from app.modules.bids.service import (
     submit_bid_with_documents,
     get_bid_by_tender_and_vendor,
     get_bid_document_by_id,
+    get_bid_document_details_for_download,
     get_bids_for_buyer_tender,
     get_tender_bid_comparison,
     accept_bid_for_tender,
     get_vendor_submitted_bids,
     update_bid,
     delete_bid,
-    delete_bid_document
+    delete_bid_document,
 )
-from app.services.supabase_storage import generate_signed_url
+from app.services.supabase_storage import generate_signed_url, download_file_bytes
+from app.utils.filename_utils import sanitize_filename, get_content_disposition
 
 router = APIRouter(prefix="/bids", tags=["Bids"])
 
@@ -46,6 +49,7 @@ os.makedirs(TEMP_UPLOAD_DIR, exist_ok=True)
 @router.post("/vendor/submit-with-documents", response_model=BidResponse, status_code=status.HTTP_201_CREATED)
 async def submit_bid(
     bid_data: str = Form(...),
+    req_doc_ids: str = Form("[]"),
     doc_type_names: str = Form("[]"),
     files: List[UploadFile] = File(default=[]),
     current_user: dict = Depends(get_current_user_org)
@@ -53,8 +57,8 @@ async def submit_bid(
     """
     Submit a bid with documents.
     - bid_data: JSON string with keys: tender_id, financial_amount
+    - req_doc_ids: JSON string list of req_doc_id matching the files array
     - doc_type_names: JSON string list of document type names matching the files array
-      (e.g. ["TIN", "TradeLicense", "Other"])
     - files: Multiple PDF files to upload
     """
     # 1. Parse JSON inputs
@@ -67,6 +71,11 @@ async def submit_bid(
         raise HTTPException(status_code=400, detail=f"Invalid bid_data JSON: {e}")
 
     try:
+        req_ids = json.loads(req_doc_ids)
+    except Exception:
+        req_ids = []
+
+    try:
         type_names = json.loads(doc_type_names)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid doc_type_names JSON: {e}")
@@ -74,7 +83,7 @@ async def submit_bid(
     # Filter out empty file uploads (files with no filename)
     actual_files = [f for f in files if f.filename]
 
-    if len(type_names) != len(actual_files):
+    if type_names and len(type_names) != len(actual_files):
         raise HTTPException(
             status_code=400,
             detail=f"Number of doc_type_names ({len(type_names)}) must match number of files ({len(actual_files)})"
@@ -83,7 +92,8 @@ async def submit_bid(
     # 2. Save files locally to temp folder for Celery
     files_data = []
     for i, file_obj in enumerate(actual_files):
-        doc_type_name = type_names[i]
+        doc_type_name = type_names[i] if i < len(type_names) else ""
+        req_doc_id = req_ids[i] if i < len(req_ids) else None
         safe_filename = f"{uuid.uuid4().hex}_{file_obj.filename}"
         local_path = os.path.join(TEMP_UPLOAD_DIR, safe_filename)
 
@@ -92,6 +102,7 @@ async def submit_bid(
 
         files_data.append({
             "local_path": local_path,
+            "req_doc_id": req_doc_id,
             "doc_type_name": doc_type_name,
         })
 
@@ -143,6 +154,16 @@ async def get_vendor_bid_for_tender(
             bid = await get_bid_by_tender_and_vendor(connection, tender_id, vendor_org_id)
             if not bid:
                 raise HTTPException(status_code=404, detail="No bid found for this tender.")
+            
+            user_role = current_user.get("role_in_org")
+            for doc in bid.get("documents", []):
+                allowed = doc.get("allowed_roles")
+                if not allowed or user_role in allowed:
+                    doc["has_access"] = True
+                else:
+                    doc["has_access"] = False
+                    doc["file_path"] = None
+            
             return bid
     except HTTPException:
         raise
@@ -174,14 +195,38 @@ async def view_bid_document(
 ):
     """
     Get a signed URL to view a bid document.
+    Access restricted to the vendor who submitted the bid, or the buyer who owns the tender.
+    Checks allowed_roles for the current user's role.
     """
+    user_org_id = current_user.get("organization_id")
+    user_role = current_user.get("role_in_org")
+    if not user_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
     try:
         async with get_db_connection() as connection:
-            doc = await get_bid_document_by_id(connection, doc_id)
-            if not doc:
+            doc_details = await get_bid_document_details_for_download(connection, doc_id)
+            if not doc_details:
                 raise HTTPException(status_code=404, detail="Document not found")
             
-            url = await generate_signed_url(doc["file_path"], expires_in=3600)
+            # Authorization Check for Org
+            if user_org_id != doc_details["vendor_org_id"] and user_org_id != doc_details["buyer_id"]:
+                raise HTTPException(status_code=403, detail="Not authorized to access this document.")
+                
+            # RBAC Check for Role
+            allowed_roles = doc_details.get("allowed_roles")
+            if allowed_roles and user_role not in allowed_roles:
+                return JSONResponse(
+                    status_code=403,
+                    content={
+                        "status": 403,
+                        "code": "INSUFFICIENT_PERMISSIONS",
+                        "message": f"Access restricted. Your assigned role does not have authorization to view this document.",
+                        "required_roles": allowed_roles
+                    }
+                )
+            
+            url = await generate_signed_url(doc_details["file_path"], expires_in=3600)
             if not url:
                 raise HTTPException(status_code=500, detail="Failed to generate signed URL")
             
@@ -206,10 +251,23 @@ async def get_buyer_bids_for_tender(
     try:
         async with get_db_connection() as connection:
             bids = await get_bids_for_buyer_tender(connection, tender_id, buyer_org_id)
+            
+            user_role = current_user.get("role_in_org")
+            for bid in bids:
+                for doc in bid.get("documents", []):
+                    allowed = doc.get("allowed_roles")
+                    if not allowed or user_role in allowed:
+                        doc["has_access"] = True
+                    else:
+                        doc["has_access"] = False
+                        doc["file_path"] = None
+                
             return bids
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
+        import logging
+        logging.getLogger("uvicorn.error").exception(f"Error fetching buyer bids for tender {tender_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
 
 
@@ -262,6 +320,73 @@ async def accept_bid(
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+@router.get("/documents/{bid_doc_id}")
+async def stream_bid_document(
+    bid_doc_id: int,
+    action: str = "view",
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    Stream a bid document with dynamic sanitized filename formatting.
+    Access restricted to the vendor who submitted the bid and the buyer who owns the tender.
+    Supports ?action=view (inline) or ?action=download (attachment).
+    """
+    user_org_id = current_user.get("organization_id")
+    user_role = current_user.get("role_in_org")
+    if not user_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            doc_details = await get_bid_document_details_for_download(connection, bid_doc_id)
+            if not doc_details:
+                raise HTTPException(status_code=404, detail="Document not found.")
+
+            # Authorization Check
+            if user_org_id != doc_details["vendor_org_id"] and user_org_id != doc_details["buyer_id"]:
+                raise HTTPException(status_code=403, detail="Not authorized to access this document.")
+                
+            # RBAC Check for Role
+            allowed_roles = doc_details.get("allowed_roles")
+            if allowed_roles and user_role not in allowed_roles:
+                return JSONResponse(
+                    status_code=403,
+                    content={
+                        "status": 403,
+                        "code": "INSUFFICIENT_PERMISSIONS",
+                        "message": f"Access restricted. Your assigned role does not have authorization to view this document.",
+                        "required_roles": allowed_roles
+                    }
+                )
+
+            # Parse extension from the file path
+            file_path = doc_details["file_path"]
+            _, ext = os.path.splitext(file_path)
+
+            # Generate sanitized filename
+            filename = sanitize_filename(
+                doc_details["vendor_name"],
+                doc_details["document_type"],
+                ext
+            )
+
+            # Download file bytes
+            file_bytes, content_type = await download_file_bytes(file_path)
+
+            # Determine disposition
+            disposition_type = "attachment" if action == "download" else "inline"
+            content_disposition = get_content_disposition(filename, disposition_type)
+
+            return Response(
+                content=file_bytes,
+                media_type=content_type,
+                headers={"Content-Disposition": content_disposition}
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to stream document: {e}")
 
 
 @router.put("/{bid_id}", response_model=BidResponse)
@@ -448,4 +573,3 @@ async def get_evaluation_run(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
-

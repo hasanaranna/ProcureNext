@@ -10,6 +10,7 @@ interface BidDocument {
   bid_id: number;
   file_path: string;
   document_type: string;
+  has_access?: boolean;
   req_doc_id?: number | null;
 }
 
@@ -56,6 +57,32 @@ interface EvaluatedBid {
   documents: BidDocument[];
   compliance_matrix: ComplianceMatrixItem[];
   securities: BidSecurity[];
+  lot_pricing?: LotPricingItem[];
+}
+
+interface LotPricingItem {
+  bid_item_id?: number;
+  tender_item_id: number;
+  lot_number: string;
+  item_name: string;
+  offered_quantity: number;
+  unit_price: number;
+  total_price: number;
+  compliance_remarks?: string | null;
+}
+
+interface VendorRecommendation {
+  vendor_id: number;
+  vendor_name: string;
+  vendor_address?: string | null;
+  vendor_verification_status?: string | null;
+  match_score: number;
+  category_match: boolean;
+  is_enlisted: boolean;
+  avg_seller_rating: number;
+  total_reviews_count: number;
+  certifications: string[];
+  reasons: string[];
 }
 
 interface BidComparisonSummary {
@@ -73,8 +100,10 @@ interface TenderComparisonData {
   tender_id: number;
   tender_title: string;
   tender_status: string;
+  package_type?: string;
   budget_min: number | null;
   budget_max: number | null;
+  lots?: any[];
   required_documents: RequiredDocument[];
   summary: BidComparisonSummary;
   bids: EvaluatedBid[];
@@ -105,6 +134,7 @@ interface Tender {
   budget_max: string;
   bid_count?: number;
   required_documents?: RequiredDocument[];
+  can_manage_document_access?: boolean;
 }
 
 export default function ViewMyTenderPage() {
@@ -131,12 +161,34 @@ export default function ViewMyTenderPage() {
   const [savingAccess, setSavingAccess] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
+  const [restrictedDocAlert, setRestrictedDocAlert] = useState<{ isOpen: boolean; docName: string }>({ isOpen: false, docName: '' });
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // FR-09: Recommendations state
+  const [recommendations, setRecommendations] = useState<VendorRecommendation[]>([]);
+  const [loadingRecommendations, setLoadingRecommendations] = useState<boolean>(false);
+
   // Comparison Matrix Interactive State
   const [filterMode, setFilterMode] = useState<'all' | 'compliant' | 'enlisted'>('all');
   const [sortMode, setSortMode] = useState<'price_asc' | 'price_desc' | 'rating_desc' | 'compliance_desc' | 'date_desc'>('price_asc');
   const [pinnedBidIds, setPinnedBidIds] = useState<number[]>([]);
   const [expandedDescriptions, setExpandedDescriptions] = useState<Record<number, boolean>>({});
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const fetchRecommendations = async () => {
+    try {
+      setLoadingRecommendations(true);
+      const res = await fetch(`/api/tenders/${tenderId}/recommendations`);
+      if (res.ok) {
+        const data = await res.json();
+        setRecommendations(data.recommendations || []);
+      }
+    } catch (err) {
+      console.error('Error loading recommendations:', err);
+    } finally {
+      setLoadingRecommendations(false);
+    }
+  };
 
   useEffect(() => {
     if (!tenderId) return;
@@ -195,6 +247,9 @@ export default function ViewMyTenderPage() {
           setCompareError('Comparison metrics could not be loaded. Bid cards still show submitted proposals.');
           setPinnedBidIds(listBids.map((b) => b.bid_id));
         }
+
+        // Fetch AI recommendations in background
+        fetchRecommendations();
       } catch (err: any) {
         setError(err.message || 'An error occurred');
       } finally {
@@ -250,7 +305,21 @@ export default function ViewMyTenderPage() {
       if (tender) {
         setTender({ ...tender, required_documents: reqDocs });
       }
+      
+      // Re-fetch bids to update document access states reactively
+      try {
+        const bidsRes = await fetch(`/api/bids/buyer/tender/${tenderId}`);
+        if (bidsRes.ok) {
+          const bidsData = await bidsRes.json();
+          setBids(bidsData);
+        }
+      } catch (e) {
+        console.error("Failed to refetch bids:", e);
+      }
+
       setShowManageAccess(false);
+      setToastMessage("Document access permissions updated successfully");
+      setTimeout(() => setToastMessage(null), 3000);
     } catch (err: any) {
       alert(err.message || "Failed to update document access");
     } finally {
@@ -275,9 +344,13 @@ export default function ViewMyTenderPage() {
         if (data.url) {
           window.open(data.url, '_blank');
         }
+      } else {
+        const errorData = await res.json();
+        alert(errorData.detail || 'Access Denied');
       }
     } catch (e) {
       console.error('Failed to view document', e);
+      alert('Failed to view document');
     }
   };
 
@@ -582,26 +655,28 @@ export default function ViewMyTenderPage() {
           </div>
         )}
 
-        {/* Manage Document Access Button */}
-        <div className="flex justify-end mb-6">
-          <button
-            type="button"
-            onClick={() => setShowManageAccess(!showManageAccess)}
-            className={`flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-xl border transition-all duration-200 shadow-md ${
-              showManageAccess
-                ? 'bg-accent-500/20 text-accent-300 border-accent-500/40'
-                : 'bg-navy-900/80 text-slate-300 border-white/10 hover:bg-navy-800 hover:text-white'
-            }`}
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-            Manage Document Access {showManageAccess ? '▲' : '▼'}
-          </button>
-        </div>
+        {/* Manage Document Access Button - OUTSIDE the white box */}
+        {(tender?.can_manage_document_access ?? true) && (
+          <div className="flex justify-end mb-6">
+            <button
+              type="button"
+              onClick={() => setShowManageAccess(!showManageAccess)}
+              className={`flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-xl border transition-all duration-200 shadow-md ${
+                showManageAccess
+                  ? 'bg-accent-500/20 text-accent-300 border-accent-500/40'
+                  : 'bg-navy-900/80 text-slate-300 border-white/10 hover:bg-navy-800 hover:text-white'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              Manage Document Access {showManageAccess ? '▲' : '▼'}
+            </button>
+          </div>
+        )}
 
-        {/* Expandable Document Access Panel */}
-        {showManageAccess && (
+        {/* Expandable Document Access Panel - OUTSIDE the Tender Details Card */}
+        {(tender?.can_manage_document_access ?? true) && showManageAccess && (
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-8 mb-8 animate-fade-in">
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-200">
               <h3 className="text-sm font-bold text-navy-900 uppercase tracking-wide">Required Document Permissions</h3>
@@ -820,15 +895,28 @@ export default function ViewMyTenderPage() {
                         {bid.documents && bid.documents.length > 0 && (
                           <div className="mb-4 flex flex-wrap gap-2">
                             {bid.documents.map((doc) => (
-                              <div key={doc.bid_doc_id} className="rounded-full px-3 py-1.5 flex items-center gap-2 border border-slate-200 bg-slate-50">
-                                <svg className="w-4 h-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
-                                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
-                                </svg>
-                                <span className="text-xs font-medium text-navy-900">{doc.document_type}</span>
-                                <button onClick={() => handleViewDocument(doc.bid_doc_id)}
-                                  className="ml-1 text-accent-600 hover:text-accent-700 text-xs font-semibold transition">
-                                  View
-                                </button>
+                              <div key={doc.bid_doc_id} className={`rounded-full px-3 py-1.5 flex items-center gap-2 border ${doc.has_access !== false ? 'border-slate-200 bg-slate-50' : 'border-slate-300 bg-slate-100 opacity-80'}`}>
+                                {doc.has_access !== false ? (
+                                  <svg className="w-4 h-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
+                                  </svg>
+                                ) : (
+                                  <span className="text-slate-500 text-sm">🔒</span>
+                                )}
+                                <span className={`text-xs font-medium ${doc.has_access !== false ? 'text-navy-900' : 'text-slate-500 italic'}`}>
+                                  {doc.document_type} {doc.has_access === false && '(Restricted)'}
+                                </span>
+                                {doc.has_access !== false ? (
+                                  <button onClick={() => handleViewDocument(doc.bid_doc_id)}
+                                    className="ml-1 text-accent-600 hover:text-accent-700 text-xs font-semibold transition">
+                                    View
+                                  </button>
+                                ) : (
+                                  <button onClick={() => setRestrictedDocAlert({ isOpen: true, docName: doc.document_type })}
+                                    className="ml-1 text-slate-400 hover:text-slate-500 text-xs font-semibold transition cursor-pointer">
+                                    View
+                                  </button>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -1098,6 +1186,38 @@ export default function ViewMyTenderPage() {
                             )}
                           </div>
 
+                          {/* Itemized Lot Pricing Breakdown (FR-10) */}
+                          {bid.lot_pricing && bid.lot_pricing.length > 0 && (
+                            <div className="border border-slate-200 bg-slate-50/80 rounded-xl p-3.5 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-bold text-navy-900 uppercase tracking-wider flex items-center gap-1.5">
+                                  <span>📦</span> Lot Price Breakdown
+                                </span>
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-navy-100 text-navy-800">
+                                  {bid.lot_pricing.length} Lots
+                                </span>
+                              </div>
+                              <div className="divide-y divide-slate-200 text-xs">
+                                {bid.lot_pricing.map((lot, lIdx) => (
+                                  <div key={lIdx} className="py-2 flex items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <p className="font-bold text-navy-900 truncate">
+                                        <span className="text-[10px] text-slate-500 font-normal mr-1">[{lot.lot_number}]</span>
+                                        {lot.item_name}
+                                      </p>
+                                      <p className="text-[10px] text-slate-500">
+                                        {lot.offered_quantity} units × ৳ {lot.unit_price.toLocaleString()}
+                                      </p>
+                                    </div>
+                                    <span className="font-bold text-navy-900 whitespace-nowrap">
+                                      ৳ {lot.total_price.toLocaleString()}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
                           {/* 2. Vendor Credibility & Track Record */}
                           <div className="border border-slate-100 bg-slate-50/50 rounded-xl p-3.5">
                             <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Vendor Reputation</h4>
@@ -1242,19 +1362,122 @@ export default function ViewMyTenderPage() {
           )}
 
           {/* ============================================================ */}
-          {/* 3. RECOMMENDED SELLERS TAB */}
+          {/* 3. RECOMMENDED SELLERS TAB (FR-09) */}
           {/* ============================================================ */}
           {activeTab === 'recommended' && (
-            <div className="mb-6">
-              <p className="text-slate-400 text-xs text-center mb-6 italic">
-                These are our smart recommendations for your current tender based on category match, past performance, and vendor credibility.
-              </p>
-              <div className="bg-white/5 rounded-2xl p-12 text-center border border-white/10">
-                <svg className="w-12 h-12 text-slate-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
-                <p className="text-slate-300 font-medium">Smart AI recommendations will appear here as more vendors join.</p>
+            <div className="mb-6 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white/5 border border-white/10 rounded-2xl p-5">
+                <div>
+                  <h3 className="text-base font-black text-white flex items-center gap-2">
+                    <span>Vendor Matching & AI Recommendations</span>
+                    <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold rounded-full">
+                      Multi-Factor Engine
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Ranked candidates evaluated on Category Match (35%), Historical Mutual Rating (30%), Enlistment (20%), and Verified Certifications (15%).
+                  </p>
+                </div>
+                <button
+                  onClick={fetchRecommendations}
+                  disabled={loadingRecommendations}
+                  className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 flex-shrink-0"
+                >
+                  <svg className={`w-3.5 h-3.5 ${loadingRecommendations ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh Matches
+                </button>
               </div>
+
+              {loadingRecommendations ? (
+                <div className="py-16 text-center text-slate-400">
+                  <svg className="animate-spin h-8 w-8 text-white mx-auto mb-3" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <p className="font-semibold text-sm">Evaluating vendor pool and calculating recommendation scores...</p>
+                </div>
+              ) : recommendations.length === 0 ? (
+                <div className="bg-white/5 rounded-2xl p-12 text-center border border-white/10">
+                  <svg className="w-12 h-12 text-slate-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                  </svg>
+                  <p className="text-slate-300 font-medium">No matching vendor recommendations found for this tender criteria.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {recommendations.map((rec, rIdx) => (
+                    <div
+                      key={rec.vendor_id}
+                      className="bg-white rounded-2xl p-5 shadow-lg border border-slate-200 flex flex-col justify-between hover:shadow-xl transition"
+                    >
+                      <div>
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="w-5 h-5 rounded-full bg-navy-900 text-white flex items-center justify-center text-[10px] font-black">
+                                #{rIdx + 1}
+                              </span>
+                              <h4 className="text-base font-black text-navy-900">{rec.vendor_name}</h4>
+                            </div>
+                            {rec.vendor_address && (
+                              <p className="text-xs text-slate-500 mt-1">📍 {rec.vendor_address}</p>
+                            )}
+                          </div>
+                          
+                          <div className="flex flex-col items-end">
+                            <span className="px-3 py-1 bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-xs font-black rounded-full shadow-sm">
+                              {rec.match_score}% Match
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Status Badges & Rating */}
+                        <div className="flex flex-wrap items-center gap-2 mb-3">
+                          <span className="px-2 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 rounded-md text-[11px] font-bold flex items-center gap-1">
+                            ⭐ {rec.avg_seller_rating.toFixed(1)} / 5.0 ({rec.total_reviews_count} reviews)
+                          </span>
+                          {rec.is_enlisted && (
+                            <span className="px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-md text-[11px] font-bold">
+                              ✓ Enlisted Partner
+                            </span>
+                          )}
+                          <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-[11px] font-bold">
+                            {rec.vendor_verification_status || 'Verified Vendor'}
+                          </span>
+                        </div>
+
+                        {/* Match Reasons / Explainability */}
+                        <div className="space-y-1.5 mb-4 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                          <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Why Recommended:</p>
+                          {rec.reasons.map((reason, rIdx2) => (
+                            <div key={rIdx2} className="flex items-center gap-2 text-xs text-slate-700">
+                              <span className="text-emerald-500 font-bold">✓</span>
+                              <span>{reason}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                        <span className="text-[11px] text-slate-400">
+                          {rec.certifications.length > 0 ? `Certifications: ${rec.certifications.join(', ')}` : 'Platform Verified Vendor'}
+                        </span>
+                        <button
+                          onClick={() => {
+                            setToastMessage(`Invitation sent to ${rec.vendor_name}`);
+                            setTimeout(() => setToastMessage(null), 3000);
+                          }}
+                          className="px-3.5 py-1.5 bg-navy-900 hover:bg-navy-800 text-white font-bold text-xs rounded-lg transition"
+                        >
+                          Invite to Bid
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -1318,6 +1541,43 @@ export default function ViewMyTenderPage() {
           </div>
         </div>
       </ModalShell>
+
+      {/* Restricted Document Access Modal */}
+      <ModalShell
+        isOpen={restrictedDocAlert.isOpen}
+        onClose={() => setRestrictedDocAlert({ isOpen: false, docName: '' })}
+        maxWidth="max-w-md"
+      >
+        <div className="p-8">
+          <div className="w-14 h-14 mx-auto mb-5 rounded-2xl bg-red-50 flex items-center justify-center">
+            <span className="text-2xl">🔒</span>
+          </div>
+          <h3 className="text-xl font-black text-navy-900 mb-2 text-center">Access Restricted</h3>
+          <p className="text-slate-600 mb-6 text-center text-sm">
+            You do not have authorization to view <strong className="text-navy-900">{restrictedDocAlert.docName}</strong>. This document requires <strong className="text-navy-900">Owner</strong> privileges. Contact your administrator or tender manager to request access.
+          </p>
+          <div className="flex justify-center">
+            <button
+              onClick={() => setRestrictedDocAlert({ isOpen: false, docName: '' })}
+              className="px-6 py-2.5 rounded-xl bg-slate-100 text-navy-900 font-semibold hover:bg-slate-200 transition border border-slate-200"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </ModalShell>
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 animate-fade-in">
+          <div className="bg-emerald-50 border border-emerald-200 shadow-xl rounded-xl px-5 py-3 flex items-center gap-3">
+            <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <p className="text-emerald-800 text-sm font-bold">{toastMessage}</p>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
