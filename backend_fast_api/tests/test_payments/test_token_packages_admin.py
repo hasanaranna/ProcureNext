@@ -48,7 +48,8 @@ def mock_admin_user():
 class TestAdminTokenAndPackages:
 
     @patch("app.modules.admin.router.get_db_connection")
-    async def test_admin_get_pricing(self, mock_db, client, auth_headers):
+    async def test_admin_get_pricing(self, mock_db, client, mock_admin_user):
+        app.dependency_overrides[get_current_admin] = lambda: mock_admin_user
         mock_conn = AsyncMock()
         mock_db.side_effect = _mock_db_ctx(mock_conn)
 
@@ -60,7 +61,7 @@ class TestAdminTokenAndPackages:
             "updated_at": datetime.now(timezone.utc),
         }
 
-        resp = await client.get("/api/auth/admin/pricing", headers=auth_headers)
+        resp = await client.get("/api/auth/admin/pricing")
         assert resp.status_code == 200
         data = resp.json()
         assert data["price_per_token"] == 1.25

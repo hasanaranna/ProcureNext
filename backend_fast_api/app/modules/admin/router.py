@@ -109,7 +109,7 @@ async def admin_login(payload: LoginRequest):
 
 
 @router.get("/admin/pending-accounts", response_model=PendingMasterAccountsResponse)
-async def list_pending_master_accounts():
+async def list_pending_master_accounts(admin: dict = Depends(get_current_admin)):
     """
     Retrieve all master accounts (organization Owners) whose user
     status is still 'Pending', including their NID documents and
@@ -129,7 +129,11 @@ async def list_pending_master_accounts():
 
 
 @router.post("/admin/verify/{organization_id}")
-async def verify_organization_endpoint(organization_id: int, payload: VerifyOrgRequest):
+async def verify_organization_endpoint(
+    organization_id: int,
+    payload: VerifyOrgRequest,
+    admin: dict = Depends(get_current_admin),
+):
     """
     Admin manually verifies organization documents.
     Sets organization verification_status to Verified or Rejected.
@@ -149,7 +153,7 @@ async def verify_organization_endpoint(organization_id: int, payload: VerifyOrgR
 
 
 @router.get("/admin/pricing", response_model=PricingConfigResponse)
-async def get_admin_pricing():
+async def get_admin_pricing(admin: dict = Depends(get_current_admin)):
     """
     Retrieve current platform token pricing configuration for admin panel.
     """

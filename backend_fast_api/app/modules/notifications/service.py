@@ -134,3 +134,43 @@ async def delete_notification(
         user_id,
     )
     return result != "DELETE 0"
+
+
+async def delete_notifications_for_tender(
+    connection: asyncpg.Connection,
+    tender_id: int,
+) -> None:
+    """Delete in-app notifications linked to a tender via action_url."""
+    await connection.execute(
+        """
+        DELETE FROM notifications
+        WHERE action_url = ANY($1::text[])
+           OR action_url LIKE $2
+        """,
+        [
+            f"/view-my-tender/{tender_id}",
+            f"/edit-tender/{tender_id}",
+            f"/bid-for-tender?id={tender_id}",
+        ],
+        f"/bid-for-tender?id={tender_id}&%",
+    )
+
+
+async def delete_notifications_for_tender(
+    connection: asyncpg.Connection,
+    tender_id: int,
+) -> None:
+    """Delete in-app notifications linked to a tender via action_url."""
+    await connection.execute(
+        """
+        DELETE FROM notifications
+        WHERE action_url = ANY($1::text[])
+           OR action_url LIKE $2
+        """,
+        [
+            f"/view-my-tender/{tender_id}",
+            f"/edit-tender/{tender_id}",
+            f"/bid-for-tender?id={tender_id}",
+        ],
+        f"/bid-for-tender?id={tender_id}&%",
+    )

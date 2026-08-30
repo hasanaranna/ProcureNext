@@ -112,3 +112,13 @@ async def vectorize_text(text: str) -> List[float]:
         if not isinstance(embedding, list):
             raise HTTPException(status_code=502, detail="ML service returned an invalid embedding payload.")
         return embedding
+
+
+def score_tender_bids_sync(payload: dict) -> dict:
+    """Synchronous client for the Celery bid-evaluation worker."""
+    base_url = _require_ml_service_url()
+
+    with httpx.Client(timeout=ML_SERVICE_TIMEOUT) as client:
+        response = client.post(f"{base_url}/evaluations/tender/score", json=payload)
+        _raise_for_ml_response(response, "bid evaluation scoring")
+        return response.json()

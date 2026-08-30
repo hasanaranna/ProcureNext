@@ -85,6 +85,7 @@ from app.core.db import get_db_connection
 from app.modules.auth.dependencies import get_current_user_org
 from app.modules.tenders.schemas import (
     TenderCreateRequest,
+    TenderUpdateRequest,
     TenderResponse,
     TenderListItem,
     TenderDetailResponse,
@@ -100,6 +101,10 @@ from app.modules.tenders.schemas import (
 )
 from app.modules.tenders.service import (
     publish_tender_with_documents,
+    save_draft_with_documents,
+    publish_draft_tender,
+    update_tender,
+    withdraw_tender,
     get_buyer_tenders,
     get_all_published_tenders,
     get_tender_detail,
@@ -121,6 +126,43 @@ router = APIRouter(prefix="/tenders", tags=["Tenders"])
 
 TEMP_UPLOAD_DIR = os.getenv("UPLOAD_DIR", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../uploads")))
 os.makedirs(TEMP_UPLOAD_DIR, exist_ok=True)
+
+
+def _parse_tender_form_payload(tender_data: str, file_names: str, files: List[UploadFile]):
+    try:
+        tender_dict = json.loads(tender_data)
+        tender_req = TenderCreateRequest(**tender_dict)
+        custom_names = json.loads(file_names) if file_names else []
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON data: {exc}") from exc
+
+    if not isinstance(custom_names, list):
+        raise HTTPException(status_code=400, detail="file_names must be a JSON array.")
+    if len(custom_names) != len(files):
+        raise HTTPException(status_code=400, detail="Number of file_names must match number of files.")
+
+    files_data = []
+    for i, file_obj in enumerate(files):
+        if not file_obj.filename:
+            continue
+        custom_name = custom_names[i]
+        safe_filename = f"{uuid.uuid4().hex}_{file_obj.filename}"
+        local_path = os.path.join(TEMP_UPLOAD_DIR, safe_filename)
+        with open(local_path, "wb") as buffer:
+            shutil.copyfileobj(file_obj.file, buffer)
+        files_data.append({"local_path": local_path, "custom_name": custom_name})
+
+    return tender_req, files_data
+
+
+def _cleanup_local_files(files_data: list[dict]) -> None:
+    for f in files_data:
+        local_path = f.get("local_path")
+        if local_path and os.path.exists(local_path):
+            try:
+                os.remove(local_path)
+            except Exception:
+                pass
 
 @router.post("/extract-from-pdf", response_model=TenderPdfExtractResponse)
 async def extract_from_pdf(
@@ -229,34 +271,11 @@ async def publish_with_documents(
     - file_names: JSON string list of custom names matching the files array length
     - files: Multiple files to upload
     """
-    # 1. Parse JSON inputs
+    # 1. Parse JSON inputs and save any uploaded files
     try:
-        tender_dict = json.loads(tender_data)
-        tender_req = TenderCreateRequest(**tender_dict)
-        custom_names = json.loads(file_names)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid JSON data: {e}")
-
-    if len(custom_names) != len(files):
-        raise HTTPException(status_code=400, detail="Number of file_names must match number of files")
-
-    # 2. Save files locally to temp folder for Celery
-    files_data = []
-    for i, file_obj in enumerate(files):
-        if not file_obj.filename:
-            continue
-            
-        custom_name = custom_names[i]
-        safe_filename = f"{uuid.uuid4().hex}_{file_obj.filename}"
-        local_path = os.path.join(TEMP_UPLOAD_DIR, safe_filename)
-        
-        with open(local_path, "wb") as buffer:
-            shutil.copyfileobj(file_obj.file, buffer)
-            
-        files_data.append({
-            "local_path": local_path,
-            "custom_name": custom_name
-        })
+        tender_req, files_data = _parse_tender_form_payload(tender_data, file_names, files)
+    except HTTPException:
+        raise
 
     buyer_id = current_user.get("organization_id", 1)
     org_user_id = current_user.get("org_user_id", 1)
@@ -274,12 +293,46 @@ async def publish_with_documents(
             )
             return new_tender
     except Exception as e:
-        for f in files_data:
-            if os.path.exists(f["local_path"]):
-                try:
-                    os.remove(f["local_path"])
-                except Exception:
-                    pass
+        _cleanup_local_files(files_data)
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
+@router.post("/buyer/draft-with-documents", response_model=TenderResponse, status_code=status.HTTP_201_CREATED)
+async def save_draft_with_documents_endpoint(
+    tender_data: str = Form(...),
+    file_names: str = Form(default="[]"),
+    files: List[UploadFile] = File(default=[]),
+    current_user: dict = Depends(get_current_user_org),
+):
+    """
+    Save a tender as Draft without deducting tokens. Documents are optional.
+    """
+    try:
+        tender_req, files_data = _parse_tender_form_payload(tender_data, file_names, files)
+    except HTTPException:
+        raise
+
+    if not tender_req.title.strip():
+        raise HTTPException(status_code=400, detail="Title is required to save a draft.")
+
+    buyer_id = current_user.get("organization_id", 1)
+    org_user_id = current_user.get("org_user_id", 1)
+    user_id = current_user.get("user_id") or current_user.get("org_user_id", 1)
+
+    try:
+        async with get_db_connection() as connection:
+            return await save_draft_with_documents(
+                connection=connection,
+                buyer_id=buyer_id,
+                org_user_id=org_user_id,
+                user_id=user_id,
+                tender_data=tender_req,
+                files_data=files_data,
+            )
+    except Exception as e:
+        _cleanup_local_files(files_data)
         if isinstance(e, HTTPException):
             raise e
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
@@ -288,10 +341,12 @@ async def publish_with_documents(
 
 @router.get("/buyer/my-tenders", response_model=List[TenderListItem])
 async def list_buyer_tenders(
-    current_user: dict = Depends(get_current_user_org)
+    status: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user_org),
 ):
     """
-    List all tenders owned by the current user's buyer organization.
+    List tenders owned by the current user's buyer organization.
+    Optionally filter by status (Draft, Published, Closed, Awarded, Cancelled).
     """
     buyer_org_id = current_user.get("organization_id")
     if not buyer_org_id:
@@ -299,7 +354,7 @@ async def list_buyer_tenders(
 
     try:
         async with get_db_connection() as connection:
-            tenders = await get_buyer_tenders(connection, buyer_org_id)
+            tenders = await get_buyer_tenders(connection, buyer_org_id, status=status)
             return tenders
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
@@ -556,6 +611,77 @@ async def get_ongoing_tender(
             return tender
     except HTTPException:
         raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
+@router.put("/{tender_id}", response_model=TenderResponse)
+async def update_tender_endpoint(
+    tender_id: int,
+    payload: TenderUpdateRequest,
+    current_user: dict = Depends(get_current_user_org),
+):
+    """Update a Draft tender, or a Published tender with no bids."""
+    buyer_org_id = current_user.get("organization_id")
+    if not buyer_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            return await update_tender(connection, tender_id, buyer_org_id, payload)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Tender not found.")
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="You do not have permission to update this tender.")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
+@router.post("/{tender_id}/publish", response_model=TenderResponse)
+async def publish_draft_tender_endpoint(
+    tender_id: int,
+    current_user: dict = Depends(get_current_user_org),
+):
+    """Publish a Draft tender and deduct tokens."""
+    buyer_org_id = current_user.get("organization_id")
+    user_id = current_user.get("user_id") or current_user.get("org_user_id")
+    if not buyer_org_id or not user_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            return await publish_draft_tender(connection, tender_id, buyer_org_id, user_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Tender not found.")
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="You do not have permission to publish this tender.")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
+@router.post("/{tender_id}/withdraw")
+async def withdraw_tender_endpoint(
+    tender_id: int,
+    current_user: dict = Depends(get_current_user_org),
+):
+    """Cancel a tender (soft delete — status becomes Cancelled)."""
+    buyer_org_id = current_user.get("organization_id")
+    if not buyer_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            return await withdraw_tender(connection, tender_id, buyer_org_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Tender not found.")
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="You do not have permission to cancel this tender.")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
 

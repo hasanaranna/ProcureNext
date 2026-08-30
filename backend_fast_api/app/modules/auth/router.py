@@ -56,8 +56,21 @@
 from fastapi import APIRouter, Depends, HTTPException, Form, File, UploadFile
 from datetime import date
 from app.core.db import get_db_connection
-from app.modules.auth.schemas import LoginRequest, TokenResponse
-from app.modules.auth.service import authenticate_user, register_employee_user
+from app.modules.auth.schemas import (
+    LoginRequest,
+    TokenResponse,
+    PasswordResetRequest,
+    PasswordResetVerifyResponse,
+    PasswordResetConfirmRequest,
+    MessageResponse,
+)
+from app.modules.auth.service import (
+    authenticate_user,
+    register_employee_user,
+    request_password_reset,
+    verify_password_reset_token,
+    confirm_password_reset,
+)
 # pyrefly: ignore [missing-import]
 import asyncpg
 
@@ -104,6 +117,51 @@ async def register_user(
                 nid_front=nidFront,
                 nid_back=nidBack,
             )
+    except HTTPException:
+        raise
+    except asyncpg.PostgresError as exc:
+        print(f"[DB ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Database Error: {str(exc)}") from exc
+    except Exception as exc:
+        print(f"[SYSTEM ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
+@router.post("/password-reset/request", response_model=MessageResponse)
+async def request_password_reset_endpoint(payload: PasswordResetRequest):
+    try:
+        async with get_db_connection() as connection:
+            return await request_password_reset(connection, payload.email)
+    except HTTPException:
+        raise
+    except asyncpg.PostgresError as exc:
+        print(f"[DB ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Database Error: {str(exc)}") from exc
+    except Exception as exc:
+        print(f"[SYSTEM ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
+@router.get("/password-reset/verify", response_model=PasswordResetVerifyResponse)
+async def verify_password_reset_endpoint(token: str):
+    try:
+        async with get_db_connection() as connection:
+            return await verify_password_reset_token(connection, token)
+    except HTTPException:
+        raise
+    except asyncpg.PostgresError as exc:
+        print(f"[DB ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Database Error: {str(exc)}") from exc
+    except Exception as exc:
+        print(f"[SYSTEM ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
+@router.post("/password-reset/confirm", response_model=MessageResponse)
+async def confirm_password_reset_endpoint(payload: PasswordResetConfirmRequest):
+    try:
+        async with get_db_connection() as connection:
+            return await confirm_password_reset(connection, payload.token, payload.new_password)
     except HTTPException:
         raise
     except asyncpg.PostgresError as exc:

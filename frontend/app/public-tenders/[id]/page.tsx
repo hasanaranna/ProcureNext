@@ -43,52 +43,24 @@ export default function PublicTenderDetailPage({ params }: { params: Promise<{ i
 
   const [tender, setTender] = useState<PublicTenderDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadTenderDetail() {
       setLoading(true);
+      setFetchError(null);
       try {
-        const res = await fetch(`/api/v1/tenders/public/${tenderId}`);
+        const res = await fetch(`/api/tenders/public/${tenderId}`);
         if (res.ok) {
           const data = await res.json();
           setTender(data);
         } else {
-          // Demo fallback if backend item not created yet
-          setTender({
-            tender_id: parseInt(tenderId),
-            title: `Public Tender Notice #${tenderId}: Infrastructure Equipment & Technical Services`,
-            description: "Procurement of specialized industrial equipment, technical installation services, system calibration, and post-commissioning maintenance. All participating vendor organizations must satisfy regulatory compliance criteria.",
-            status: "Published",
-            visibility_type: "Public",
-            category_name: "Industrial & Electrical Engineering",
-            procurement_nature: "Goods & Associated Services",
-            procurement_method: "Open Tendering Method (OTM)",
-            buyer_org_name: "National Infrastructure & Power Authority",
-            buyer_org_type: "State Corporation",
-            buyer_verified: true,
-            buyer_org_website: "https://procurement.gov.bd",
-            budget_min: 18000000,
-            budget_max: 25000000,
-            security_required: true,
-            security_valid_until: new Date(Date.now() + 90 * 86400000).toISOString(),
-            proposal_valid_until: new Date(Date.now() + 60 * 86400000).toISOString(),
-            tender_public_date: new Date(Date.now() - 4 * 86400000).toISOString(),
-            pre_bid_meeting: new Date(Date.now() + 3 * 86400000).toISOString(),
-            submission_deadline: new Date(Date.now() + 14 * 86400000).toISOString(),
-            tender_opening_date: new Date(Date.now() + 14 * 86400000 + 7200000).toISOString(),
-            created_at: new Date(Date.now() - 4 * 86400000).toISOString(),
-            required_documents: [
-              { req_doc_id: 1, custom_doc_name: "Valid Trade License (Current FY)", is_mandatory: true },
-              { req_doc_id: 2, custom_doc_name: "TIN & Latest Tax Assessment Certificate", is_mandatory: true },
-              { req_doc_id: 3, custom_doc_name: "13-Digit BIN / VAT Registration Certificate", is_mandatory: true },
-              { req_doc_id: 4, custom_doc_name: "Manufacturer Authorization Letter (MAF)", is_mandatory: true },
-              { req_doc_id: 5, custom_doc_name: "ISO 9001:2015 Quality Management Certificate", is_mandatory: false },
-              { req_doc_id: 6, custom_doc_name: "Audited Financial Balance Sheets (Last 3 Years)", is_mandatory: false },
-            ],
-          });
+          setTender(null);
+          setFetchError("This tender may be restricted, closed, or no longer available.");
         }
       } catch {
-        // Fallback
+        setTender(null);
+        setFetchError("Unable to load this tender notice. Please try again later.");
       } finally {
         setLoading(false);
       }
@@ -113,7 +85,9 @@ export default function PublicTenderDetailPage({ params }: { params: Promise<{ i
       <main className="w-full min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center p-6">
         <div className="max-w-md w-full text-center p-8 rounded-3xl bg-slate-800/40 border border-slate-800">
           <h2 className="text-xl font-bold text-white mb-2">Tender Notice Not Found</h2>
-          <p className="text-xs text-slate-400 mb-6">This tender may be restricted, draft, or closed to public viewing.</p>
+          <p className="text-xs text-slate-400 mb-6">
+            {fetchError || "This tender may be restricted, draft, or closed to public viewing."}
+          </p>
           <button
             onClick={() => router.push("/public-tenders")}
             className="px-6 py-2.5 bg-accent-500 text-white text-xs font-bold rounded-xl transition"

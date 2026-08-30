@@ -113,6 +113,8 @@ function BidForTenderContent() {
   // Success Modal State
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [submittedBidResult, setSubmittedBidResult] = useState<any>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
 
   const [restrictedDocAlert, setRestrictedDocAlert] = useState<{ isOpen: boolean; docName: string }>({ isOpen: false, docName: '' });
 
@@ -147,6 +149,10 @@ function BidForTenderContent() {
         if (bidRes.ok) {
           const bidData = await bidRes.json();
           setExistingBid(bidData);
+          setFormData({
+            description: bidData.description || "",
+            bidAmount: bidData.financial_amount != null ? String(bidData.financial_amount) : "",
+          });
         }
 
         if (balRes.ok) {
@@ -340,8 +346,98 @@ function BidForTenderContent() {
         submitted_at: submittedBidResult.submitted_at || new Date().toISOString(),
         documents: submittedBidResult.documents || [],
       });
+      setFormData({
+        description: submittedBidResult.description || "",
+        bidAmount:
+          submittedBidResult.financial_amount != null
+            ? String(submittedBidResult.financial_amount)
+            : "",
+      });
     }
     setIsSuccessModalOpen(false);
+    setIsEditing(false);
+  };
+
+  const canModifyBid =
+    existingBid &&
+    !["Accepted", "Rejected", "Withdrawn"].includes(existingBid.status) &&
+    tender &&
+    !["Closed", "Awarded", "Cancelled"].includes(tender.status);
+
+  const handleUpdateBid = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!existingBid || submitting) return;
+
+    const amountVal = parseFloat(formData.bidAmount);
+    if (isNaN(amountVal) || amountVal <= 0) {
+      setFormValidationError("Please provide a valid financial bid amount greater than 0.");
+      return;
+    }
+    if (!formData.description.trim()) {
+      setFormValidationError("Please provide a proposal description.");
+      return;
+    }
+
+    setSubmitting(true);
+    setFormValidationError(null);
+    try {
+      const res = await fetch(`/api/bids/${existingBid.bid_id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          financial_amount: amountVal,
+          description: formData.description.trim(),
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        setFormValidationError(errData?.detail || "Failed to update bid.");
+        return;
+      }
+
+      const updated = await res.json();
+      setExistingBid({
+        ...existingBid,
+        financial_amount: updated.financial_amount,
+        description: updated.description,
+        status: updated.status,
+        documents: updated.documents || existingBid.documents,
+      });
+      setIsEditing(false);
+    } catch (err) {
+      setFormValidationError(err instanceof Error ? err.message : "Failed to update bid.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleWithdrawBid = async () => {
+    if (!existingBid || withdrawing) return;
+    if (
+      !window.confirm(
+        "Withdraw this bid? This removes your proposal and cannot be undone without submitting again.",
+      )
+    ) {
+      return;
+    }
+
+    setWithdrawing(true);
+    try {
+      const res = await fetch(`/api/bids/${existingBid.bid_id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        alert(errData?.detail || "Failed to withdraw bid.");
+        return;
+      }
+      setExistingBid(null);
+      setIsEditing(false);
+      setFormData({ description: "", bidAmount: "" });
+    } catch {
+      alert("Network error. Please try again.");
+    } finally {
+      setWithdrawing(false);
+    }
   };
 
   // Loading state
@@ -465,7 +561,7 @@ function BidForTenderContent() {
         </div>
 
         {/* Bid Form Card or Existing Bid View */}
-        {existingBid ? (
+        {existingBid && !isEditing ? (
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden relative">
             <div className="absolute top-0 right-0 p-4">
               <span className="px-3 py-1 bg-emerald-50 text-emerald-700 text-sm font-bold rounded-full border border-emerald-200 flex items-center gap-1">
@@ -545,15 +641,104 @@ function BidForTenderContent() {
                 </div>
               </div>
               <div className="pt-6 border-t border-slate-200 mt-6 flex flex-col sm:flex-row gap-3">
+                {canModifyBid && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditing(true)}
+                      className="flex-1 px-6 py-3 bg-accent-600 text-white font-bold rounded-xl hover:bg-accent-700 transition text-sm shadow"
+                    >
+                      Edit Proposal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleWithdrawBid}
+                      disabled={withdrawing}
+                      className="flex-1 px-6 py-3 bg-red-50 text-red-700 font-semibold rounded-xl hover:bg-red-100 transition border border-red-200 text-sm disabled:opacity-50"
+                    >
+                      {withdrawing ? "Withdrawing..." : "Withdraw Bid"}
+                    </button>
+                  </>
+                )}
                 <button type="button" onClick={() => router.push("/view-my-bids")}
                   className="flex-1 px-6 py-3 bg-navy-900 text-white font-bold rounded-xl hover:bg-navy-800 transition text-sm shadow">
-                  📋 View All My Bids
+                  View All My Bids
                 </button>
                 <button type="button" onClick={() => router.push("/home")}
                   className="flex-1 px-6 py-3 bg-slate-100 text-navy-900 font-semibold rounded-xl hover:bg-slate-200 transition border border-slate-200 text-sm">
                   Back to Dashboard
                 </button>
               </div>
+            </div>
+          </div>
+        ) : existingBid && isEditing ? (
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden relative">
+            <div className="p-8">
+              <h2 className="text-2xl font-black text-navy-900 mb-1">Edit Your Proposal</h2>
+              <p className="text-slate-500 text-sm mb-6">
+                Update your financial amount and description. Document changes are not supported here.
+              </p>
+
+              {formValidationError && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-800 text-sm">
+                  {formValidationError}
+                </div>
+              )}
+
+              <form onSubmit={handleUpdateBid} className="space-y-5">
+                <div>
+                  <label className="block text-sm font-semibold text-navy-900 mb-1">Financial bid amount</label>
+                  <input
+                    name="bidAmount"
+                    type="number"
+                    min="1"
+                    step="0.01"
+                    value={formData.bidAmount}
+                    onChange={handleChange}
+                    required
+                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-navy-900 mb-1">Proposal description</label>
+                  <textarea
+                    name="description"
+                    value={formData.description}
+                    onChange={handleChange}
+                    rows={5}
+                    required
+                    className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-accent-500"
+                  />
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditing(false);
+                      setFormValidationError(null);
+                      if (existingBid) {
+                        setFormData({
+                          description: existingBid.description || "",
+                          bidAmount:
+                            existingBid.financial_amount != null
+                              ? String(existingBid.financial_amount)
+                              : "",
+                        });
+                      }
+                    }}
+                    className="flex-1 px-6 py-3 bg-slate-100 text-navy-900 font-semibold rounded-xl border border-slate-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="flex-1 px-6 py-3 bg-navy-900 text-white font-bold rounded-xl disabled:opacity-50"
+                  >
+                    {submitting ? "Saving..." : "Save Changes"}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         ) : (
@@ -602,7 +787,7 @@ function BidForTenderContent() {
                       </p>
                       {tokenBalance < bidCost && (
                         <p className="text-xs text-rose-600 font-semibold mt-0.5">
-                          ⚠️ Insufficient balance. You need {bidCost - tokenBalance} more tokens to place a bid.
+                          Insufficient balance. You need {bidCost - tokenBalance} more tokens to place a bid.
                         </p>
                       )}
                     </div>
@@ -722,7 +907,7 @@ function BidForTenderContent() {
                                     </p>
                                   ) : (
                                     <p className={`text-xs mt-0.5 ${isMissing ? 'text-red-600 font-bold' : 'text-slate-400'}`}>
-                                      {isMissing ? '⚠️ Missing required upload' : 'No PDF attached'}
+                                      {isMissing ? 'Missing required upload' : 'No PDF attached'}
                                     </p>
                                   )}
                                 </div>

@@ -28,7 +28,7 @@
 
 import logging
 import asyncpg
-from app.modules.tenders.schemas import TenderCreateRequest
+from app.modules.tenders.schemas import TenderCreateRequest, TenderUpdateRequest
 from app.tasks.document_tasks import upload_tender_documents_to_supabase
 from app.modules.payments.service import deduct_tokens_for_tender_publish
 from app.services.ml_client import parse_and_embed_tender_pdf, vectorize_text
@@ -98,32 +98,80 @@ async def resolve_category_id(connection: asyncpg.Connection, category_name: str
     except Exception:
         return None
 
-async def publish_tender_with_documents(
-    connection: asyncpg.Connection, 
-    buyer_id: int, 
-    org_user_id: int, 
-    user_id: int,
-    tender_data: TenderCreateRequest, 
-    files_data: list[dict]
-) -> dict:
-    """
-    Creates a tender directly in Published state, deducts tokens, saves 384-d embedding,
-    and queues background file upload.
-    """
-    nature_id = await resolve_nature_id(connection, tender_data.procurement_nature, tender_data.nature_id)
-    method_id = await resolve_method_id(connection, tender_data.procurement_method, tender_data.method_id)
-    category_id = await resolve_category_id(connection, tender_data.category, tender_data.category_id)
 
-    embedding_str = None
+async def _build_embedding_str(tender_data: TenderCreateRequest) -> str | None:
     if tender_data.embedding and len(tender_data.embedding) == 384:
-        embedding_str = f"[{','.join(str(float(x)) for x in tender_data.embedding)}]"
-    elif tender_data.description:
+        return f"[{','.join(str(float(x)) for x in tender_data.embedding)}]"
+    if tender_data.description:
         try:
             vec = await vectorize_text(tender_data.description)
             if vec and len(vec) == 384:
-                embedding_str = f"[{','.join(str(float(x)) for x in vec)}]"
+                return f"[{','.join(str(float(x)) for x in vec)}]"
         except Exception as e:
-            logger.warning(f"Failed to generate embedding during tender publish: {e}")
+            logger.warning("Failed to generate embedding during tender save: %s", e)
+    return None
+
+
+async def _insert_required_seller_docs(
+    connection: asyncpg.Connection,
+    tender_id: int,
+    required_seller_docs: list[dict] | None,
+) -> None:
+    if not required_seller_docs:
+        return
+    insert_req_doc_query = """
+        INSERT INTO public.tender_required_documents (
+            tender_id, custom_doc_name, is_mandatory, allowed_roles
+        )
+        VALUES ($1, $2, $3, $4::public.role_in_org[]);
+    """
+    for doc_entry in required_seller_docs:
+        doc_name = doc_entry.get("name", "")
+        roles = doc_entry.get("allowed_roles", ["Owner"])
+        if "Owner" not in roles:
+            roles = ["Owner"] + roles
+        await connection.execute(
+            insert_req_doc_query,
+            tender_id,
+            doc_name,
+            True,
+            roles,
+        )
+
+
+async def _dispatch_tender_document_upload(tender_id: int, files_data: list[dict]) -> None:
+    if not files_data:
+        return
+    try:
+        upload_tender_documents_to_supabase.delay(tender_id, files_data)
+    except Exception as e:
+        logger.warning("Failed to dispatch Celery upload task: %s", e)
+
+
+async def create_tender_with_documents(
+    connection: asyncpg.Connection,
+    buyer_id: int,
+    org_user_id: int,
+    user_id: int,
+    tender_data: TenderCreateRequest,
+    files_data: list[dict],
+    *,
+    status: str = "Published",
+    deduct_tokens: bool | None = None,
+) -> dict:
+    """
+    Create a tender with optional documents.
+    Draft tenders do not deduct tokens; Published tenders do by default.
+    """
+    if status not in ("Draft", "Published"):
+        raise ValueError(f"Invalid tender status for creation: {status}")
+    if deduct_tokens is None:
+        deduct_tokens = status == "Published"
+
+    nature_id = await resolve_nature_id(connection, tender_data.procurement_nature, tender_data.nature_id)
+    method_id = await resolve_method_id(connection, tender_data.procurement_method, tender_data.method_id)
+    category_id = await resolve_category_id(connection, tender_data.category, tender_data.category_id)
+    embedding_str = await _build_embedding_str(tender_data)
 
     # Validate packaging rules if items provided
     pkg_type_val = tender_data.package_type.value if hasattr(tender_data.package_type, "value") else str(tender_data.package_type)
@@ -148,7 +196,7 @@ async def publish_tender_with_documents(
         )
         RETURNING *;
     """
-    
+
     async with connection.transaction():
         row = await connection.fetchrow(
             query,
@@ -162,8 +210,7 @@ async def publish_tender_with_documents(
             tender_data.eligibility_of_tenderer,
             tender_data.visibility_type.value if hasattr(tender_data.visibility_type, "value") else str(tender_data.visibility_type),
             tender_data.budget_min,
-            tender_data.budget_max,
-            "Published" if not tender_data.scheduled_publish_at or tender_data.scheduled_publish_at <= datetime.utcnow() else "Draft",
+            "Draft" if (tender_data.scheduled_publish_at and tender_data.scheduled_publish_at > datetime.utcnow()) else status,
             tender_data.submission_deadline.replace(tzinfo=None) if tender_data.submission_deadline else None,
             tender_data.tender_public_date.replace(tzinfo=None) if tender_data.tender_public_date else None,
             tender_data.pre_bid_meeting.replace(tzinfo=None) if tender_data.pre_bid_meeting else None,
@@ -171,9 +218,9 @@ async def publish_tender_with_documents(
             pkg_type_val,
             tender_data.bid_bond_amount or 0.00,
             tender_data.scheduled_publish_at.replace(tzinfo=None) if tender_data.scheduled_publish_at else None,
-            embedding_str
+            embedding_str,
         )
-        
+
         tender_id = row['tender_id']
 
         # Insert items / lots if specified
@@ -196,42 +243,20 @@ async def publish_tender_with_documents(
                     itm.estimated_unit_price
                 )
 
-        if tender_data.required_seller_docs:
-            insert_req_doc_query = """
-                INSERT INTO public.tender_required_documents (
-                    tender_id, custom_doc_name, is_mandatory, allowed_roles
-                )
-                VALUES ($1, $2, $3, $4::public.role_in_org[]);
-            """
-            for doc_entry in tender_data.required_seller_docs:
-                doc_name = doc_entry.get("name", "")
-                roles = doc_entry.get("allowed_roles", ["Owner"])
-                # Ensure Owner is always included
-                if "Owner" not in roles:
-                    roles = ["Owner"] + roles
-                await connection.execute(
-                    insert_req_doc_query,
-                    tender_id,
-                    doc_name,
-                    True,
-                    roles
-                )
+        await _insert_required_seller_docs(connection, tender_id, tender_data.required_seller_docs)
 
-        # Deduct configured tokens from buyer organization
-        await deduct_tokens_for_tender_publish(
-            connection=connection,
-            organization_id=buyer_id,
-            user_id=user_id,
-            tender_id=tender_id,
-            tender_title=tender_data.title,
-        )
+        # Do not deduct tokens if scheduled for future publishing
+        should_deduct = deduct_tokens and not (tender_data.scheduled_publish_at and tender_data.scheduled_publish_at > datetime.utcnow())
+        if should_deduct:
+            await deduct_tokens_for_tender_publish(
+                connection=connection,
+                organization_id=buyer_id,
+                user_id=user_id,
+                tender_id=tender_id,
+                tender_title=tender_data.title,
+            )
 
-    if files_data:
-        # Dispatch Celery task to upload the local files to Supabase
-        try:
-            upload_tender_documents_to_supabase.delay(tender_id, files_data)
-        except Exception as e:
-            logger.warning(f"Failed to dispatch Celery upload task: {e}")
+    await _dispatch_tender_document_upload(tender_id, files_data)
 
     ret = dict(row)
     if "category" not in ret and tender_data.category:
@@ -241,6 +266,271 @@ async def publish_tender_with_documents(
     if "procurement_method" not in ret and tender_data.procurement_method:
         ret["procurement_method"] = tender_data.procurement_method
     return ret
+
+
+async def publish_tender_with_documents(
+    connection: asyncpg.Connection,
+    buyer_id: int,
+    org_user_id: int,
+    user_id: int,
+    tender_data: TenderCreateRequest,
+    files_data: list[dict],
+) -> dict:
+    """Creates a tender directly in Published state, deducts tokens, saves embedding, queues uploads."""
+    return await create_tender_with_documents(
+        connection=connection,
+        buyer_id=buyer_id,
+        org_user_id=org_user_id,
+        user_id=user_id,
+        tender_data=tender_data,
+        files_data=files_data,
+        status="Published",
+        deduct_tokens=True,
+    )
+
+
+async def save_draft_with_documents(
+    connection: asyncpg.Connection,
+    buyer_id: int,
+    org_user_id: int,
+    user_id: int,
+    tender_data: TenderCreateRequest,
+    files_data: list[dict],
+) -> dict:
+    """Save a tender as Draft without deducting tokens."""
+    return await create_tender_with_documents(
+        connection=connection,
+        buyer_id=buyer_id,
+        org_user_id=org_user_id,
+        user_id=user_id,
+        tender_data=tender_data,
+        files_data=files_data,
+        status="Draft",
+        deduct_tokens=False,
+    )
+
+
+async def publish_draft_tender(
+    connection: asyncpg.Connection,
+    tender_id: int,
+    buyer_org_id: int,
+    user_id: int,
+) -> dict:
+    """Publish an existing Draft tender and deduct tokens."""
+    row = await connection.fetchrow(
+        "SELECT tender_id, buyer_id, status, title FROM tenders WHERE tender_id = $1",
+        tender_id,
+    )
+    if not row:
+        raise KeyError("Tender not found")
+    if row["buyer_id"] != buyer_org_id:
+        raise PermissionError("You do not have permission to publish this tender.")
+    if row["status"] != "Draft":
+        raise ValueError("Only draft tenders can be published.")
+
+    async with connection.transaction():
+        await deduct_tokens_for_tender_publish(
+            connection=connection,
+            organization_id=buyer_org_id,
+            user_id=user_id,
+            tender_id=tender_id,
+            tender_title=row["title"],
+        )
+        updated = await connection.fetchrow(
+            "UPDATE tenders SET status = 'Published' WHERE tender_id = $1 RETURNING *",
+            tender_id,
+        )
+
+    return dict(updated)
+
+
+async def _count_tender_bids(connection: asyncpg.Connection, tender_id: int) -> int:
+    return int(
+        await connection.fetchval(
+            "SELECT COUNT(*) FROM bids WHERE tender_id = $1",
+            tender_id,
+        )
+        or 0
+    )
+
+
+async def update_tender(
+    connection: asyncpg.Connection,
+    tender_id: int,
+    buyer_org_id: int,
+    tender_data: TenderUpdateRequest,
+) -> dict:
+    """Update tender fields. Draft: any field. Published: only when no bids exist."""
+    row = await connection.fetchrow(
+        "SELECT tender_id, buyer_id, status FROM tenders WHERE tender_id = $1",
+        tender_id,
+    )
+    if not row:
+        raise KeyError("Tender not found")
+    if row["buyer_id"] != buyer_org_id:
+        raise PermissionError("You do not have permission to update this tender.")
+
+    status = row["status"]
+    if status in ("Awarded", "Cancelled", "Closed"):
+        raise ValueError(f"Cannot update a tender with status '{status}'.")
+
+    bid_count = await _count_tender_bids(connection, tender_id)
+    if status == "Published" and bid_count > 0:
+        raise ValueError("Cannot update a published tender that already has bids.")
+
+    updates: dict = {}
+    if tender_data.title is not None:
+        updates["title"] = tender_data.title
+    if tender_data.description is not None:
+        updates["description"] = tender_data.description
+    if tender_data.eligibility_of_tenderer is not None:
+        updates["eligibility_of_tenderer"] = tender_data.eligibility_of_tenderer
+    if tender_data.budget_min is not None:
+        updates["budget_min"] = tender_data.budget_min
+    if tender_data.budget_max is not None:
+        updates["budget_max"] = tender_data.budget_max
+    if tender_data.submission_deadline is not None:
+        updates["submission_deadline"] = tender_data.submission_deadline.replace(tzinfo=None)
+    if tender_data.tender_public_date is not None:
+        updates["tender_public_date"] = tender_data.tender_public_date.replace(tzinfo=None)
+    if tender_data.pre_bid_meeting is not None:
+        updates["pre_bid_meeting"] = tender_data.pre_bid_meeting.replace(tzinfo=None)
+    if tender_data.tender_opening_date is not None:
+        updates["tender_opening_date"] = tender_data.tender_opening_date.replace(tzinfo=None)
+    if tender_data.visibility_type is not None:
+        updates["visibility_type"] = (
+            tender_data.visibility_type.value
+            if hasattr(tender_data.visibility_type, "value")
+            else str(tender_data.visibility_type)
+        )
+
+    if tender_data.category is not None or tender_data.category_id is not None:
+        updates["category_id"] = await resolve_category_id(
+            connection, tender_data.category, tender_data.category_id
+        )
+    if tender_data.procurement_nature is not None or tender_data.nature_id is not None:
+        updates["nature_id"] = await resolve_nature_id(
+            connection, tender_data.procurement_nature, tender_data.nature_id
+        )
+    if tender_data.procurement_method is not None or tender_data.method_id is not None:
+        updates["method_id"] = await resolve_method_id(
+            connection, tender_data.procurement_method, tender_data.method_id
+        )
+    if tender_data.embedding is not None and len(tender_data.embedding) == 384:
+        updates["embedding"] = f"[{','.join(str(float(x)) for x in tender_data.embedding)}]"
+
+    if not updates and tender_data.required_seller_docs is None:
+        raise ValueError("No fields provided to update.")
+
+    async with connection.transaction():
+        if updates:
+            set_parts = []
+            values = []
+            idx = 1
+            for column, value in updates.items():
+                if column == "embedding":
+                    set_parts.append(f"{column} = ${idx}::vector")
+                else:
+                    set_parts.append(f"{column} = ${idx}")
+                values.append(value)
+                idx += 1
+            values.append(tender_id)
+            query = f"UPDATE tenders SET {', '.join(set_parts)} WHERE tender_id = ${idx} RETURNING *"
+            updated_row = await connection.fetchrow(query, *values)
+        else:
+            updated_row = await connection.fetchrow(
+                "SELECT * FROM tenders WHERE tender_id = $1",
+                tender_id,
+            )
+
+        if tender_data.required_seller_docs is not None:
+            await connection.execute(
+                "DELETE FROM public.tender_required_documents WHERE tender_id = $1",
+                tender_id,
+            )
+            await _insert_required_seller_docs(
+                connection, tender_id, tender_data.required_seller_docs
+            )
+
+    return dict(updated_row)
+
+
+async def withdraw_tender(
+    connection: asyncpg.Connection,
+    tender_id: int,
+    buyer_org_id: int,
+) -> dict:
+    """Soft-cancel a tender (status -> Cancelled) and notify vendors who bid."""
+    from app.modules.notifications.service import create_notification
+
+    row = await connection.fetchrow(
+        "SELECT tender_id, buyer_id, status, title FROM tenders WHERE tender_id = $1",
+        tender_id,
+    )
+    if not row:
+        raise KeyError("Tender not found")
+    if row["buyer_id"] != buyer_org_id:
+        raise PermissionError("You do not have permission to cancel this tender.")
+    if row["status"] in ("Awarded", "Cancelled", "Closed"):
+        raise ValueError(f"Cannot cancel a tender with status '{row['status']}'.")
+
+    async with connection.transaction():
+        updated = await connection.fetchrow(
+            "UPDATE tenders SET status = 'Cancelled' WHERE tender_id = $1 RETURNING tender_id, status, title",
+            tender_id,
+        )
+
+        bidders = await connection.fetch(
+            """
+            SELECT DISTINCT u.user_id, t.title AS tender_title
+            FROM bids b
+            JOIN organization_employees oe
+              ON b.vendor_org_id = oe.organization_id AND oe.role_in_org = 'Owner'
+            JOIN users u ON oe.user_id = u.user_id
+            JOIN tenders t ON b.tender_id = t.tender_id
+            WHERE b.tender_id = $1
+              AND b.status NOT IN ('Withdrawn', 'Draft')
+            """,
+            tender_id,
+        )
+
+        for bidder in bidders:
+            try:
+                await create_notification(
+                    connection,
+                    user_id=bidder["user_id"],
+                    title="Tender Cancelled",
+                    message=f"The tender \"{bidder['tender_title']}\" has been cancelled by the buyer.",
+                    notification_type="Tender",
+                    action_url="/view-my-bids",
+                )
+            except Exception as exc:
+                logger.warning("Failed to notify bidder %s about cancellation: %s", bidder["user_id"], exc)
+
+    return {
+        "message": f"Tender #{tender_id} has been cancelled.",
+        "tender_id": updated["tender_id"],
+        "status": updated["status"],
+        "title": updated["title"],
+    }
+
+
+async def auto_close_expired_tenders(connection: asyncpg.Connection) -> int:
+    """Close published tenders past their submission deadline."""
+    result = await connection.execute(
+        """
+        UPDATE tenders
+        SET status = 'Closed'
+        WHERE status = 'Published'
+          AND submission_deadline IS NOT NULL
+          AND submission_deadline < NOW()
+        """
+    )
+    # asyncpg returns e.g. 'UPDATE 3'
+    try:
+        return int(result.split()[-1])
+    except (ValueError, IndexError):
+        return 0
 
 
 async def create_tender_from_parsed_pdf(
@@ -309,9 +599,11 @@ async def create_tender_from_pdf_file(
 async def get_buyer_tenders(
     connection: asyncpg.Connection,
     buyer_org_id: int,
+    status: str | None = None,
 ) -> list[dict]:
     """
-    Fetch all tenders created by the given buyer organization.
+    Fetch tenders created by the given buyer organization.
+    Optionally filter by tender status.
     """
     query = """
         SELECT
@@ -325,9 +617,13 @@ async def get_buyer_tenders(
         FROM tenders t
         JOIN organizations o ON t.buyer_id = o.organization_id
         WHERE t.buyer_id = $1
-        ORDER BY t.created_at DESC;
     """
-    rows = await connection.fetch(query, buyer_org_id)
+    args: list = [buyer_org_id]
+    if status:
+        query += " AND t.status = $2"
+        args.append(status)
+    query += " ORDER BY t.created_at DESC;"
+    rows = await connection.fetch(query, *args)
     return [dict(row) for row in rows]
 
 
@@ -443,6 +739,7 @@ async def get_tender_detail(
     """
     req_doc_rows = await connection.fetch(req_docs_query, tender_id)
     result["required_documents"] = [dict(r) for r in req_doc_rows]
+    result["bid_count"] = await _count_tender_bids(connection, tender_id)
 
     return result
 
@@ -638,6 +935,16 @@ async def delete_tender(
     if tender_row["status"] == "Awarded":
         raise ValueError("Cannot delete an awarded tender.")
 
+    if tender_row["status"] == "Published":
+        bid_count = await _count_tender_bids(connection, tender_id)
+        if bid_count > 0:
+            raise ValueError(
+                "Cannot delete a published tender that has bids. Cancel it instead."
+            )
+
+    if tender_row["status"] == "Cancelled":
+        raise ValueError("Cancelled tenders cannot be deleted.")
+
     # 2. Gather all storage file paths for cleanup
     # Tender documents
     tender_docs = await connection.fetch(
@@ -704,20 +1011,8 @@ async def delete_tender(
         """, tender_id)
         await connection.execute("DELETE FROM message_threads WHERE tender_id = $1", tender_id)
 
-        # Notifications
-        await connection.execute("""
-            DELETE FROM notification_recipients
-            WHERE notification_id IN (
-                SELECT notification_id FROM notifications
-                WHERE (reference_type = 'TENDER' AND reference_id = $1)
-                   OR (reference_type = 'BID' AND reference_id IN (SELECT bid_id FROM bids WHERE tender_id = $1))
-            )
-        """, tender_id)
-        await connection.execute("""
-            DELETE FROM notifications
-            WHERE (reference_type = 'TENDER' AND reference_id = $1)
-               OR (reference_type = 'BID' AND reference_id IN (SELECT bid_id FROM bids WHERE tender_id = $1))
-        """, tender_id)
+        from app.modules.notifications.service import delete_notifications_for_tender
+        await delete_notifications_for_tender(connection, tender_id)
 
         # Awards & contracts
         await connection.execute("""
