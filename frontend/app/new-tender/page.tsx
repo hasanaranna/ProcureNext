@@ -7,7 +7,7 @@ import ModalShell from "@/components/ModalShell";
 import { parseApiError, pollTenderPdfJob } from "@/lib/tenderPdf";
 import {
   clearTenderDraft,
-  loadTenderDraft,
+  loadInitialTenderFormState,
   saveTenderDraft,
 } from "@/lib/tenderDraft";
 
@@ -58,26 +58,31 @@ function formatDateForInput(dateStr: string | null | undefined): string {
 
 export default function NewTenderPage() {
   const router = useRouter();
-  const [sellerDocs, setSellerDocs] = useState<SellerDoc[]>([]);
+  const [initialFormState] = useState(() => loadInitialTenderFormState(EMPTY_FORM_DATA));
+  const [sellerDocs, setSellerDocs] = useState<SellerDoc[]>(initialFormState.sellerDocs);
   const [newSellerDoc, setNewSellerDoc] = useState("");
-  const [showAccessConfig, setShowAccessConfig] = useState(false);
+  const [showAccessConfig, setShowAccessConfig] = useState(initialFormState.showAccessConfig);
   
-  const [fileCount, setFileCount] = useState<number | "">(1);
-  const [customFiles, setCustomFiles] = useState<{name: string, file: File | null}[]>([
-    { name: "", file: null }
-  ]);
+  const [fileCount, setFileCount] = useState<number | "">(initialFormState.fileCount);
+  const [customFiles, setCustomFiles] = useState<{name: string, file: File | null}[]>(
+    initialFormState.customFiles,
+  );
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isPublishingPdf, setIsPublishingPdf] = useState(false);
   const [pdfJobMessage, setPdfJobMessage] = useState<string | null>(null);
 
   // PDF Extraction & AI state
   const [isExtractingPdf, setIsExtractingPdf] = useState(false);
   const [pdfSuccessMessage, setPdfSuccessMessage] = useState<string | null>(null);
-  const [draftRestoredMessage, setDraftRestoredMessage] = useState<string | null>(null);
-  const [extractedEmbedding, setExtractedEmbedding] = useState<number[] | null>(null);
-  const draftReadyRef = useRef(false);
-  const skipDraftSaveRef = useRef(false);
+  const [localFormRestoredMessage, setLocalFormRestoredMessage] = useState<string | null>(
+    initialFormState.restoredMessage,
+  );
+  const [extractedEmbedding, setExtractedEmbedding] = useState<number[] | null>(
+    initialFormState.extractedEmbedding,
+  );
+  const skipLocalSaveRef = useRef(false);
 
   // Success Modal State
   const [createdTenderResult, setCreatedTenderResult] = useState<any>(null);
@@ -90,10 +95,10 @@ export default function NewTenderPage() {
   const [showManageTokens, setShowManageTokens] = useState(false);
   const [tokenError, setTokenError] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState({ ...EMPTY_FORM_DATA });
+  const [formData, setFormData] = useState(initialFormState.formData);
 
-  const clearFormAndDraft = () => {
-    skipDraftSaveRef.current = true;
+  const clearFormAndLocalSave = () => {
+    skipLocalSaveRef.current = true;
     clearTenderDraft();
     setFormData({ ...EMPTY_FORM_DATA });
     setSellerDocs([]);
@@ -101,34 +106,13 @@ export default function NewTenderPage() {
     setCustomFiles([{ name: "", file: null }]);
     setExtractedEmbedding(null);
     setPdfSuccessMessage(null);
-    setDraftRestoredMessage(null);
+    setLocalFormRestoredMessage(null);
     setShowAccessConfig(false);
   };
 
   useEffect(() => {
-    const draft = loadTenderDraft();
-    if (draft) {
-      setFormData(draft.formData);
-      setSellerDocs(draft.sellerDocs);
-      setFileCount(draft.fileCount);
-      setCustomFiles(
-        draft.customFileNames.length > 0
-          ? draft.customFileNames.map((name) => ({ name, file: null }))
-          : [{ name: "", file: null }],
-      );
-      setExtractedEmbedding(draft.extractedEmbedding);
-      setShowAccessConfig(draft.showAccessConfig);
-      setDraftRestoredMessage(
-        "Restored your saved draft. Re-attach document files if you had any.",
-      );
-    }
-    draftReadyRef.current = true;
-  }, []);
-
-  useEffect(() => {
-    if (!draftReadyRef.current) return;
-    if (skipDraftSaveRef.current) {
-      skipDraftSaveRef.current = false;
+    if (skipLocalSaveRef.current) {
+      skipLocalSaveRef.current = false;
       return;
     }
 
@@ -347,7 +331,9 @@ export default function NewTenderPage() {
         }
       ]);
 
-      setPdfSuccessMessage(`Extracted "${data.title?.substring(0, 60)}..." and generated 384-d semantic embedding vector!`);
+      setPdfSuccessMessage(
+        `Form fields populated from "${(data.title || "tender notice").substring(0, 60)}${(data.title || "").length > 60 ? "..." : ""}". Review the details below before publishing.`
+      );
     } catch (err: any) {
       setFormError(err.message || "Error processing PDF notice.");
     } finally {
@@ -368,7 +354,7 @@ export default function NewTenderPage() {
     setIsSubmitting(true);
     setFormError(null);
     setPdfSuccessMessage(null);
-    setPdfJobMessage("Uploading PDF and starting AI processing...");
+    setPdfJobMessage("Uploading PDF and starting processing...");
 
     try {
       const directData = new FormData();
@@ -385,10 +371,10 @@ export default function NewTenderPage() {
           throw new Error("Server did not return a processing job id.");
         }
 
-        setPdfJobMessage("Parsing PDF, generating embeddings, and publishing tender...");
+        setPdfJobMessage("Extracting notice details and publishing tender...");
         const result = await pollTenderPdfJob(job.task_id);
         setCreatedTenderResult(result);
-        clearFormAndDraft();
+        clearFormAndLocalSave();
         await refreshTokenBalance();
         setPdfJobMessage(null);
         setIsSuccessModalOpen(true);
@@ -400,7 +386,7 @@ export default function NewTenderPage() {
         if (resJson) {
           setCreatedTenderResult(resJson);
         }
-        clearFormAndDraft();
+        clearFormAndLocalSave();
         await refreshTokenBalance();
         setIsSuccessModalOpen(true);
         return;
@@ -417,6 +403,70 @@ export default function NewTenderPage() {
       setIsPublishingPdf(false);
       setIsSubmitting(false);
       setPdfJobMessage(null);
+    }
+  };
+
+  const buildTenderPayload = () => ({
+    title: formData.title,
+    description: formData.description,
+    procurement_nature: formData.procurementNature || "Goods",
+    procurement_method: formData.procurementMethod || "OTM",
+    eligibility_of_tenderer: formData.eligibilityOfTenderer || null,
+    budget_max: parseFloat(formData.budget) || null,
+    submission_deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null,
+    visibility_type: "Public",
+    security_required: false,
+    category: formData.category || null,
+    tender_public_date: formData.tenderPublicDate ? new Date(formData.tenderPublicDate).toISOString() : null,
+    pre_bid_meeting: formData.preBidMeeting ? new Date(formData.preBidMeeting).toISOString() : null,
+    tender_opening_date: formData.tenderOpeningDate ? new Date(formData.tenderOpeningDate).toISOString() : null,
+    required_seller_docs: sellerDocs.length > 0 ? sellerDocs : null,
+    embedding: extractedEmbedding,
+  });
+
+  const buildTenderFormData = () => {
+    const tenderData = buildTenderPayload();
+    const validFiles = customFiles.filter((cf) => cf.name.trim() && cf.file);
+    const data = new FormData();
+    data.append("tender_data", JSON.stringify(tenderData));
+    data.append("file_names", JSON.stringify(validFiles.map((cf) => cf.name.trim())));
+    validFiles.forEach((cf) => {
+      if (cf.file) data.append("files", cf.file);
+    });
+    return data;
+  };
+
+  const handleSaveDraft = async () => {
+    setFormError(null);
+
+    if (!formData.title.trim()) {
+      setFormError("Title is required to save a draft.");
+      return;
+    }
+
+    setIsSavingDraft(true);
+    try {
+      const response = await fetch("/api/tenders/buyer/draft-with-documents", {
+        method: "POST",
+        body: buildTenderFormData(),
+      });
+
+      if (response.ok) {
+        const resJson = await response.json().catch(() => null);
+        clearFormAndLocalSave();
+        if (resJson?.tender_id) {
+          router.push(`/view-my-tender/${resJson.tender_id}`);
+        } else {
+          router.push("/home");
+        }
+        return;
+      }
+
+      setFormError(await parseApiError(response, "Failed to save draft."));
+    } catch (e: unknown) {
+      setFormError(e instanceof Error ? e.message : "Error saving draft.");
+    } finally {
+      setIsSavingDraft(false);
     }
   };
 
@@ -440,35 +490,7 @@ export default function NewTenderPage() {
     }
     
     // Map to the backend schema TenderCreateRequest
-    const tenderData = {
-      title: formData.title,
-      description: formData.description,
-      procurement_nature: formData.procurementNature || "Goods",
-      procurement_method: formData.procurementMethod || "OTM",
-      eligibility_of_tenderer: formData.eligibilityOfTenderer || null,
-      budget_max: parseFloat(formData.budget) || null,
-      submission_deadline: formData.deadline ? new Date(formData.deadline).toISOString() : null,
-      visibility_type: "Public",
-      security_required: false,
-      category: formData.category || null,
-      tender_public_date: formData.tenderPublicDate ? new Date(formData.tenderPublicDate).toISOString() : null,
-      pre_bid_meeting: formData.preBidMeeting ? new Date(formData.preBidMeeting).toISOString() : null,
-      tender_opening_date: formData.tenderOpeningDate ? new Date(formData.tenderOpeningDate).toISOString() : null,
-      required_seller_docs: sellerDocs.length > 0 ? sellerDocs : null,
-      embedding: extractedEmbedding,
-    };
-    
-    const validFiles = customFiles.filter(cf => cf.name.trim() && cf.file);
-    const fileNames = validFiles.map(cf => cf.name.trim());
-    const filesToUpload = validFiles.map(cf => cf.file);
-    
-    const data = new FormData();
-    data.append('tender_data', JSON.stringify(tenderData));
-    data.append('file_names', JSON.stringify(fileNames));
-    filesToUpload.forEach(f => {
-      if (f) data.append('files', f);
-    });
-
+    const data = buildTenderFormData();
     setIsSubmitting(true);
     setFormError(null);
     try {
@@ -480,7 +502,7 @@ export default function NewTenderPage() {
         if (response.ok) {
             const resJson = await response.json().catch(() => null);
             setCreatedTenderResult(resJson);
-            clearFormAndDraft();
+            clearFormAndLocalSave();
             await refreshTokenBalance();
             setIsSuccessModalOpen(true);
         } else {
@@ -536,7 +558,7 @@ export default function NewTenderPage() {
           <div className="bg-gradient-to-r from-navy-900 to-navy-800 px-8 py-6 flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-black text-white">Create New Tender</h1>
-              <p className="text-slate-300 text-sm mt-1">Upload a PDF notice for instant AI extraction & 384-d embedding, or fill out manually</p>
+              <p className="text-slate-300 text-sm mt-1">Import a PDF notice to pre-fill the form, or enter tender details manually</p>
             </div>
 
             {/* Quick Token Badge in Header */}
@@ -566,65 +588,59 @@ export default function NewTenderPage() {
             </div>
           )}
 
-          {draftRestoredMessage && (
+          {localFormRestoredMessage && (
             <div className="m-8 mb-0 p-4 bg-sky-50 border-2 border-sky-200 rounded-xl flex items-start gap-3 animate-fade-in text-sky-900 text-sm">
               <svg className="w-5 h-5 text-sky-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <div>
-                <p className="font-bold text-sky-950">Draft Restored</p>
-                <p className="text-xs text-sky-800 mt-0.5">{draftRestoredMessage}</p>
+                <p className="font-bold text-sky-950">Saved on this device</p>
+                <p className="text-xs text-sky-800 mt-0.5">{localFormRestoredMessage}</p>
               </div>
             </div>
           )}
 
           {/* PDF AI Success Notice */}
           {pdfSuccessMessage && (
-            <div className="m-8 mb-0 p-4 bg-emerald-50 border-2 border-emerald-300 rounded-xl flex items-start gap-3 animate-fade-in text-emerald-900 text-sm">
-              <div className="p-1.5 bg-emerald-500 text-white rounded-lg flex-shrink-0">
+            <div className="m-8 mb-0 p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-3 animate-fade-in text-emerald-900 text-sm">
+              <div className="p-1.5 bg-emerald-600 text-white rounded-lg flex-shrink-0">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
               <div className="flex-1">
-                <p className="font-bold text-emerald-950">AI Document Parser & Embedder Completed</p>
+                <p className="font-semibold text-emerald-950">PDF import complete</p>
                 <p className="text-xs text-emerald-800 mt-0.5">{pdfSuccessMessage}</p>
               </div>
             </div>
           )}
 
           {pdfJobMessage && (
-            <div className="m-8 mb-0 p-4 bg-indigo-50 border-2 border-indigo-200 rounded-xl flex items-start gap-3 animate-fade-in text-indigo-900 text-sm">
-              <svg className="animate-spin h-5 w-5 text-indigo-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24">
+            <div className="m-8 mb-0 p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-start gap-3 animate-fade-in text-slate-800 text-sm">
+              <svg className="animate-spin h-5 w-5 text-accent-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
               <div>
-                <p className="font-bold text-indigo-950">Processing PDF Tender</p>
-                <p className="text-xs text-indigo-800 mt-0.5">{pdfJobMessage}</p>
+                <p className="font-semibold text-navy-900">Processing PDF</p>
+                <p className="text-xs text-slate-600 mt-0.5">{pdfJobMessage}</p>
               </div>
             </div>
           )}
 
           <div className="px-8 pt-8">
-            {/* ── AI PDF Import Card (outside form to avoid accidental submit/navigation) ───────── */}
-            <div className="p-6 bg-gradient-to-br from-indigo-50/90 via-sky-50/60 to-purple-50/80 border-2 border-indigo-200/80 rounded-2xl shadow-sm transition-all duration-200">
+            <div className="p-6 bg-slate-50 border border-slate-200 rounded-2xl">
               <div className="flex items-start justify-between gap-4 mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md flex-shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-navy-800 text-white flex items-center justify-center flex-shrink-0">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                   </div>
                   <div>
-                    <h3 className="text-base font-black text-navy-900 flex items-center gap-2">
-                      <span>Instant AI Tender Import (PDF Only)</span>
-                      <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] font-extrabold uppercase tracking-wide rounded-full border border-indigo-200">
-                        384-d Vector Engine
-                      </span>
-                    </h3>
+                    <h3 className="text-base font-bold text-navy-900">Import from PDF notice</h3>
                     <p className="text-xs text-slate-600 mt-0.5">
-                      Upload your official tender notice PDF (e.g. e-GP / government notice). We extract all fields & generate 384-d pgvector embeddings automatically.
+                      Upload an official tender notice PDF to extract fields into the form, or publish directly without manual entry.
                     </p>
                   </div>
                 </div>
@@ -634,7 +650,7 @@ export default function NewTenderPage() {
                 <label className={`flex-1 w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed rounded-xl cursor-pointer transition ${
                   isExtractingPdf || isPublishingPdf
                     ? "bg-slate-100 border-slate-300 text-slate-400 cursor-not-allowed"
-                    : "bg-white border-indigo-300 hover:border-indigo-500 text-indigo-900 hover:bg-indigo-50/50 shadow-sm"
+                    : "bg-white border-slate-300 hover:border-accent-500 text-navy-900 hover:bg-white shadow-sm"
                 }`}>
                   <input
                     type="file"
@@ -645,26 +661,26 @@ export default function NewTenderPage() {
                   />
                   {isExtractingPdf ? (
                     <>
-                      <svg className="animate-spin h-4 w-4 text-indigo-600" fill="none" viewBox="0 0 24 24">
+                      <svg className="animate-spin h-4 w-4 text-accent-600" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                       </svg>
-                      <span className="text-xs font-bold text-indigo-900">Parsing PDF & Generating Embeddings...</span>
+                      <span className="text-xs font-semibold text-slate-700">Extracting tender details...</span>
                     </>
                   ) : (
                     <>
-                      <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-accent-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                       </svg>
-                      <span className="text-xs font-bold">Auto-Fill Form from PDF</span>
+                      <span className="text-xs font-semibold">Fill form from PDF</span>
                     </>
                   )}
                 </label>
 
-                <label className={`w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl text-xs font-bold transition shadow-md flex-shrink-0 ${
+                <label className={`w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl text-xs font-semibold transition flex-shrink-0 ${
                   isPublishingPdf
                     ? "bg-slate-400 text-white cursor-not-allowed"
-                    : "bg-gradient-to-r from-indigo-600 to-navy-900 hover:from-indigo-700 hover:to-navy-800 text-white cursor-pointer"
+                    : "bg-navy-900 hover:bg-navy-800 text-white cursor-pointer"
                 }`}>
                   <input
                     type="file"
@@ -683,14 +699,14 @@ export default function NewTenderPage() {
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                       </svg>
-                      <span>Publishing PDF...</span>
+                      <span>Publishing...</span>
                     </>
                   ) : (
                     <>
-                      <svg className="w-4 h-4 text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                       </svg>
-                      <span>1-Click Publish PDF</span>
+                      <span>Publish from PDF</span>
                     </>
                   )}
                 </label>
@@ -721,8 +737,8 @@ export default function NewTenderPage() {
                     Available: <span className={`font-black ${tokenBalance < tenderPublishCost ? 'text-rose-600' : 'text-emerald-600'}`}>{tokenBalance} Tokens</span>
                   </p>
                   {tokenBalance < tenderPublishCost && (
-                    <p className="text-xs text-rose-600 font-semibold mt-0.5">
-                      ⚠️ Insufficient balance. You need {tenderPublishCost - tokenBalance} more tokens to publish.
+                    <p className="text-xs text-rose-600 font-medium mt-0.5">
+                      Insufficient balance. You need {tenderPublishCost - tokenBalance} more tokens to publish.
                     </p>
                   )}
                 </div>
@@ -1001,12 +1017,20 @@ export default function NewTenderPage() {
             </div>
 
             {/* Buttons */}
-            <div className="flex gap-4 pt-4">
+            <div className="flex flex-col sm:flex-row gap-4 pt-4">
               <button type="button" onClick={handleCancel}
                 className="flex-1 px-6 py-3.5 bg-slate-100 text-navy-900 font-semibold rounded-xl hover:bg-slate-200 transition border border-slate-200 text-sm cursor-pointer">
                 Cancel
               </button>
-              <button type="submit" disabled={isSubmitting || isExtractingPdf || isPublishingPdf}
+              <button
+                type="button"
+                onClick={handleSaveDraft}
+                disabled={isSubmitting || isSavingDraft || isExtractingPdf || isPublishingPdf}
+                className="flex-1 px-6 py-3.5 bg-white text-navy-900 font-semibold rounded-xl hover:bg-slate-50 transition border border-slate-300 text-sm cursor-pointer disabled:opacity-50"
+              >
+                {isSavingDraft ? "Saving Draft..." : "Save as Draft"}
+              </button>
+              <button type="submit" disabled={isSubmitting || isSavingDraft || isExtractingPdf || isPublishingPdf}
                 className="flex-1 px-6 py-3.5 bg-gradient-to-r from-navy-900 to-navy-800 text-white font-bold rounded-xl hover:from-navy-800 hover:to-navy-700 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 text-sm cursor-pointer disabled:opacity-50">
                 {isSubmitting ? (
                   <>

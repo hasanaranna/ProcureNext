@@ -30,6 +30,7 @@ const ADMIN_GUEST_ONLY_ROUTES = ['/admin-login'];
 const USER_PROTECTED_ROUTES = [
   '/home',
   '/new-tender',
+  '/edit-tender',
   '/bid-for-tender',
   '/view-my-bids',
   '/view-my-tender',

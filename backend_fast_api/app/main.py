@@ -34,7 +34,10 @@ load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.logging_config import setup_logging
 from app.core.db import check_db_connection, create_notifications_table
+from app.middleware.audit_middleware import AuditMiddleware
+from app.middleware.request_logging import RequestLoggingMiddleware
 from app.modules.organizations.router import router as organizations_router
 from app.modules.auth.router import router as auth_router
 from app.modules.admin.router import router as admin_router
@@ -44,9 +47,11 @@ from app.modules.messaging.router import router as messaging_router
 from app.modules.payments.router import router as payments_router
 from app.modules.audit.router import router as audit_router
 from app.modules.notifications.router import router as notifications_router
+from app.modules.users.router import router as users_router
 from app.modules.messaging.websocket import websocket_endpoint
 
 logger = logging.getLogger("app.main")
+setup_logging()
 
 
 @asynccontextmanager
@@ -78,6 +83,8 @@ app.add_middleware(
 	allow_methods=["*"],
 	allow_headers=["*"],
 )
+app.add_middleware(AuditMiddleware)
+app.add_middleware(RequestLoggingMiddleware)
 
 app.include_router(organizations_router)
 app.include_router(auth_router)
@@ -88,6 +95,7 @@ app.include_router(messaging_router)
 app.include_router(payments_router)
 app.include_router(audit_router)
 app.include_router(notifications_router)
+app.include_router(users_router)
 
 app.add_api_websocket_route("/ws/messages", websocket_endpoint)
 

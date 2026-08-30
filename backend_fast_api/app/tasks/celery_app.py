@@ -16,6 +16,7 @@ celery_app = Celery(
         "app.tasks.audit_tasks",
         "app.tasks.notification_tasks",
         "app.tasks.ml_tasks",
+        "app.tasks.tender_tasks",
     ]
 )
 
@@ -25,4 +26,10 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
+    beat_schedule={
+        "auto-close-expired-tenders-hourly": {
+            "task": "auto_close_expired_tenders_task",
+            "schedule": 3600.0,
+        },
+    },
 )

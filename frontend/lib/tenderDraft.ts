@@ -1,4 +1,8 @@
+// Browser-local form persistence only — not a server-side tender draft.
 const DRAFT_STORAGE_KEY = "new_tender_draft_v1";
+
+export const LOCAL_FORM_RESTORED_MESSAGE =
+  "We restored this form from your last session in this browser. Re-attach document files if you had any.";
 
 export type TenderFormDraft = {
   formData: {
@@ -48,4 +52,44 @@ export function clearTenderDraft(): void {
   } catch {
     // ignore
   }
+}
+
+export type TenderFormInitialState = {
+  formData: TenderFormDraft["formData"];
+  sellerDocs: TenderFormDraft["sellerDocs"];
+  fileCount: number | "";
+  customFiles: Array<{ name: string; file: File | null }>;
+  extractedEmbedding: number[] | null;
+  showAccessConfig: boolean;
+  restoredMessage: string | null;
+};
+
+export function loadInitialTenderFormState(
+  emptyFormData: TenderFormDraft["formData"],
+): TenderFormInitialState {
+  const draft = loadTenderDraft();
+  if (!draft) {
+    return {
+      formData: { ...emptyFormData },
+      sellerDocs: [],
+      fileCount: 1,
+      customFiles: [{ name: "", file: null }],
+      extractedEmbedding: null,
+      showAccessConfig: false,
+      restoredMessage: null,
+    };
+  }
+
+  return {
+    formData: draft.formData,
+    sellerDocs: draft.sellerDocs,
+    fileCount: draft.fileCount,
+    customFiles:
+      draft.customFileNames.length > 0
+        ? draft.customFileNames.map((name) => ({ name, file: null }))
+        : [{ name: "", file: null }],
+    extractedEmbedding: draft.extractedEmbedding,
+    showAccessConfig: draft.showAccessConfig,
+    restoredMessage: LOCAL_FORM_RESTORED_MESSAGE,
+  };
 }

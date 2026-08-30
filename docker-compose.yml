@@ -72,7 +72,7 @@ services:
     volumes:
       - ./backend_fast_api:/app:z
       - ./backend_fast_api/uploads:/app/uploads:z
-    command: ["celery", "-A", "app.tasks.celery_app.celery_app", "worker", "--loglevel=info"]
+    command: ["celery", "-A", "app.tasks.celery_app.celery_app", "worker", "--beat", "--loglevel=info"]
     depends_on:
       - redis
       - db
