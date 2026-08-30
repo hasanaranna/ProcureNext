@@ -563,6 +563,53 @@ async def delete_bid_document(
     return {"message": "Bid document deleted successfully.", "doc_id": doc_id}
 
 
+def compute_compliance_for_bid(required_documents: list[dict], bid_documents: list[dict]) -> dict:
+    """
+    Match a bid's submitted documents against a tender's required documents.
+    Shared by the bid comparison matrix and the smart bid evaluation payload
+    so both features agree on what "compliant" means.
+    """
+    submitted_by_req_doc: dict[int, dict] = {}
+    for d in bid_documents:
+        if d.get("req_doc_id"):
+            submitted_by_req_doc[d["req_doc_id"]] = d
+
+    compliance_matrix = []
+    mandatory_missing = 0
+    total_req = len(required_documents)
+    submitted_req_count = 0
+
+    for req in required_documents:
+        r_id = req["req_doc_id"]
+        is_mand = req.get("is_mandatory", True)
+        submitted_doc = submitted_by_req_doc.get(r_id)
+
+        is_submitted = submitted_doc is not None
+        if is_submitted:
+            submitted_req_count += 1
+        elif is_mand:
+            mandatory_missing += 1
+
+        compliance_matrix.append({
+            "req_doc_id": r_id,
+            "custom_doc_name": req.get("custom_doc_name") or "Document",
+            "is_mandatory": is_mand,
+            "is_submitted": is_submitted,
+            "bid_doc_id": submitted_doc["bid_doc_id"] if submitted_doc else None,
+            "file_path": submitted_doc["file_path"] if submitted_doc else None
+        })
+
+    compliance_score_pct = round((submitted_req_count / total_req) * 100, 1) if total_req > 0 else 100.0
+    mandatory_satisfied = (mandatory_missing == 0)
+
+    return {
+        "compliance_matrix": compliance_matrix,
+        "mandatory_missing": mandatory_missing,
+        "compliance_score_pct": compliance_score_pct,
+        "mandatory_satisfied": mandatory_satisfied,
+    }
+
+
 async def get_tender_bid_comparison(
     connection: asyncpg.Connection,
     tender_id: int,
@@ -718,44 +765,13 @@ async def get_tender_bid_comparison(
         if amount is not None and avg_amount is not None and avg_amount > 0:
             avg_variance_pct = round(((amount - avg_amount) / avg_amount) * 100, 1)
 
-        # Build compliance matrix
-        # Map submitted docs by req_doc_id
-        submitted_by_req_doc: dict[int, dict] = {}
-        for d in b_docs:
-            if d.get("req_doc_id"):
-                submitted_by_req_doc[d["req_doc_id"]] = d
-
-        compliance_matrix = []
-        mandatory_missing = 0
+        # Build compliance matrix (shared with the smart bid evaluation payload)
+        compliance = compute_compliance_for_bid(required_documents, b_docs)
+        compliance_matrix = compliance["compliance_matrix"]
+        compliance_score_pct = compliance["compliance_score_pct"]
+        mandatory_satisfied = compliance["mandatory_satisfied"]
         total_req = len(required_documents)
-        submitted_req_count = 0
 
-        for req in required_documents:
-            r_id = req["req_doc_id"]
-            is_mand = req.get("is_mandatory", True)
-            submitted_doc = submitted_by_req_doc.get(r_id)
-
-            is_submitted = submitted_doc is not None
-            if is_submitted:
-                submitted_req_count += 1
-            elif is_mand:
-                mandatory_missing += 1
-
-            compliance_matrix.append({
-                "req_doc_id": r_id,
-                "custom_doc_name": req.get("custom_doc_name") or "Document",
-                "is_mandatory": is_mand,
-                "is_submitted": is_submitted,
-                "bid_doc_id": submitted_doc["bid_doc_id"] if submitted_doc else None,
-                "file_path": submitted_doc["file_path"] if submitted_doc else None
-            })
-
-        if total_req > 0:
-            compliance_score_pct = round((submitted_req_count / total_req) * 100, 1)
-        else:
-            compliance_score_pct = 100.0
-
-        mandatory_satisfied = (mandatory_missing == 0)
         if mandatory_satisfied and (compliance_score_pct >= 100.0 or total_req == 0):
             fully_compliant_count += 1
 

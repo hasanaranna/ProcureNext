@@ -3,7 +3,14 @@ import logging
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
 
-from src.schemas import ProcurementDocument, TextEmbedRequest, TextEmbedResponse
+from src.bid_evaluator import score_tender_bids
+from src.schemas import (
+    ProcurementDocument,
+    TenderEvaluationRequest,
+    TenderEvaluationResponse,
+    TextEmbedRequest,
+    TextEmbedResponse,
+)
 from src.tender_parser import generate_embedding, parse_and_embed_tender_pdf
 
 load_dotenv()
@@ -43,3 +50,12 @@ async def embed_text(payload: TextEmbedRequest) -> TextEmbedResponse:
     except Exception as exc:
         logger.exception("Text embedding failed")
         raise HTTPException(status_code=500, detail=f"Failed to generate embedding: {exc}") from exc
+
+
+@app.post("/evaluations/tender/score", response_model=TenderEvaluationResponse)
+async def score_tender_bids_endpoint(payload: TenderEvaluationRequest) -> TenderEvaluationResponse:
+    try:
+        return score_tender_bids(payload)
+    except Exception as exc:
+        logger.exception("Bid evaluation scoring failed")
+        raise HTTPException(status_code=500, detail=f"Failed to score bids: {exc}") from exc

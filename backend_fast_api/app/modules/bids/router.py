@@ -10,6 +10,12 @@ from typing import List
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
 from app.core.db import get_db_connection
 from app.modules.auth.dependencies import get_current_user_org
+from app.modules.bids.evaluation_schemas import EvaluationRunResponse, EvaluationRunWithResults
+from app.modules.bids.evaluation_service import (
+    get_latest_run_with_results,
+    get_run_with_results_for_buyer,
+    trigger_evaluation_run,
+)
 from app.modules.bids.schemas import (
     BidResponse,
     BidListItem,
@@ -17,8 +23,8 @@ from app.modules.bids.schemas import (
     TenderBidComparisonResponse,
 )
 from app.modules.bids.service import (
-    submit_bid_with_documents, 
-    get_bid_by_tender_and_vendor, 
+    submit_bid_with_documents,
+    get_bid_by_tender_and_vendor,
     get_bid_document_by_id,
     get_bids_for_buyer_tender,
     get_tender_bid_comparison,
@@ -347,6 +353,97 @@ async def delete_single_bid_document(
         raise HTTPException(status_code=403, detail="You do not have permission to delete this document.")
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
+# ============================================================
+# Smart Bid Evaluation
+# ============================================================
+
+@router.post("/buyer/tender/{tender_id}/evaluate", response_model=EvaluationRunResponse, status_code=status.HTTP_202_ACCEPTED)
+async def evaluate_tender_bids(
+    tender_id: int,
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    Trigger a smart bid evaluation run for a tender. Buyer only.
+    Creates the run row and dispatches the scoring job in the background —
+    returns immediately with the run_id rather than blocking on the LLM.
+    If a run is already pending/running for this tender, its id is returned
+    instead of starting a duplicate.
+    """
+    buyer_org_id = current_user.get("organization_id")
+    if not buyer_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            run = await trigger_evaluation_run(connection, tender_id, buyer_org_id, current_user["org_user_id"])
+        return run
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Tender not found.")
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
+@router.get("/buyer/tender/{tender_id}/evaluation-runs/latest", response_model=EvaluationRunWithResults)
+async def get_latest_evaluation_run(
+    tender_id: int,
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    Lightweight status/results endpoint the frontend polls after triggering
+    an evaluation. Also self-heals a run stuck in pending/running past the
+    timeout, so the button always has a way back out.
+    """
+    buyer_org_id = current_user.get("organization_id")
+    if not buyer_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            data = await get_latest_run_with_results(connection, tender_id, buyer_org_id)
+        if not data:
+            raise HTTPException(status_code=404, detail="No evaluation run found for this tender.")
+        return data
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Tender not found.")
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
+@router.get("/buyer/tender/{tender_id}/evaluation-runs/{run_id}", response_model=EvaluationRunWithResults)
+async def get_evaluation_run(
+    tender_id: int,
+    run_id: int,
+    current_user: dict = Depends(get_current_user_org)
+):
+    """Fetch one specific past evaluation run and its results. Buyer only."""
+    buyer_org_id = current_user.get("organization_id")
+    if not buyer_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            data = await get_run_with_results_for_buyer(connection, tender_id, run_id, buyer_org_id)
+        if not data:
+            raise HTTPException(status_code=404, detail="Evaluation run not found.")
+        return data
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Tender not found.")
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
     except HTTPException:
         raise
     except Exception as e:
