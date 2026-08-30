@@ -178,6 +178,22 @@ CREATE TABLE user_invitations (
     UNIQUE (organization_id, email)
 );
 
+-- ============================================================
+-- PASSWORD RESET TOKENS (30-minute validity)
+-- ============================================================
+CREATE TABLE password_reset_tokens (
+    reset_id    SERIAL              PRIMARY KEY,
+    user_id     INT                 NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    email       VARCHAR(255)        NOT NULL,
+    token       VARCHAR(255)        UNIQUE NOT NULL,
+    expires_at  TIMESTAMP           NOT NULL,
+    used_at     TIMESTAMP           DEFAULT NULL,
+    created_at  TIMESTAMP           DEFAULT NOW()
+);
+
+CREATE INDEX idx_pwd_reset_token ON password_reset_tokens(token);
+CREATE INDEX idx_pwd_reset_user_email ON password_reset_tokens(email);
+
 CREATE TABLE document_types (
     type_id     SERIAL          PRIMARY KEY,
     type_name   VARCHAR(100)    UNIQUE NOT NULL,

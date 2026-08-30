@@ -263,3 +263,169 @@ async def authenticate_admin(connection: asyncpg.Connection, payload: LoginReque
         refresh_token=refresh_token,
         user=admin_user,
     )
+
+
+async def request_password_reset(connection: asyncpg.Connection, email: str) -> dict:
+    """
+    Generate a 30-minute password reset token and send reset instructions to user's email.
+    """
+    import secrets
+    import os
+    import asyncio
+
+    clean_email = email.strip().lower()
+    user = await connection.fetchrow(
+        "SELECT user_id, full_name, email FROM users WHERE LOWER(email) = $1",
+        clean_email,
+    )
+
+    # For security best practice, do not reveal if email is not registered
+    if not user:
+        return {"message": "If an account with this email exists, a password reset link has been sent to your email."}
+
+    user_id = user["user_id"]
+    user_name = user["full_name"]
+    user_email = user["email"]
+
+    # Invalidate any previously issued unused tokens for this user
+    await connection.execute(
+        "UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL",
+        user_id,
+    )
+
+    # Generate a cryptographically secure token
+    token = secrets.token_urlsafe(32)
+
+    # Insert token with 30-minute validity
+    await connection.execute(
+        """
+        INSERT INTO password_reset_tokens (user_id, email, token, expires_at)
+        VALUES ($1, $2, $3, NOW() + INTERVAL '30 minutes')
+        """,
+        user_id,
+        user_email,
+        token,
+    )
+
+    # Construct the reset password link
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+    reset_link = f"{frontend_url}/reset-password?token={token}"
+
+    # Asynchronously dispatch email via Celery task (with background thread fallback)
+    try:
+        from app.tasks.notification_tasks import send_password_reset_email_task
+        send_password_reset_email_task.delay(
+            to_email=user_email,
+            reset_link=reset_link,
+            user_name=user_name,
+            expires_minutes=30,
+        )
+        print(f"[PASSWORD RESET] Dispatched reset email Celery task to {user_email}", flush=True)
+    except Exception as task_exc:
+        print(f"[PASSWORD RESET FALLBACK] Celery dispatch failed ({task_exc}). Using background thread...", flush=True)
+        from app.services.email import send_password_reset_email
+        asyncio.create_task(
+            asyncio.to_thread(
+                send_password_reset_email,
+                to_email=user_email,
+                reset_link=reset_link,
+                user_name=user_name,
+                expires_minutes=30,
+            )
+        )
+
+    return {"message": "If an account with this email exists, a password reset link has been sent to your email."}
+
+
+async def verify_password_reset_token(connection: asyncpg.Connection, token: str) -> dict:
+    """
+    Verify that a password reset token exists, is not expired, and has not been used.
+    """
+    row = await connection.fetchrow(
+        """
+        SELECT 
+            t.reset_id,
+            t.user_id,
+            t.email,
+            t.expires_at,
+            t.used_at,
+            (t.expires_at > NOW()) AS is_unexpired
+        FROM password_reset_tokens t
+        WHERE t.token = $1
+        """,
+        token,
+    )
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Invalid password reset link.")
+
+    if row["used_at"] is not None:
+        raise HTTPException(status_code=400, detail="This password reset link has already been used.")
+
+    if not row["is_unexpired"]:
+        raise HTTPException(status_code=400, detail="This password reset link has expired (valid for 30 minutes). Please request a new one.")
+
+    return {
+        "valid": True,
+        "email": row["email"],
+        "message": "Password reset token is valid.",
+    }
+
+
+async def confirm_password_reset(connection: asyncpg.Connection, token: str, new_password: str) -> dict:
+    """
+    Validate reset token and update user's password hash.
+    """
+    if len(new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long.")
+
+    row = await connection.fetchrow(
+        """
+        SELECT 
+            t.reset_id,
+            t.user_id,
+            t.email,
+            t.expires_at,
+            t.used_at,
+            (t.expires_at > NOW()) AS is_unexpired
+        FROM password_reset_tokens t
+        WHERE t.token = $1
+        """,
+        token,
+    )
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Invalid password reset link.")
+
+    if row["used_at"] is not None:
+        raise HTTPException(status_code=400, detail="This password reset link has already been used.")
+
+    if not row["is_unexpired"]:
+        raise HTTPException(status_code=400, detail="This password reset link has expired. Please request a new one.")
+
+    new_hash = hash_password(new_password)
+
+    async with connection.transaction():
+        # Update user's password
+        await connection.execute(
+            """
+            UPDATE users
+            SET password_hash = $1,
+                updated_at = NOW()
+            WHERE user_id = $2
+            """,
+            new_hash,
+            row["user_id"],
+        )
+
+        # Mark token as used
+        await connection.execute(
+            """
+            UPDATE password_reset_tokens
+            SET used_at = NOW()
+            WHERE reset_id = $1
+            """,
+            row["reset_id"],
+        )
+
+    return {"message": "Password has been successfully reset. You can now log in with your new password."}

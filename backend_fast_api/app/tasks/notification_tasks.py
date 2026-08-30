@@ -12,9 +12,41 @@ from app.services.email import (
     send_bid_received_email,
     send_bid_accepted_email,
     send_bid_rejected_email,
+    send_password_reset_email,
 )
 
 logger = logging.getLogger("app.tasks.notifications")
+
+
+@celery_app.task(
+    name="send_password_reset_email_task",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+)
+def send_password_reset_email_task(
+    self,
+    to_email: str,
+    reset_link: str,
+    user_name: str | None = None,
+    expires_minutes: int = 30,
+) -> bool:
+    """Asynchronously send a password reset email using Celery."""
+    try:
+        print(f"[CELERY TASK] Sending password reset email to {to_email}...", flush=True)
+        success = send_password_reset_email(
+            to_email=to_email,
+            reset_link=reset_link,
+            user_name=user_name,
+            expires_minutes=expires_minutes,
+        )
+        return success
+    except Exception as exc:
+        logger.error(f"Error in send_password_reset_email_task for {to_email}: {exc}", exc_info=True)
+        try:
+            raise self.retry(exc=exc)
+        except Exception:
+            return False
 
 
 @celery_app.task(

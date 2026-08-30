@@ -34,7 +34,7 @@ load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.db import check_db_connection, create_notifications_table
+from app.core.db import check_db_connection, create_notifications_table, create_password_reset_tokens_table
 from app.modules.organizations.router import router as organizations_router
 from app.modules.auth.router import router as auth_router
 from app.modules.admin.router import router as admin_router
@@ -61,6 +61,9 @@ async def lifespan(app: FastAPI):
 
     # Ensure the notifications table exists (idempotent)
     await create_notifications_table()
+
+    # Ensure the password_reset_tokens table exists (idempotent)
+    await create_password_reset_tokens_table()
 
     yield
     logger.info("ProcureNext backend shutting down.")

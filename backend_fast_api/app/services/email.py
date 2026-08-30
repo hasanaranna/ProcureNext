@@ -236,6 +236,162 @@ def send_employee_invitation_email(
 
 
 # ──────────────────────────────────────────────────────────────
+# Password Reset Email
+# ──────────────────────────────────────────────────────────────
+
+def build_password_reset_html(
+    to_email: str,
+    reset_link: str,
+    user_name: str | None = None,
+    expires_minutes: int = 30,
+) -> str:
+    """Build a modern, responsive HTML email template for password reset."""
+    greeting_name = f" {user_name}" if user_name else ""
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset Your ProcureNext Password</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9; padding: 40px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width: 580px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08); border: 1px solid #e2e8f0;" cellspacing="0" cellpadding="0">
+          <!-- Header Banner -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 36px 32px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 26px; font-weight: 800; letter-spacing: -0.5px;">
+                Procure<span style="color: #38bdf8;">Next</span>
+              </h1>
+              <p style="margin: 6px 0 0 0; color: #94a3b8; font-size: 13px; letter-spacing: 0.5px; text-transform: uppercase;">
+                Account Security
+              </p>
+            </td>
+          </tr>
+
+          <!-- Main Body -->
+          <tr>
+            <td style="padding: 36px 32px;">
+              <h2 style="margin: 0 0 16px 0; color: #0f172a; font-size: 20px; font-weight: 700;">
+                Password Reset Request
+              </h2>
+
+              <p style="margin: 0 0 18px 0; font-size: 15px; line-height: 1.6; color: #475569;">
+                Hello{greeting_name},
+              </p>
+              <p style="margin: 0 0 24px 0; font-size: 15px; line-height: 1.6; color: #475569;">
+                We received a request to reset the password for your ProcureNext account associated with <strong>{to_email}</strong>.
+              </p>
+
+              <!-- CTA Button -->
+              <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 0 auto 28px auto;">
+                <tr>
+                  <td align="center" style="border-radius: 12px; background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);">
+                    <a href="{reset_link}" target="_blank" style="display: inline-block; padding: 14px 32px; font-size: 15px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 12px; letter-spacing: 0.2px;">
+                      Reset Password &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin: 0 0 12px 0; font-size: 13px; color: #64748b; line-height: 1.5;">
+                If the button above does not work, copy and paste this link into your browser:
+              </p>
+              <div style="background-color: #f1f5f9; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 12px; color: #334155; word-break: break-all; margin-bottom: 24px;">
+                <a href="{reset_link}" style="color: #0284c7; text-decoration: underline;">{reset_link}</a>
+              </div>
+
+              <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px 16px; border-radius: 6px; margin-bottom: 24px;">
+                <p style="margin: 0; font-size: 13px; color: #92400e; line-height: 1.5;">
+                  ⏰ <strong>Notice:</strong> This password reset link is valid for <strong>{expires_minutes} minutes</strong>.
+                </p>
+              </div>
+
+              <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; font-size: 13px; color: #94a3b8; line-height: 1.5;">
+                <p style="margin: 0;">
+                  If you did not request a password reset, you can safely ignore this email. Your password will remain unchanged and your account is secure.
+                </p>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f8fafc; padding: 24px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
+              <p style="margin: 0 0 6px 0; font-size: 12px; color: #64748b;">
+                Sent by <strong>ProcureNext Security</strong> &bull; <a href="mailto:procurenext.contact@gmail.com" style="color: #0284c7; text-decoration: none;">procurenext.contact@gmail.com</a>
+              </p>
+              <p style="margin: 0; font-size: 11px; color: #94a3b8;">
+                &copy; 2026 ProcureNext. All rights reserved.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
+
+
+def build_password_reset_text(
+    to_email: str,
+    reset_link: str,
+    user_name: str | None = None,
+    expires_minutes: int = 30,
+) -> str:
+    """Build a plain text fallback version for the password reset email."""
+    greeting_name = f" {user_name}" if user_name else ""
+    return f"""ProcureNext - Password Reset Request
+
+Hello{greeting_name},
+
+We received a request to reset the password for your ProcureNext account ({to_email}).
+
+Click the link below to set a new password:
+{reset_link}
+
+Note: This link will expire in {expires_minutes} minutes.
+If you did not request this, you can safely ignore this email. Your password will not change.
+
+--
+ProcureNext Security Team
+procurenext.contact@gmail.com
+"""
+
+
+def send_password_reset_email(
+    to_email: str,
+    reset_link: str,
+    user_name: str | None = None,
+    expires_minutes: int = 30,
+) -> bool:
+    """Send a password reset email to the specified recipient."""
+    subject = "Reset Your ProcureNext Password"
+    html_content = build_password_reset_html(
+        to_email=to_email,
+        reset_link=reset_link,
+        user_name=user_name,
+        expires_minutes=expires_minutes,
+    )
+    text_content = build_password_reset_text(
+        to_email=to_email,
+        reset_link=reset_link,
+        user_name=user_name,
+        expires_minutes=expires_minutes,
+    )
+
+    return send_smtp_email(
+        to_email=to_email,
+        subject=subject,
+        html_body=html_content,
+        text_body=text_content,
+    )
+
+
+# ──────────────────────────────────────────────────────────────
 # Pending Master Account – Admin Alert
 # ──────────────────────────────────────────────────────────────
 
