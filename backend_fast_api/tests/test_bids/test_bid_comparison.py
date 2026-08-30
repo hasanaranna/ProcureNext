@@ -39,10 +39,13 @@ class TestBidComparisonService:
             "budget_min": 50000.0,
             "budget_max": 100000.0,
             "buyer_id": 1,
+            "package_type": "SingleItem",
         }
 
-        # 2. Required docs
+        # 2. Required docs & lot rows
         mock_conn.fetch.side_effect = [
+            # tender_items (lots)
+            [],
             # tender_required_documents
             [
                 {"req_doc_id": 101, "custom_doc_name": "TIN Certificate", "is_mandatory": True, "allowed_roles": ["Owner"]},
@@ -98,7 +101,9 @@ class TestBidComparisonService:
             # bid_securities
             [
                 {"security_id": 1, "bid_id": 11, "security_amount": 3000.0, "security_type": "BankGuarantee", "bid_security_doc_path": "sec/1.pdf", "valid_until": date(2026, 12, 31)},
-            ]
+            ],
+            # bid_items (lot pricing)
+            []
         ]
 
         result = await get_tender_bid_comparison(mock_conn, tender_id=1, buyer_org_id=1)
