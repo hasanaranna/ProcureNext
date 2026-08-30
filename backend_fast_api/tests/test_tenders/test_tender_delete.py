@@ -46,14 +46,10 @@ class TestTenderDeleteService:
         mock_conn.fetchrow.return_value = {
             "tender_id": 10,
             "buyer_id": 1,
-            "status": "Published"
+            "status": "Draft"
         }
 
         # Mock gathering storage file paths:
-        # 1. tender_docs
-        # 2. bid_docs
-        # 3. bid_secs
-        # 4. contract_docs
         mock_conn.fetch.side_effect = [
             [{"file_path": "tenders/10/spec.pdf"}, {"file_path": "tenders/10/boq.pdf"}],
             [{"file_path": "bids/101/proposal.pdf"}],
@@ -127,6 +123,50 @@ class TestTenderDeleteService:
             "DELETE FROM tender_documents WHERE tender_doc_id = $1", 5
         )
         mock_delete_files.assert_called_once_with(["tenders/10/doc5.pdf"])
+
+    @pytest.mark.asyncio
+    @patch("app.services.supabase_storage.delete_files")
+    async def test_delete_tender_removes_notifications_by_action_url(self, mock_delete_files):
+        mock_conn = AsyncMock()
+
+        @asynccontextmanager
+        async def _fake_tx():
+            yield
+
+        mock_conn.transaction = MagicMock(side_effect=_fake_tx)
+        mock_conn.fetchrow.return_value = {
+            "tender_id": 10,
+            "buyer_id": 1,
+            "status": "Draft",
+        }
+        mock_conn.fetch.side_effect = [
+            [],
+            [],
+            [],
+            [],
+        ]
+
+        await delete_tender(mock_conn, tender_id=10, buyer_org_id=1)
+
+        execute_sqls = [call.args[0] for call in mock_conn.execute.call_args_list]
+        assert not any("reference_type" in sql for sql in execute_sqls)
+        assert not any("notification_recipients" in sql for sql in execute_sqls)
+
+        notification_delete = next(
+            sql for sql in execute_sqls if "DELETE FROM notifications" in sql
+        )
+        assert "action_url" in notification_delete
+
+        notification_call = next(
+            call for call in mock_conn.execute.call_args_list
+            if "DELETE FROM notifications" in call.args[0]
+        )
+        assert notification_call.args[1] == [
+            "/view-my-tender/10",
+            "/edit-tender/10",
+            "/bid-for-tender?id=10",
+        ]
+        assert notification_call.args[2] == "/bid-for-tender?id=10&%"
 
     @pytest.mark.asyncio
     async def test_delete_tender_document_unauthorized(self):

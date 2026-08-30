@@ -170,8 +170,43 @@ export default function HomePage() {
   const [buyerTenders, setBuyerTenders] = useState<TenderItem[]>([]);
   const [sellerTenders, setSellerTenders] = useState<TenderItem[]>([]);
   const [tendersLoading, setTendersLoading] = useState(false);
-  const [filterStatus, setFilterStatus] = useState<'all' | 'published' | 'accepted'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'draft' | 'published' | 'accepted' | 'closed' | 'cancelled'>('all');
+  const buyerTenderMatchesFilter = (t: TenderItem) => {
+    switch (filterStatus) {
+      case 'draft':
+        return t.status === 'Draft';
+      case 'published':
+        return t.status === 'Published';
+      case 'accepted':
+        return t.status === 'Awarded' || t.status === 'Accepted';
+      case 'closed':
+        return t.status === 'Closed';
+      case 'cancelled':
+        return t.status === 'Cancelled';
+      default:
+        return true;
+    }
+  };
+
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const matchesSearch = (t: TenderItem) => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      t.title.toLowerCase().includes(q) ||
+      t.description.toLowerCase().includes(q) ||
+      t.buyer_org_name.toLowerCase().includes(q)
+    );
+  };
+
+  const filteredBuyerTenders = buyerTenders.filter(
+    (t) => buyerTenderMatchesFilter(t) && matchesSearch(t),
+  );
+  const filteredSellerTenders = sellerTenders.filter(matchesSearch);
   const [enlistedOrgs, setEnlistedOrgs] = useState<Array<{ organization_id: number; organization_name: string; organization_type: string }>>([]);
+  const [sellerBidCount, setSellerBidCount] = useState(0);
+  const [sellerOngoingCount, setSellerOngoingCount] = useState(0);
 
   // Fetch tenders when mode or activeTab changes
   useEffect(() => {
@@ -219,6 +254,31 @@ export default function HomePage() {
     fetchEnlisted();
   }, []);
 
+  useEffect(() => {
+    if (mode !== 'seller') return;
+
+    const fetchSellerStats = async () => {
+      try {
+        const [bidsRes, ongoingRes] = await Promise.all([
+          fetch('/api/bids/vendor/my-bids'),
+          fetch('/api/tenders/ongoing'),
+        ]);
+        if (bidsRes.ok) {
+          const bids = await bidsRes.json();
+          setSellerBidCount(Array.isArray(bids) ? bids.length : 0);
+        }
+        if (ongoingRes.ok) {
+          const ongoing = await ongoingRes.json();
+          setSellerOngoingCount(Array.isArray(ongoing) ? ongoing.length : 0);
+        }
+      } catch (err) {
+        console.error('Failed to fetch seller stats:', err);
+      }
+    };
+
+    fetchSellerStats();
+  }, [mode]);
+
   const user = {
     name: userData.full_name || 'User',
     email: userData.email || 'user@example.com',
@@ -241,12 +301,60 @@ export default function HomePage() {
 
   // Sidebar nav items
   const navItems: Array<{ label: string; href?: string; onClick?: () => void; icon: React.ReactNode }> = [
-    { label: 'Find Organizations', href: '/organizations', icon: (<svg className="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>) },
-    { label: 'Ongoing Tenders', href: '/ongoing-tenders', icon: (<svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>) },
-    { label: 'Manage Tokens', onClick: () => setShowManageTokens(true), icon: (<svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) },
+    { label: 'Find Organizations', href: '/organizations', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>) },
+    { label: 'Ongoing Tenders', href: '/ongoing-tenders', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>) },
+    { label: 'Manage Tokens', onClick: () => setShowManageTokens(true), icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) },
     { label: 'Update Credentials', href: '#', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) },
-    { label: 'Change Password', href: '#', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>) },
+    { label: 'Change Password', href: '/change-password', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>) },
   ];
+
+  const renderNotificationIcon = (type: string) => {
+    const iconClass = 'w-4 h-4 text-accent-300';
+    switch (type) {
+      case 'Award':
+        return (
+          <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+          </svg>
+        );
+      case 'Deadline':
+        return (
+          <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        );
+      case 'Enlist':
+        return (
+          <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        );
+      case 'Verification':
+        return (
+          <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+        );
+      case 'System':
+        return (
+          <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        );
+      case 'TenderUpdate':
+        return (
+          <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        );
+      default:
+        return (
+          <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+        );
+    }
+  };
 
   const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
     <div className="flex flex-col h-full">
@@ -369,8 +477,8 @@ export default function HomePage() {
               <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                 <SlidingToggle
                   options={[
-                    { value: 'buyer', label: '🛒 Buyer' },
-                    { value: 'seller', label: '🏪 Seller' },
+                    { value: 'buyer', label: 'Buyer' },
+                    { value: 'seller', label: 'Seller' },
                   ]}
                   value={mode}
                   onChange={(v) => handleModeSwitch(v as 'buyer' | 'seller')}
@@ -394,8 +502,13 @@ export default function HomePage() {
 
                 {/* Search */}
                 <div className="flex-1 md:flex-initial" style={{ minWidth: '180px' }}>
-                  <input type="text" placeholder="Search tenders..."
-                    className="w-full px-4 py-2 rounded-xl border border-white/20 bg-white/10 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:bg-white/15 transition text-sm" />
+                  <input
+                    type="text"
+                    placeholder="Search tenders..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full px-4 py-2 rounded-xl border border-white/20 bg-white/10 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:bg-white/15 transition text-sm"
+                  />
                 </div>
 
                 {/* Token capsule */}
@@ -442,7 +555,11 @@ export default function HomePage() {
                             <p className="text-slate-400 text-xs font-semibold">Total Published Tenders</p>
                             <p className="text-2xl font-black text-white mt-1">{buyerTenders.filter(t => t.status === 'Published').length}</p>
                           </div>
-                          <div className="w-10 h-10 bg-gradient-to-br from-accent-500 to-accent-600 rounded-xl flex items-center justify-center text-white text-lg shadow-lg">📊</div>
+                          <div className="w-10 h-10 bg-navy-800 rounded-xl flex items-center justify-center text-white flex-shrink-0">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                          </div>
                         </div>
                       </div>
                       <div
@@ -452,12 +569,16 @@ export default function HomePage() {
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="flex items-center gap-1">
-                              <p className="text-slate-400 text-xs font-semibold group-hover:text-emerald-300 transition-colors">Accepted / Ongoing Tenders</p>
+                              <p className="text-slate-400 text-xs font-semibold group-hover:text-accent-300 transition-colors">Accepted / Ongoing Tenders</p>
                               <span className="text-xs text-slate-400">→</span>
                             </div>
                             <p className="text-2xl font-black text-white mt-1">{buyerTenders.filter(t => t.status === 'Awarded').length}</p>
                           </div>
-                          <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-xl flex items-center justify-center text-white text-lg shadow-lg">📦</div>
+                          <div className="w-10 h-10 bg-accent-600 rounded-xl flex items-center justify-center text-white flex-shrink-0">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </div>
                         </div>
                       </div>
                       <div className="bg-white/10 rounded-2xl p-4 border border-white/10 backdrop-blur-sm sm:col-span-2">
@@ -480,9 +601,8 @@ export default function HomePage() {
                               <button
                                 key={v.organization_id}
                                 onClick={() => router.push(`/organizations/${v.organization_id}`)}
-                                className="px-3 py-1 rounded-full text-xs text-white bg-white/10 hover:bg-white/20 border border-white/10 font-medium transition cursor-pointer flex items-center gap-1"
+                                className="px-3 py-1 rounded-full text-xs text-white bg-white/10 hover:bg-white/20 border border-white/10 font-medium transition cursor-pointer"
                               >
-                                <span>⭐</span>
                                 <span>{v.organization_name}</span>
                               </button>
                             ))
@@ -496,9 +616,13 @@ export default function HomePage() {
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="text-slate-400 text-xs font-semibold">Tenders Bid On</p>
-                            <p className="text-2xl font-black text-white mt-1">15</p>
+                            <p className="text-2xl font-black text-white mt-1">{sellerBidCount}</p>
                           </div>
-                          <div className="w-10 h-10 bg-gradient-to-br from-accent-500 to-accent-600 rounded-xl flex items-center justify-center text-white text-lg shadow-lg">📊</div>
+                          <div className="w-10 h-10 bg-navy-800 rounded-xl flex items-center justify-center text-white flex-shrink-0">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                          </div>
                         </div>
                       </div>
                       <div
@@ -508,12 +632,16 @@ export default function HomePage() {
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="flex items-center gap-1">
-                              <p className="text-slate-400 text-xs font-semibold group-hover:text-emerald-300 transition-colors">Accepted Bids / Ongoing</p>
+                              <p className="text-slate-400 text-xs font-semibold group-hover:text-accent-300 transition-colors">Accepted Bids / Ongoing</p>
                               <span className="text-xs text-slate-400">→</span>
                             </div>
-                            <p className="text-2xl font-black text-white mt-1">6</p>
+                            <p className="text-2xl font-black text-white mt-1">{sellerOngoingCount}</p>
                           </div>
-                          <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-xl flex items-center justify-center text-white text-lg shadow-lg">✅</div>
+                          <div className="w-10 h-10 bg-accent-600 rounded-xl flex items-center justify-center text-white flex-shrink-0">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </div>
                         </div>
                       </div>
                       <div className="bg-white/10 rounded-2xl p-4 border border-white/10 backdrop-blur-sm sm:col-span-2">
@@ -536,9 +664,8 @@ export default function HomePage() {
                               <button
                                 key={b.organization_id}
                                 onClick={() => router.push(`/organizations/${b.organization_id}`)}
-                                className="px-3 py-1 rounded-full text-xs text-white bg-white/10 hover:bg-white/20 border border-white/10 font-medium transition cursor-pointer flex items-center gap-1"
+                                className="px-3 py-1 rounded-full text-xs text-white bg-white/10 hover:bg-white/20 border border-white/10 font-medium transition cursor-pointer"
                               >
-                                <span>⭐</span>
                                 <span>{b.organization_name}</span>
                               </button>
                             ))
@@ -564,7 +691,7 @@ export default function HomePage() {
           </div>
 
           {/* Lower Section */}
-          <div className="flex-1 bg-white overflow-y-auto">
+          <div className="flex-1 bg-slate-50 overflow-y-auto">
             {mode === 'seller' && (
               <div className="pt-8 px-4 md:px-8 flex justify-center">
                 <SlidingToggle
@@ -592,17 +719,20 @@ export default function HomePage() {
                             onChange={(e) => setFilterStatus(e.target.value as any)}
                             className="bg-white text-navy-900 font-medium text-sm outline-none cursor-pointer rounded-lg px-2 py-1">
                             <option value="all">Show All</option>
+                            <option value="draft">Draft</option>
                             <option value="published">Published</option>
                             <option value="accepted">Accepted / Awarded</option>
+                            <option value="closed">Closed</option>
+                            <option value="cancelled">Cancelled</option>
                           </select>
                         </div>
                         <button onClick={() => router.push('/organizations')}
-                          className="px-4 py-2 rounded-xl bg-cyan-50 text-cyan-800 border border-cyan-300 font-bold hover:bg-cyan-100 transition-all text-sm flex items-center gap-1.5 shadow-sm">
-                          🌐 Find Organizations
+                          className="px-4 py-2 rounded-xl bg-white text-navy-800 border border-slate-200 font-semibold hover:bg-slate-50 transition-all text-sm">
+                          Find Organizations
                         </button>
                         <button onClick={() => router.push('/ongoing-tenders')}
-                          className="px-4 py-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold hover:bg-emerald-100 transition-all text-sm flex items-center gap-1.5 shadow-sm">
-                          📋 Ongoing Tenders
+                          className="px-4 py-2 rounded-xl bg-white text-navy-800 border border-slate-200 font-semibold hover:bg-slate-50 transition-all text-sm">
+                          Ongoing Tenders
                         </button>
                         <button type="button" onClick={() => router.push('/new-tender')}
                           className="px-6 py-2 rounded-xl bg-gradient-to-r from-accent-500 to-accent-600 text-white font-bold hover:from-accent-600 hover:to-accent-700 transition-all shadow-lg hover:shadow-xl hover:scale-[1.02] text-sm">
@@ -619,7 +749,7 @@ export default function HomePage() {
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                           </svg>
                         </div>
-                      ) : buyerTenders.filter(t => filterStatus === 'all' ? true : filterStatus === 'published' ? t.status === 'Published' : (t.status === 'Awarded' || t.status === 'Accepted')).length === 0 ? (
+                      ) : filteredBuyerTenders.length === 0 ? (
                         <div className="col-span-full text-center py-16">
                           <svg className="w-12 h-12 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -627,14 +757,15 @@ export default function HomePage() {
                           <p className="text-slate-400 text-lg font-medium">No tenders found matching your filter.</p>
                         </div>
                       ) : (
-                        buyerTenders
-                          .filter(t => filterStatus === 'all' ? true : filterStatus === 'published' ? t.status === 'Published' : (t.status === 'Awarded' || t.status === 'Accepted'))
+                        filteredBuyerTenders
                           .map((tender) => (
                             <TenderCard
                               key={tender.tender_id}
                               title={tender.title}
                               subtitle={tender.description}
                               vendor={tender.buyer_org_name}
+                              status={tender.status}
+                              deadline={tender.submission_deadline}
                               onClick={() => router.push(`/view-my-tender/${tender.tender_id}`)}
                             />
                           ))
@@ -648,12 +779,12 @@ export default function HomePage() {
                     <h2 className="text-2xl font-black text-navy-900">Available Tenders</h2>
                     <div className="flex items-center gap-3 flex-wrap">
                       <button onClick={() => router.push('/organizations')}
-                        className="px-4 py-2 rounded-xl bg-cyan-50 text-cyan-800 border border-cyan-300 font-bold hover:bg-cyan-100 transition-all text-sm flex items-center gap-1.5 shadow-sm">
-                        🌐 Find Organizations
+                        className="px-4 py-2 rounded-xl bg-white text-navy-800 border border-slate-200 font-semibold hover:bg-slate-50 transition-all text-sm">
+                        Find Organizations
                       </button>
                       <button onClick={() => router.push('/ongoing-tenders')}
-                        className="px-4 py-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold hover:bg-emerald-100 transition-all text-sm flex items-center gap-1.5 shadow-sm">
-                        📋 Ongoing Tenders
+                        className="px-4 py-2 rounded-xl bg-white text-navy-800 border border-slate-200 font-semibold hover:bg-slate-50 transition-all text-sm">
+                        Ongoing Tenders
                       </button>
                       <button onClick={() => router.push('/view-my-bids')}
                         className="px-6 py-2 rounded-xl bg-gradient-to-r from-accent-500 to-accent-600 text-white font-bold hover:from-accent-600 hover:to-accent-700 transition-all shadow-lg hover:shadow-xl hover:scale-[1.02] text-sm">
@@ -669,7 +800,7 @@ export default function HomePage() {
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                         </svg>
                       </div>
-                    ) : sellerTenders.length === 0 ? (
+                    ) : filteredSellerTenders.length === 0 ? (
                       <div className="col-span-full text-center py-16 bg-slate-50 rounded-2xl border border-slate-200">
                         <svg className="w-12 h-12 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
@@ -692,7 +823,7 @@ export default function HomePage() {
                         )}
                       </div>
                     ) : (
-                      sellerTenders.map((tender) => (
+                      filteredSellerTenders.map((tender) => (
                         <TenderCard
                           key={tender.tender_id}
                           title={tender.title}
@@ -814,15 +945,6 @@ export default function HomePage() {
             <div className="overflow-y-auto flex-1">
               {(() => {
                 const filtered = notifications.filter(n => notifTab === 'unread' ? !n.is_read : n.is_read);
-                const iconMap: Record<string, React.ReactNode> = {
-                  BidUpdate: <span className="text-lg">📩</span>,
-                  Award: <span className="text-lg">🏆</span>,
-                  Deadline: <span className="text-lg">⏰</span>,
-                  Enlist: <span className="text-lg">🤝</span>,
-                  TenderUpdate: <span className="text-lg">📋</span>,
-                  System: <span className="text-lg">⚠️</span>,
-                  Verification: <span className="text-lg">✅</span>,
-                };
                 if (filtered.length === 0) {
                   return (
                     <div className="flex flex-col items-center justify-center py-14 text-center px-6">
@@ -848,7 +970,7 @@ export default function HomePage() {
                     }}
                   >
                     <div className="flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center bg-white/10">
-                      {iconMap[notif.type] || <span className="text-lg">🔔</span>}
+                      {renderNotificationIcon(notif.type)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">

@@ -36,6 +36,7 @@ from contextlib import asynccontextmanager
 from fastapi import HTTPException
 
 from app.main import app
+from app.modules.auth.dependencies import get_current_admin
 
 
 # ---------------------------------------------------------------------------
@@ -59,6 +60,25 @@ def clear_dependency_overrides():
     """Ensure FastAPI dependency overrides don't bleed across tests."""
     yield
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def mock_admin_user():
+    return {
+        "user_id": 99,
+        "email": "admin@procurenext.com",
+        "full_name": "Platform Admin",
+        "admin_id": 1,
+        "admin_role": "SuperAdmin",
+    }
+
+
+@pytest.fixture(autouse=True)
+def override_admin_auth(mock_admin_user):
+    """Authenticated admin for endpoints guarded by get_current_admin."""
+    app.dependency_overrides[get_current_admin] = lambda: mock_admin_user
+    yield
+    app.dependency_overrides.pop(get_current_admin, None)
 
 
 # ===========================================================================
@@ -300,83 +320,15 @@ class TestVerifyOrganization:
 # ===========================================================================
 
 class TestNonAdminRejected:
-    """
-    Documents the current and expected access control posture of admin endpoints.
+    """Access control on admin endpoints guarded by get_current_admin."""
 
-    CURRENT STATE:
-      The admin router does NOT have a FastAPI Depends() auth guard yet —
-      core/dependencies.py (get_current_admin) and core/permissions.py are
-      both stubs. Unauthenticated callers can currently reach these endpoints.
-      The tests marked CURRENT_BEHAVIOUR assert this reality so the test suite
-      stays green while the guard is a stub.
-
-    FUTURE STATE (TODO):
-      Once get_current_admin is wired up as a Depends() on each admin route,
-      the TODO tests below should be uncommented and the CURRENT_BEHAVIOUR
-      tests removed. The TODO tests assert 401/403 for callers without a
-      valid admin JWT.
-    """
-
-    # ── CURRENT BEHAVIOUR (no guard yet) ────────────────────────────────────
+    @pytest.fixture(autouse=True)
+    def clear_admin_override(self):
+        app.dependency_overrides.pop(get_current_admin, None)
+        yield
 
     @pytest.mark.asyncio
-    @patch("app.modules.admin.router.get_db_connection")
-    @patch("app.modules.admin.router.verify_organization")
-    async def test_verify_endpoint_reachable_without_auth_currently(
-        self, mock_verify, mock_db, client
-    ):
-        """
-        CURRENT BEHAVIOUR: Without a Depends() guard on the route,
-        any caller (no token at all) can reach POST /api/auth/admin/verify/{id}.
-        This test documents the gap so it is visible in CI output.
-        """
-        mock_conn = AsyncMock()
-        mock_db.side_effect = _mock_db_ctx(mock_conn)
-        mock_verify.return_value = {"message": "Organization 1 has been Verified."}
-
-        resp = await client.post(
-            "/api/auth/admin/verify/1",
-            json={"verification_status": "Verified"},
-            # No Authorization header — unauthenticated
-        )
-
-        # Without a guard, the endpoint still returns 200.
-        # This is the GAP. Change to `assert resp.status_code == 401`
-        # once get_current_admin Depends() is wired up.
-        assert resp.status_code == 200
-
-    @pytest.mark.asyncio
-    @patch("app.modules.admin.router.get_db_connection")
-    @patch("app.modules.admin.router.get_pending_master_accounts")
-    async def test_pending_accounts_endpoint_reachable_without_auth_currently(
-        self, mock_get_pending, mock_db, client
-    ):
-        """
-        CURRENT BEHAVIOUR: GET /api/auth/admin/pending-accounts has no auth guard yet.
-        """
-        mock_conn = AsyncMock()
-        mock_db.side_effect = _mock_db_ctx(mock_conn)
-        mock_get_pending.return_value = {"accounts": [], "total": 0}
-
-        resp = await client.get(
-            "/api/auth/admin/pending-accounts",
-            # No Authorization header
-        )
-
-        assert resp.status_code == 200
-
-    # ── TODO: expected behaviour once get_current_admin Depends() is added ───
-
-    @pytest.mark.asyncio
-    @pytest.mark.skip(
-        reason="TODO: Unskip after get_current_admin Depends() is wired up on admin routes. "
-               "Expected: unauthenticated caller gets 401."
-    )
     async def test_verify_endpoint_returns_401_for_unauthenticated_caller(self, client):
-        """
-        FUTURE: No token at all → 401 Unauthorized.
-        Uncomment once the Depends(get_current_admin) guard is in place.
-        """
         resp = await client.post(
             "/api/auth/admin/verify/1",
             json={"verification_status": "Verified"},
@@ -384,32 +336,22 @@ class TestNonAdminRejected:
         assert resp.status_code == 401
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(
-        reason="TODO: Unskip after get_current_admin Depends() is wired up on admin routes. "
-               "Expected: regular-user token gets 403."
-    )
+    @patch("app.modules.auth.dependencies.get_db_connection")
     async def test_verify_endpoint_returns_403_for_regular_user_token(
-        self, client, auth_headers
+        self, mock_db, client, auth_headers
     ):
-        """
-        FUTURE: A valid regular-user JWT (no admin_role in payload) → 403 Forbidden.
-        Uncomment once the Depends(get_current_admin) guard is in place.
-        """
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+        mock_conn.fetchrow.return_value = None
+
         resp = await client.post(
             "/api/auth/admin/verify/1",
             json={"verification_status": "Verified"},
-            headers=auth_headers,  # regular user token from conftest
+            headers=auth_headers,
         )
         assert resp.status_code == 403
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(
-        reason="TODO: Unskip after get_current_admin Depends() is wired up on admin routes. "
-               "Expected: unauthenticated caller gets 401 on pending-accounts."
-    )
     async def test_pending_accounts_returns_401_for_unauthenticated_caller(self, client):
-        """
-        FUTURE: GET /api/auth/admin/pending-accounts without token → 401.
-        """
         resp = await client.get("/api/auth/admin/pending-accounts")
         assert resp.status_code == 401
