@@ -96,6 +96,7 @@ from app.modules.tenders.schemas import (
     TenderPdfExtractResponse,
     TenderPdfJobResponse,
     TenderPdfJobStatus,
+    VendorRecommendationResponse,
 )
 from app.modules.tenders.service import (
     publish_tender_with_documents,
@@ -109,6 +110,7 @@ from app.modules.tenders.service import (
     delete_tender_document,
     get_public_active_tenders,
     get_public_tender_detail,
+    get_vendor_recommendations_for_tender,
 )
 from app.services.ml_client import parse_and_embed_tender_pdf
 from app.tasks.celery_app import celery_app
@@ -404,6 +406,28 @@ async def get_tender_details(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
+@router.get("/{tender_id}/recommendations", response_model=VendorRecommendationResponse)
+async def get_tender_vendor_recommendations(
+    tender_id: int,
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    FR-09: Fetch explainable recommendations of top matching vendors for a tender.
+    Buyer only. Evaluates category capabilities, mutual ratings, certifications, and enlistment.
+    """
+    buyer_org_id = current_user.get("organization_id")
+    if not buyer_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            return await get_vendor_recommendations_for_tender(connection, tender_id, buyer_org_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Tender not found.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch recommendations: {e}")
 
 
 @router.get("/documents/{doc_id}/view")

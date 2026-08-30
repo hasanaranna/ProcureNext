@@ -125,16 +125,26 @@ async def publish_tender_with_documents(
         except Exception as e:
             logger.warning(f"Failed to generate embedding during tender publish: {e}")
 
+    # Validate packaging rules if items provided
+    pkg_type_val = tender_data.package_type.value if hasattr(tender_data.package_type, "value") else str(tender_data.package_type)
+    if tender_data.items is not None:
+        if pkg_type_val == "SingleItem" and len(tender_data.items) != 1:
+            raise ValueError("SingleItem tender must contain exactly one item/lot.")
+        elif pkg_type_val == "PackagedLots" and len(tender_data.items) < 2:
+            raise ValueError("PackagedLots tender must contain at least two items/lots.")
+
     query = """
         INSERT INTO tenders (
             buyer_id, created_by, title, description, category_id, nature_id, method_id,
             eligibility_of_tenderer, visibility_type, budget_min, budget_max, status,
             submission_deadline, tender_public_date, pre_bid_meeting, tender_opening_date,
+            package_type, bid_bond_amount, scheduled_publish_at,
             embedding
         )
         VALUES (
             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-            $17::vector
+            $17::public.tender_package_type, $18, $19,
+            $20::vector
         )
         RETURNING *;
     """
@@ -153,15 +163,38 @@ async def publish_tender_with_documents(
             tender_data.visibility_type.value if hasattr(tender_data.visibility_type, "value") else str(tender_data.visibility_type),
             tender_data.budget_min,
             tender_data.budget_max,
-            "Published",
+            "Published" if not tender_data.scheduled_publish_at or tender_data.scheduled_publish_at <= datetime.utcnow() else "Draft",
             tender_data.submission_deadline.replace(tzinfo=None) if tender_data.submission_deadline else None,
             tender_data.tender_public_date.replace(tzinfo=None) if tender_data.tender_public_date else None,
             tender_data.pre_bid_meeting.replace(tzinfo=None) if tender_data.pre_bid_meeting else None,
             tender_data.tender_opening_date.replace(tzinfo=None) if tender_data.tender_opening_date else None,
+            pkg_type_val,
+            tender_data.bid_bond_amount or 0.00,
+            tender_data.scheduled_publish_at.replace(tzinfo=None) if tender_data.scheduled_publish_at else None,
             embedding_str
         )
         
         tender_id = row['tender_id']
+
+        # Insert items / lots if specified
+        if tender_data.items:
+            insert_item_query = """
+                INSERT INTO public.tender_items (
+                    tender_id, lot_number, item_name, specifications, quantity, unit_of_measure, estimated_unit_price
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7);
+            """
+            for itm in tender_data.items:
+                await connection.execute(
+                    insert_item_query,
+                    tender_id,
+                    itm.lot_number,
+                    itm.item_name,
+                    itm.specifications,
+                    itm.quantity,
+                    itm.unit_of_measure,
+                    itm.estimated_unit_price
+                )
 
         if tender_data.required_seller_docs:
             insert_req_doc_query = """
@@ -460,6 +493,8 @@ async def get_ongoing_tenders(
             buyer_org.organization_name AS buyer_org_name,
             vendor_org.organization_id AS vendor_org_id,
             vendor_org.organization_name AS vendor_org_name,
+            c.contract_id,
+            COALESCE(c.status::text, 'Active') AS contract_status,
             CASE
                 WHEN t.buyer_id = $1 THEN 'buyer'
                 ELSE 'vendor'
@@ -469,6 +504,7 @@ async def get_ongoing_tenders(
         JOIN bids b ON a.winning_bid_id = b.bid_id
         JOIN organizations buyer_org ON t.buyer_id = buyer_org.organization_id
         JOIN organizations vendor_org ON b.vendor_org_id = vendor_org.organization_id
+        LEFT JOIN contracts c ON c.award_id = a.award_id
         WHERE t.buyer_id = $1 OR b.vendor_org_id = $1
         ORDER BY a.awarded_at DESC;
     """
@@ -513,6 +549,8 @@ async def get_ongoing_tender_detail(
             vendor_org.organization_name AS vendor_org_name,
             vendor_org.address AS vendor_org_address,
             vendor_org.website AS vendor_org_website,
+            c.contract_id,
+            COALESCE(c.status::text, 'Active') AS contract_status,
             CASE
                 WHEN t.buyer_id = $2 THEN 'buyer'
                 ELSE 'vendor'
@@ -522,6 +560,7 @@ async def get_ongoing_tender_detail(
         JOIN bids b ON a.winning_bid_id = b.bid_id
         JOIN organizations buyer_org ON t.buyer_id = buyer_org.organization_id
         JOIN organizations vendor_org ON b.vendor_org_id = vendor_org.organization_id
+        LEFT JOIN contracts c ON c.award_id = a.award_id
         WHERE t.tender_id = $1 AND (t.buyer_id = $2 OR b.vendor_org_id = $2);
     """
     row = await connection.fetchrow(query, tender_id, org_id)
@@ -529,6 +568,19 @@ async def get_ongoing_tender_detail(
         return None
 
     result = dict(row)
+
+    # Ensure a contract record exists for this award
+    if not result.get("contract_id"):
+        try:
+            cid = await connection.fetchval("""
+                INSERT INTO contracts (award_id, contract_value, status, signed_at)
+                VALUES ($1, $2, 'Active', NOW())
+                RETURNING contract_id
+            """, result["award_id"], result.get("winning_bid_amount"))
+            result["contract_id"] = cid
+            result["contract_status"] = "Active"
+        except Exception:
+            pass
 
     # Tender documents
     docs_query = """
@@ -868,4 +920,125 @@ async def get_public_tender_detail(
     return result
 
 
+async def get_vendor_recommendations_for_tender(
+    connection: asyncpg.Connection,
+    tender_id: int,
+    buyer_org_id: int
+) -> dict:
+    """
+    FR-09: Calculate and return explainable vendor recommendations for a specific tender.
+    Factors in:
+      - Category Match: 35%
+      - Mutual Historical Rating: 30%
+      - Enlistment with Buyer: 20%
+      - Verified Certifications: 15%
+    """
+    # 1. Fetch tender details
+    tender_row = await connection.fetchrow("""
+        SELECT tender_id, title, category_id, visibility_type, buyer_id
+        FROM tenders
+        WHERE tender_id = $1
+    """, tender_id)
+    is_exclusive = str(tender_row["visibility_type"]).lower() in ("exclusive", "enlisted")
 
+    # 2. Fetch candidate vendor organizations (excluding the buyer)
+    vendors_query = """
+        SELECT 
+            o.organization_id AS vendor_id,
+            o.organization_name AS vendor_name,
+            o.address AS vendor_address,
+            o.verification_status AS vendor_verification_status,
+            COALESCE(r.seller_avg_rating, 
+                (SELECT ROUND(AVG(rating)::numeric, 2) FROM vendor_performance WHERE vendor_org_id = o.organization_id), 
+                3.00
+            )::float AS avg_seller_rating,
+            COALESCE(r.seller_review_count,
+                (SELECT COUNT(*) FROM vendor_performance WHERE vendor_org_id = o.organization_id),
+                0
+            )::int AS total_reviews_count,
+            CASE WHEN ev.enlisted_org_id IS NOT NULL THEN true ELSE false END AS is_enlisted
+        FROM organizations o
+        LEFT JOIN organization_reputation r ON o.organization_id = r.organization_id
+        LEFT JOIN enlisted_vendors ev ON ev.org_id = $2 AND ev.enlisted_org_id = o.organization_id
+        WHERE o.organization_id <> $2
+        ORDER BY o.organization_id
+    """
+    vendor_rows = await connection.fetch(vendors_query, tender_id, buyer_org_id)
+
+    recommendations = []
+    for v in vendor_rows:
+        v_dict = dict(v)
+        vendor_id = v_dict["vendor_id"]
+
+        # Check category match via previous bids/awards or tender_vendor_suggestions
+        cat_match_row = await connection.fetchval("""
+            SELECT 1 FROM bids b
+            JOIN tenders t ON b.tender_id = t.tender_id
+            WHERE b.vendor_org_id = $1 AND t.category_id = $2
+            LIMIT 1
+        """, vendor_id, tender_cat_id)
+        has_category_match = bool(cat_match_row) or (tender_cat_id is None)
+
+        # Check certifications in organization_documents
+        cert_rows = await connection.fetch("""
+            SELECT dt.type_name
+            FROM organization_documents od
+            JOIN document_types dt ON od.doc_type_id = dt.type_id
+            WHERE od.organization_id = $1
+              AND dt.type_name ILIKE ANY(ARRAY['%iso%', '%cert%', '%license%'])
+        """, vendor_id)
+        certs = [r["type_name"] for r in cert_rows]
+
+        # Scoring Logic
+        is_enlisted = v_dict["is_enlisted"]
+        if is_exclusive and not is_enlisted:
+            continue
+
+        cat_score = 1.0 if has_category_match else 0.15
+        avg_rating = float(v_dict["avg_seller_rating"])
+        rating_score = min(max(avg_rating / 5.0, 0.0), 1.0)
+        enlist_score = 1.0 if is_enlisted else 0.0
+        cert_score = 1.0 if len(certs) > 0 else 0.35
+
+        composite_score = (
+            (0.35 * cat_score) +
+            (0.30 * rating_score) +
+            (0.20 * enlist_score) +
+            (0.15 * cert_score)
+        ) * 100.0
+
+        reasons = []
+        if has_category_match:
+            reasons.append("Proven category capability from historical bids")
+        if avg_rating >= 4.0:
+            reasons.append(f"High mutual satisfaction rating ({avg_rating:.1f}/5.0 stars)")
+        if is_enlisted:
+            reasons.append("Officially enlisted partner organization")
+        if certs:
+            reasons.append(f"Verified certifications on file: {', '.join(certs[:2])}")
+        if not reasons:
+            reasons.append("Active supplier on ProcureNext platform")
+
+        recommendations.append({
+            "vendor_id": vendor_id,
+            "vendor_name": v_dict["vendor_name"],
+            "vendor_address": v_dict["vendor_address"],
+            "vendor_verification_status": v_dict["vendor_verification_status"],
+            "match_score": round(composite_score, 1),
+            "category_match": has_category_match,
+            "is_enlisted": is_enlisted,
+            "avg_seller_rating": avg_rating,
+            "total_reviews_count": v_dict["total_reviews_count"],
+            "certifications": certs,
+            "reasons": reasons
+        })
+
+    # Sort descending by match score
+    recommendations.sort(key=lambda x: x["match_score"], reverse=True)
+
+    return {
+        "tender_id": tender_id,
+        "tender_title": tender_row["title"],
+        "total_recommendations": len(recommendations),
+        "recommendations": recommendations[:15]
+    }

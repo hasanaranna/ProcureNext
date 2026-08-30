@@ -73,6 +73,18 @@ class BidDocumentComplianceItem(BaseModel):
     file_path: Optional[str] = None
 
 
+class BidItemLotPricing(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    bid_item_id: Optional[int] = None
+    tender_item_id: int
+    lot_number: str
+    item_name: str
+    offered_quantity: float
+    unit_price: float
+    total_price: float
+    compliance_remarks: Optional[str] = None
+
+
 class BuyerBidComparisonItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -107,6 +119,7 @@ class BuyerBidComparisonItem(BaseModel):
     documents: List[BidDocumentInfo] = []
     compliance_matrix: List[BidDocumentComplianceItem] = []
     securities: List[BidSecurityInfo] = []
+    lot_pricing: List[BidItemLotPricing] = []
 
 
 class BidComparisonSummary(BaseModel):
@@ -124,8 +137,10 @@ class TenderBidComparisonResponse(BaseModel):
     tender_id: int
     tender_title: str
     tender_status: str
+    package_type: Optional[str] = "SingleItem"
     budget_min: Optional[float] = None
     budget_max: Optional[float] = None
+    lots: List[dict] = []
     required_documents: List[dict] = []
     summary: BidComparisonSummary
     bids: List[BuyerBidComparisonItem]

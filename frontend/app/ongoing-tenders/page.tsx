@@ -24,6 +24,8 @@ interface OngoingTenderItem {
   vendor_org_id: number;
   vendor_org_name: string;
   role_in_tender: 'buyer' | 'vendor' | null;
+  contract_id?: number | null;
+  contract_status?: string | null;
 }
 
 export default function OngoingTendersPage() {
@@ -33,6 +35,7 @@ export default function OngoingTendersPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState<'all' | 'buyer' | 'vendor'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'completed'>('all');
 
   useEffect(() => {
     const fetchOngoingTenders = async () => {
@@ -77,7 +80,12 @@ export default function OngoingTendersPage() {
     const matchesRole =
       filterRole === 'all' || item.role_in_tender === filterRole;
 
-    return matchesSearch && matchesRole;
+    const matchesStatus =
+      filterStatus === 'all' ||
+      (filterStatus === 'active' && item.contract_status !== 'Completed') ||
+      (filterStatus === 'completed' && item.contract_status === 'Completed');
+
+    return matchesSearch && matchesRole && matchesStatus;
   });
 
   const totalValue = tenders.reduce(
@@ -86,6 +94,8 @@ export default function OngoingTendersPage() {
   );
   const buyerCount = tenders.filter((t) => t.role_in_tender === 'buyer').length;
   const vendorCount = tenders.filter((t) => t.role_in_tender === 'vendor').length;
+  const completedCount = tenders.filter((t) => t.contract_status === 'Completed').length;
+  const activeCount = tenders.filter((t) => t.contract_status !== 'Completed').length;
 
   if (loading) {
     return (
@@ -191,45 +201,82 @@ export default function OngoingTendersPage() {
             </div>
             <input
               type="text"
-              placeholder="Search ongoing tenders by title, buyer, or vendor..."
+              placeholder="Search tenders by title, buyer, or vendor..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-white/15 bg-white/10 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500 text-sm"
             />
           </div>
 
-          {/* Role Filter Pills */}
-          <div className="flex items-center gap-1.5 p-1 bg-navy-950/60 rounded-xl border border-white/10">
-            <button
-              onClick={() => setFilterRole('all')}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                filterRole === 'all'
-                  ? 'bg-accent-500 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              All ({tenders.length})
-            </button>
-            <button
-              onClick={() => setFilterRole('buyer')}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                filterRole === 'buyer'
-                  ? 'bg-cyan-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              As Buyer ({buyerCount})
-            </button>
-            <button
-              onClick={() => setFilterRole('vendor')}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                filterRole === 'vendor'
-                  ? 'bg-purple-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              As Vendor ({vendorCount})
-            </button>
+          {/* Filters */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Status Filter */}
+            <div className="flex items-center gap-1 p-1 bg-navy-950/60 rounded-xl border border-white/10">
+              <button
+                onClick={() => setFilterStatus('all')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  filterStatus === 'all'
+                    ? 'bg-accent-500 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                All Status
+              </button>
+              <button
+                onClick={() => setFilterStatus('active')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  filterStatus === 'active'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                ⚡ Active ({activeCount})
+              </button>
+              <button
+                onClick={() => setFilterStatus('completed')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  filterStatus === 'completed'
+                    ? 'bg-emerald-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                ✓ Completed ({completedCount})
+              </button>
+            </div>
+
+            {/* Role Filter Pills */}
+            <div className="flex items-center gap-1 p-1 bg-navy-950/60 rounded-xl border border-white/10">
+              <button
+                onClick={() => setFilterRole('all')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  filterRole === 'all'
+                    ? 'bg-accent-500 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                All Roles
+              </button>
+              <button
+                onClick={() => setFilterRole('buyer')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  filterRole === 'buyer'
+                    ? 'bg-cyan-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Buyer ({buyerCount})
+              </button>
+              <button
+                onClick={() => setFilterRole('vendor')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  filterRole === 'vendor'
+                    ? 'bg-purple-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Vendor ({vendorCount})
+              </button>
+            </div>
           </div>
         </div>
 
@@ -251,10 +298,10 @@ export default function OngoingTendersPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </div>
-            <h2 className="text-xl font-bold text-white mb-2">No Ongoing Tenders Found</h2>
+            <h2 className="text-xl font-bold text-white mb-2">No Tenders Found</h2>
             <p className="text-slate-400 mb-8 max-w-md mx-auto text-sm">
-              {searchTerm || filterRole !== 'all'
-                ? 'No ongoing tenders matched your current filter criteria.'
+              {searchTerm || filterRole !== 'all' || filterStatus !== 'all'
+                ? 'No tenders matched your current filter criteria.'
                 : 'Once you accept bids or have your bids accepted, ongoing tenders and contracts will appear here.'}
             </p>
             <button
@@ -277,9 +324,15 @@ export default function OngoingTendersPage() {
                     <span className="text-xs font-black text-slate-400 uppercase tracking-wider">
                       Tender #{tender.tender_id} • Award #{tender.award_id}
                     </span>
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
-                      ● Ongoing / Awarded
-                    </span>
+                    {tender.contract_status === 'Completed' ? (
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                        ✓ Contract Completed
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-300 flex items-center gap-1">
+                        ⚡ Active / In Progress
+                      </span>
+                    )}
                     {tender.role_in_tender === 'buyer' ? (
                       <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-cyan-100 text-cyan-800 border border-cyan-300">
                         Your Org: Buyer
