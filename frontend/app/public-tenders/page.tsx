@@ -24,83 +24,28 @@ interface PublicTender {
   created_at: string;
 }
 
-const FALLBACK_PUBLIC_TENDERS: PublicTender[] = [
-  {
-    tender_id: 101,
-    title: "Supply & Commissioning of 33/11kV Power Transformers",
-    description: "Procurement of high-capacity step-down power transformers, switchgear units, and digital monitoring systems for regional power distribution upgrade.",
-    status: "Published",
-    category_name: "Power & Electrical Infrastructure",
-    procurement_nature: "Goods",
-    procurement_method: "Open Tendering Method (OTM)",
-    buyer_org_name: "National Energy Distribution Corp.",
-    buyer_org_type: "State Corporation",
-    buyer_verified: true,
-    budget_min: 15000000,
-    budget_max: 22000000,
-    security_required: true,
-    submission_deadline: new Date(Date.now() + 12 * 86400000).toISOString(),
-    tender_public_date: new Date(Date.now() - 3 * 86400000).toISOString(),
-    created_at: new Date(Date.now() - 3 * 86400000).toISOString(),
-  },
-  {
-    tender_id: 102,
-    title: "Enterprise Cloud ERP Modernization & Data Migration Services",
-    description: "Multi-phase implementation of cloud ERP for supply chain automation, financial reporting, human resources, and real-time inventory management.",
-    status: "Published",
-    category_name: "Information Technology & Software",
-    procurement_nature: "Services",
-    procurement_method: "Request for Quotation (RFQ)",
-    buyer_org_name: "Apex Logistics & Port Authority",
-    buyer_org_type: "Semi-Government Enterprise",
-    buyer_verified: true,
-    budget_min: 8500000,
-    budget_max: 12000000,
-    security_required: false,
-    submission_deadline: new Date(Date.now() + 8 * 86400000).toISOString(),
-    tender_public_date: new Date(Date.now() - 2 * 86400000).toISOString(),
-    created_at: new Date(Date.now() - 2 * 86400000).toISOString(),
-  },
-  {
-    tender_id: 103,
-    title: "Construction of Multi-Span Pre-Stressed Concrete Highway Overpass",
-    description: "Civil engineering works including piling, pre-stressed girder placement, deck slab casting, asphalt carpeting, and LED street illumination.",
-    status: "Published",
-    category_name: "Civil Engineering & Construction",
-    procurement_nature: "Works",
-    procurement_method: "Open Tendering Method (OTM)",
-    buyer_org_name: "Metropolitan Development Authority",
-    buyer_org_type: "Government Ministry",
-    buyer_verified: true,
-    budget_min: 45000000,
-    budget_max: 60000000,
-    security_required: true,
-    submission_deadline: new Date(Date.now() + 20 * 86400000).toISOString(),
-    tender_public_date: new Date(Date.now() - 5 * 86400000).toISOString(),
-    created_at: new Date(Date.now() - 5 * 86400000).toISOString(),
-  },
-];
-
 export default function PublicTendersPage() {
   const router = useRouter();
-  const [tenders, setTenders] = useState<PublicTender[]>(FALLBACK_PUBLIC_TENDERS);
-  const [loading, setLoading] = useState(false);
+  const [tenders, setTenders] = useState<PublicTender[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [selectedNature, setSelectedNature] = useState<string>("All");
 
   useEffect(() => {
     async function fetchPublicTenders() {
       setLoading(true);
+      setFetchError(null);
       try {
-        const res = await fetch("/api/v1/tenders/public/active");
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
-            setTenders(data);
-          }
+        const res = await fetch("/api/tenders/public/active");
+        if (!res.ok) {
+          throw new Error("Failed to load public tenders.");
         }
+        const data = await res.json();
+        setTenders(Array.isArray(data) ? data : []);
       } catch {
-        // Fallback to demo tenders
+        setFetchError("Unable to load public tenders. Please try again later.");
+        setTenders([]);
       } finally {
         setLoading(false);
       }
@@ -220,6 +165,11 @@ export default function PublicTendersPage() {
         {/* Tenders Grid */}
         {loading ? (
           <div className="text-center py-20 text-slate-400">Loading active tenders...</div>
+        ) : fetchError ? (
+          <div className="text-center py-20 bg-slate-800/20 rounded-3xl border border-slate-800">
+            <p className="text-lg font-bold text-white mb-1">Could not load tenders</p>
+            <p className="text-xs text-slate-400">{fetchError}</p>
+          </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-20 bg-slate-800/20 rounded-3xl border border-slate-800">
             <p className="text-lg font-bold text-white mb-1">No active public tenders found</p>

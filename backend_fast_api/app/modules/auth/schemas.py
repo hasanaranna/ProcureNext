@@ -67,3 +67,22 @@ class AdminTokenResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     user: AdminUserResponse
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetVerifyResponse(BaseModel):
+    valid: bool
+    email: str | None = None
+    message: str | None = None
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+class MessageResponse(BaseModel):
+    message: str

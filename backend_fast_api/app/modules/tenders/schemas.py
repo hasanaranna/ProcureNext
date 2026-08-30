@@ -59,6 +59,26 @@ class TenderCreateRequest(BaseModel):
     tender_opening_date: Optional[datetime] = None
     required_seller_docs: Optional[List[dict]] = None  # [{name: str, allowed_roles: [str]}]
 
+class TenderUpdateRequest(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    category_id: Optional[int] = None
+    category: Optional[str] = None
+    nature_id: Optional[int] = None
+    procurement_nature: Optional[str] = None
+    method_id: Optional[int] = None
+    procurement_method: Optional[str] = None
+    eligibility_of_tenderer: Optional[str] = None
+    embedding: Optional[List[float]] = None
+    visibility_type: Optional[TenderVisibility] = None
+    budget_min: Optional[float] = None
+    budget_max: Optional[float] = None
+    submission_deadline: Optional[datetime] = None
+    tender_public_date: Optional[datetime] = None
+    pre_bid_meeting: Optional[datetime] = None
+    tender_opening_date: Optional[datetime] = None
+    required_seller_docs: Optional[List[dict]] = None
+
 class TenderResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -162,6 +182,7 @@ class TenderDetailResponse(BaseModel):
     created_at: datetime
     documents: List[TenderDocumentItem] = []
     required_documents: List[RequiredDocumentItem] = []
+    bid_count: int = 0
 
 class TenderDocumentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)

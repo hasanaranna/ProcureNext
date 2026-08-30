@@ -17,28 +17,57 @@ export default function ViewMyBidsPage() {
   const [bids, setBids] = useState<BidItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [withdrawingId, setWithdrawingId] = useState<number | null>(null);
+
+  const fetchBids = async () => {
+    try {
+      const res = await fetch("/api/bids/vendor/my-bids");
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          router.push("/login");
+          return;
+        }
+        throw new Error("Failed to load your bids");
+      }
+      const data = await res.json();
+      setBids(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchBids = async () => {
-      try {
-        const res = await fetch("/api/bids/vendor/my-bids");
-        if (!res.ok) {
-          if (res.status === 401 || res.status === 403) {
-            router.push("/login");
-            return;
-          }
-          throw new Error("Failed to load your bids");
-        }
-        const data = await res.json();
-        setBids(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An error occurred");
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchBids();
   }, [router]);
+
+  const canWithdraw = (status: string) =>
+    ["Submitted", "Draft", "UnderEvaluation"].includes(status);
+
+  const handleWithdraw = async (bidId: number) => {
+    if (
+      !window.confirm(
+        "Withdraw this bid? You can submit a new proposal later if the tender is still open.",
+      )
+    ) {
+      return;
+    }
+    setWithdrawingId(bidId);
+    try {
+      const res = await fetch(`/api/bids/${bidId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        alert(errData?.detail || "Failed to withdraw bid.");
+        return;
+      }
+      setBids((prev) => prev.filter((b) => b.bid_id !== bidId));
+    } catch {
+      alert("Network error. Please try again.");
+    } finally {
+      setWithdrawingId(null);
+    }
+  };
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return "N/A";
@@ -173,7 +202,16 @@ export default function ViewMyBidsPage() {
                       <button 
                         onClick={() => router.push(`/ongoing-tenders/${bid.tender_id}`)}
                         className="w-full md:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow flex items-center justify-center gap-1.5 text-sm">
-                        🏆 View Ongoing Tender
+                        View Ongoing Tender
+                      </button>
+                    )}
+                    {canWithdraw(bid.status) && (
+                      <button
+                        onClick={() => handleWithdraw(bid.bid_id)}
+                        disabled={withdrawingId === bid.bid_id}
+                        className="w-full md:w-auto px-4 py-2.5 bg-red-50 text-red-700 font-bold rounded-xl hover:bg-red-100 transition border border-red-200 text-sm disabled:opacity-50"
+                      >
+                        {withdrawingId === bid.bid_id ? "Withdrawing..." : "Withdraw"}
                       </button>
                     )}
                     <button 

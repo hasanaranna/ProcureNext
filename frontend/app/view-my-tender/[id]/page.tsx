@@ -103,6 +103,7 @@ interface Tender {
   status: string;
   budget_min: string;
   budget_max: string;
+  bid_count?: number;
   required_documents?: RequiredDocument[];
 }
 
@@ -116,6 +117,8 @@ export default function ViewMyTenderPage() {
   
   const [tender, setTender] = useState<Tender | null>(null);
   const [comparisonData, setComparisonData] = useState<TenderComparisonData | null>(null);
+  const [basicBids, setBasicBids] = useState<EvaluatedBid[]>([]);
+  const [compareError, setCompareError] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
@@ -133,6 +136,7 @@ export default function ViewMyTenderPage() {
   const [sortMode, setSortMode] = useState<'price_asc' | 'price_desc' | 'rating_desc' | 'compliance_desc' | 'date_desc'>('price_asc');
   const [pinnedBidIds, setPinnedBidIds] = useState<number[]>([]);
   const [expandedDescriptions, setExpandedDescriptions] = useState<Record<number, boolean>>({});
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
     if (!tenderId) return;
@@ -140,9 +144,10 @@ export default function ViewMyTenderPage() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [tenderRes, compareRes] = await Promise.all([
+        const [tenderRes, bidsRes, compareRes] = await Promise.all([
           fetch(`/api/tenders/${tenderId}/detail`),
-          fetch(`/api/bids/buyer/tender/${tenderId}/compare`)
+          fetch(`/api/bids/buyer/tender/${tenderId}`),
+          fetch(`/api/bids/buyer/tender/${tenderId}/compare`),
         ]);
 
         if (!tenderRes.ok) throw new Error('Failed to fetch tender details');
@@ -150,51 +155,45 @@ export default function ViewMyTenderPage() {
         setTender(tenderData);
         setReqDocs(tenderData.required_documents || []);
 
+        let listBids: EvaluatedBid[] = [];
+        if (bidsRes.ok) {
+          const rawBids = await bidsRes.json();
+          listBids = rawBids.map((b: Record<string, unknown>) => ({
+            bid_id: b.bid_id as number,
+            vendor_org_id: b.vendor_org_id as number,
+            submitted_by: b.submitted_by as number,
+            tender_id: b.tender_id as number,
+            financial_amount: parseFloat(String(b.financial_amount)) || 0,
+            description: (b.description as string) || null,
+            status: b.status as EvaluatedBid['status'],
+            submitted_at: b.submitted_at as string,
+            updated_at: (b.updated_at as string) || (b.submitted_at as string),
+            vendor_name: (b.vendor_name as string) || 'Unknown Vendor',
+            vendor_rating: 0,
+            total_ratings_count: 0,
+            completed_contracts_count: 0,
+            is_enlisted: false,
+            budget_variance_pct: null,
+            avg_variance_pct: null,
+            is_lowest_bid: false,
+            compliance_score_pct: -1,
+            mandatory_docs_satisfied: false,
+            documents: (b.documents as BidDocument[]) || [],
+            compliance_matrix: [],
+            securities: [],
+          }));
+          setBasicBids(listBids);
+        }
+
         if (compareRes.ok) {
           const compData: TenderComparisonData = await compareRes.json();
           setComparisonData(compData);
+          setCompareError('');
           setPinnedBidIds(compData.bids.map((b) => b.bid_id));
         } else {
-          // Fallback if compare endpoint fails
-          const fallbackRes = await fetch(`/api/bids/buyer/tender/${tenderId}`);
-          if (fallbackRes.ok) {
-            const rawBids = await fallbackRes.json();
-            const fallbackCompData: TenderComparisonData = {
-              tender_id: tenderData.tender_id,
-              tender_title: tenderData.title,
-              tender_status: tenderData.status,
-              budget_min: parseFloat(tenderData.budget_min) || null,
-              budget_max: parseFloat(tenderData.budget_max) || null,
-              required_documents: tenderData.required_documents || [],
-              summary: {
-                total_bids: rawBids.length,
-                min_amount: rawBids.length ? Math.min(...rawBids.map((b: any) => parseFloat(b.financial_amount) || 0)) : null,
-                max_amount: rawBids.length ? Math.max(...rawBids.map((b: any) => parseFloat(b.financial_amount) || 0)) : null,
-                avg_amount: rawBids.length ? rawBids.reduce((acc: number, b: any) => acc + (parseFloat(b.financial_amount) || 0), 0) / rawBids.length : null,
-                budget_min: parseFloat(tenderData.budget_min) || null,
-                budget_max: parseFloat(tenderData.budget_max) || null,
-                lowest_bid_id: rawBids[0]?.bid_id || null,
-                fully_compliant_bids_count: rawBids.length,
-              },
-              bids: rawBids.map((b: any) => ({
-                ...b,
-                financial_amount: parseFloat(b.financial_amount) || 0,
-                vendor_rating: 4.5,
-                total_ratings_count: 0,
-                completed_contracts_count: 0,
-                is_enlisted: false,
-                budget_variance_pct: 0,
-                avg_variance_pct: 0,
-                is_lowest_bid: false,
-                compliance_score_pct: 100,
-                mandatory_docs_satisfied: true,
-                compliance_matrix: [],
-                securities: [],
-              })),
-            };
-            setComparisonData(fallbackCompData);
-            setPinnedBidIds(fallbackCompData.bids.map((b) => b.bid_id));
-          }
+          setComparisonData(null);
+          setCompareError('Comparison metrics could not be loaded. Bid cards still show submitted proposals.');
+          setPinnedBidIds(listBids.map((b) => b.bid_id));
         }
       } catch (err: any) {
         setError(err.message || 'An error occurred');
@@ -206,7 +205,8 @@ export default function ViewMyTenderPage() {
     fetchData();
   }, [tenderId]);
 
-  const bids = comparisonData?.bids || [];
+  const bids = comparisonData?.bids ?? basicBids;
+  const hasComparison = comparisonData !== null;
   const summary = comparisonData?.summary;
 
   const toggleRole = (reqDocId: number, role: string) => {
@@ -382,6 +382,55 @@ export default function ViewMyTenderPage() {
   }, [bids, filterMode, sortMode, pinnedBidIds]);
 
   const hasAcceptedBid = bids.some(b => b.status === 'Accepted');
+  const bidCount = comparisonData?.summary?.total_bids ?? tender?.bid_count ?? 0;
+  const canEdit = tender?.status === 'Draft' || (tender?.status === 'Published' && bidCount === 0);
+  const canPublish = tender?.status === 'Draft';
+  const canCancel = tender?.status === 'Published';
+  const canDelete =
+    tender?.status === 'Draft' || (tender?.status === 'Published' && bidCount === 0);
+
+  const handlePublishDraft = async () => {
+    if (!window.confirm('Publish this draft? Tokens will be deducted from your organization balance.')) return;
+    setActionLoading('publish');
+    try {
+      const res = await fetch(`/api/tenders/${tenderId}/publish`, { method: 'POST' });
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail || 'Failed to publish tender.');
+      const data = await res.json();
+      setTender((prev) => (prev ? { ...prev, status: data.status || 'Published' } : prev));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to publish tender.');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleCancelTender = async () => {
+    if (!window.confirm('Cancel this tender? Vendors who already bid will be notified.')) return;
+    setActionLoading('cancel');
+    try {
+      const res = await fetch(`/api/tenders/${tenderId}/withdraw`, { method: 'POST' });
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail || 'Failed to cancel tender.');
+      setTender((prev) => (prev ? { ...prev, status: 'Cancelled' } : prev));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to cancel tender.');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeleteTender = async () => {
+    if (!window.confirm('Permanently delete this tender and all related data? This cannot be undone.')) return;
+    setActionLoading('delete');
+    try {
+      const res = await fetch(`/api/tenders/${tenderId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail || 'Failed to delete tender.');
+      router.push('/home');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to delete tender.');
+      setActionLoading(null);
+    }
+  };
+
   const isTenderClosed = tender?.status === 'Awarded' || tender?.status === 'Closed' || tender?.status === 'Cancelled';
 
   const compliantCount = bids.filter(b => b.mandatory_docs_satisfied && b.compliance_score_pct >= 100).length;
@@ -461,8 +510,47 @@ export default function ViewMyTenderPage() {
               )}
             </div>
           </div>
-          <div className="px-8 py-5">
+          <div className="px-8 py-5 space-y-4">
             <p className="text-slate-600 text-sm leading-relaxed">{tender?.description}</p>
+            {(canEdit || canPublish || canCancel || canDelete) && (
+              <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+                {canEdit && (
+                  <button
+                    onClick={() => router.push(`/edit-tender/${tenderId}`)}
+                    className="px-4 py-2 text-xs font-bold rounded-xl bg-slate-100 text-navy-900 hover:bg-slate-200"
+                  >
+                    Edit
+                  </button>
+                )}
+                {canPublish && (
+                  <button
+                    onClick={handlePublishDraft}
+                    disabled={actionLoading !== null}
+                    className="px-4 py-2 text-xs font-bold rounded-xl bg-accent-500 text-white hover:bg-accent-600 disabled:opacity-50"
+                  >
+                    {actionLoading === 'publish' ? 'Publishing...' : 'Publish Draft'}
+                  </button>
+                )}
+                {canCancel && (
+                  <button
+                    onClick={handleCancelTender}
+                    disabled={actionLoading !== null}
+                    className="px-4 py-2 text-xs font-bold rounded-xl bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 disabled:opacity-50"
+                  >
+                    {actionLoading === 'cancel' ? 'Cancelling...' : 'Cancel Tender'}
+                  </button>
+                )}
+                {canDelete && (
+                  <button
+                    onClick={handleDeleteTender}
+                    disabled={actionLoading !== null}
+                    className="px-4 py-2 text-xs font-bold rounded-xl bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 disabled:opacity-50"
+                  >
+                    {actionLoading === 'delete' ? 'Deleting...' : 'Delete'}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -470,8 +558,10 @@ export default function ViewMyTenderPage() {
         {(tender?.status === 'Awarded' || hasAcceptedBid) && (
           <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-2xl p-5 shadow-xl mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-xl flex-shrink-0">
-                🏆
+              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                </svg>
               </div>
               <div>
                 <h3 className="font-bold text-white text-base">Tender Awarded & Ongoing</h3>
@@ -582,7 +672,7 @@ export default function ViewMyTenderPage() {
                 activeTab === 'bids' ? 'bg-white text-navy-900 shadow-md' : 'text-slate-400 hover:text-white'
               }`}
             >
-              📋 Bid Cards ({bids.length})
+              Bid Cards ({bids.length})
             </button>
             <button
               onClick={() => handleTabSwitch('compare')}
@@ -590,7 +680,7 @@ export default function ViewMyTenderPage() {
                 activeTab === 'compare' ? 'bg-white text-navy-900 shadow-md' : 'text-slate-400 hover:text-white'
               }`}
             >
-              ⚖️ Compare Bids Matrix
+              Compare Bids Matrix
             </button>
             <button
               onClick={() => handleTabSwitch('recommended')}
@@ -598,7 +688,7 @@ export default function ViewMyTenderPage() {
                 activeTab === 'recommended' ? 'bg-white text-navy-900 shadow-md' : 'text-slate-400 hover:text-white'
               }`}
             >
-              🌟 Recommended Sellers
+              Recommended Sellers
             </button>
             <button
               onClick={() => handleTabSwitch('evaluation')}
@@ -629,7 +719,10 @@ export default function ViewMyTenderPage() {
                     onClick={() => handleTabSwitch('compare')}
                     className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-xl border border-white/20 transition flex items-center gap-1.5"
                   >
-                    Switch to Comparison Matrix ➔
+                    Switch to Comparison Matrix
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
                   </button>
                 )}
               </div>
@@ -659,25 +752,28 @@ export default function ViewMyTenderPage() {
                       <div className="p-6">
                         <div className="flex justify-between items-start mb-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-accent-500 to-accent-600 flex items-center justify-center text-white text-lg flex-shrink-0 shadow-md">
-                              🏢
+                            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-accent-500 to-accent-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-md">
+                              {(bid.vendor_name || 'V').charAt(0).toUpperCase()}
                             </div>
                             <div>
                               <div className="flex items-center gap-2">
                                 <h3 className="text-lg font-bold text-navy-900">{bid.vendor_name}</h3>
-                                {bid.is_enlisted && (
+                                {hasComparison && bid.is_enlisted && (
                                   <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-[10px] font-bold rounded-full border border-purple-200">
-                                    ⭐ Enlisted Partner
+                                    Enlisted Partner
                                   </span>
                                 )}
-                                {bid.is_lowest_bid && (
+                                {hasComparison && bid.is_lowest_bid && (
                                   <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded-full border border-amber-300">
-                                    🏆 Lowest Proposal
+                                    Lowest Proposal
                                   </span>
                                 )}
                               </div>
                               <p className="text-xs text-slate-400">
-                                Submitted: {new Date(bid.submitted_at).toLocaleString()} • Rating: ⭐ {bid.vendor_rating || 0.0} ({bid.total_ratings_count || 0})
+                                Submitted: {new Date(bid.submitted_at).toLocaleString()}
+                                {hasComparison && (
+                                  <> · Rating: {bid.vendor_rating || 0} ({bid.total_ratings_count || 0})</>
+                                )}
                               </p>
                             </div>
                           </div>
@@ -701,6 +797,7 @@ export default function ViewMyTenderPage() {
                             {bid.status}
                           </span>
 
+                          {hasComparison && bid.compliance_score_pct >= 0 && (
                           <span className={`px-2.5 py-0.5 text-xs font-bold rounded-full ${
                             bid.compliance_score_pct >= 100 && bid.mandatory_docs_satisfied
                               ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
@@ -708,6 +805,7 @@ export default function ViewMyTenderPage() {
                           }`}>
                             {bid.compliance_score_pct}% Document Compliance
                           </span>
+                          )}
                         </div>
 
                         {/* Description */}
@@ -771,6 +869,11 @@ export default function ViewMyTenderPage() {
           {/* ============================================================ */}
           {activeTab === 'compare' && (
             <div className="mb-8">
+              {!hasComparison && (
+                <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-100 text-sm">
+                  {compareError || 'Comparison data is unavailable.'}
+                </div>
+              )}
               {/* Summary KPIs Banner */}
               {summary && summary.total_bids > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -846,7 +949,7 @@ export default function ViewMyTenderPage() {
                           : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                       }`}
                     >
-                      ✅ 100% Compliant ({compliantCount})
+                      100% Compliant ({compliantCount})
                     </button>
                     <button
                       onClick={() => setFilterMode('enlisted')}
@@ -856,7 +959,7 @@ export default function ViewMyTenderPage() {
                           : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                       }`}
                     >
-                      ⭐ Enlisted Partners ({enlistedCount})
+                      Enlisted Partners ({enlistedCount})
                     </button>
                   </div>
 
@@ -870,11 +973,11 @@ export default function ViewMyTenderPage() {
                         onChange={(e) => setSortMode(e.target.value as any)}
                         className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold text-navy-900 focus:outline-none focus:ring-2 focus:ring-accent-500"
                       >
-                        <option value="price_asc">Price: Low to High 💰</option>
-                        <option value="price_desc">Price: High to Low 📈</option>
-                        <option value="rating_desc">Vendor Rating ⭐</option>
-                        <option value="compliance_desc">Document Compliance 📄</option>
-                        <option value="date_desc">Submission Date 🕒</option>
+                        <option value="price_asc">Price: Low to High</option>
+                        <option value="price_desc">Price: High to Low</option>
+                        <option value="rating_desc">Vendor Rating</option>
+                        <option value="compliance_desc">Document Compliance</option>
+                        <option value="date_desc">Submission Date</option>
                       </select>
                     </div>
 
@@ -956,7 +1059,7 @@ export default function ViewMyTenderPage() {
                           <div className="flex flex-wrap gap-1.5">
                             {bid.is_lowest_bid && (
                               <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-bold rounded-md flex items-center gap-1">
-                                🏆 Lowest Bid
+                                Lowest Bid
                               </span>
                             )}
                             {bid.is_enlisted && (
@@ -1012,7 +1115,7 @@ export default function ViewMyTenderPage() {
                               </div>
                               {bid.vendor_address && (
                                 <div className="col-span-2 mt-1 text-[11px] text-slate-500 truncate">
-                                  📍 {bid.vendor_address}
+                                  {bid.vendor_address}
                                 </div>
                               )}
                             </div>
@@ -1126,7 +1229,7 @@ export default function ViewMyTenderPage() {
                                   : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/20 hover:shadow-lg'
                               }`}
                             >
-                              <span>🏆 Accept & Award Bid</span>
+                              Accept & Award Bid
                             </button>
                           )}
                         </div>

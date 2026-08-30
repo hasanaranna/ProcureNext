@@ -22,18 +22,10 @@ export default function InvitationSection() {
   const [invitationToken, setInvitationToken] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
 
-  const getAuthHeaders = (): Record<string, string> => {
-    const token = localStorage.getItem('access_token');
-    return {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    };
-  };
-
   const fetchInvitations = useCallback(async () => {
     try {
       const res = await fetch(`/api/org/invitations?t=${new Date().getTime()}`, {
-        headers: getAuthHeaders(),
+        credentials: 'include',
       });
       if (res.ok) {
         const data = await res.json();
@@ -58,7 +50,8 @@ export default function InvitationSection() {
     try {
       const res = await fetch('/api/org/invitations', {
         method: 'POST',
-        headers: getAuthHeaders(),
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: email.trim()
         }),
@@ -85,7 +78,7 @@ export default function InvitationSection() {
     try {
       const res = await fetch(`/api/org/invitations/${invitationId}`, {
         method: 'DELETE',
-        headers: getAuthHeaders(),
+        credentials: 'include',
       });
 
       if (res.ok) {
@@ -119,7 +112,7 @@ export default function InvitationSection() {
               ? 'border-navy-900 text-navy-900'
               : 'border-transparent text-slate-400 hover:text-slate-600'
           }`}>
-          ✉️ Invite
+          Invite
         </button>
         <button onClick={() => setActiveTab('sent')}
           className={`flex-1 py-3 text-sm font-semibold transition-all duration-200 border-b-[3px] ${
@@ -127,7 +120,7 @@ export default function InvitationSection() {
               ? 'border-navy-900 text-navy-900'
               : 'border-transparent text-slate-400 hover:text-slate-600'
           }`}>
-          📬 Sent Invitations
+          Sent Invitations
           {pendingInvitations.length > 0 && (
             <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-bold text-white bg-navy-900">
               {pendingInvitations.length}
@@ -273,7 +266,7 @@ export default function InvitationSection() {
                                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                 : 'bg-accent-50 text-accent-700 border border-accent-200 hover:bg-accent-100'
                             }`}>
-                            {copiedId === inv.invitation_id ? '✓ Copied!' : '🔗 Copy Link'}
+                            {copiedId === inv.invitation_id ? 'Copied!' : 'Copy Link'}
                           </button>
                           <button onClick={() => handleCancel(inv.invitation_id)}
                             className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-all duration-200">

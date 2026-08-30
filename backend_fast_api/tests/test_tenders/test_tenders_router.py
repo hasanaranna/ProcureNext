@@ -126,7 +126,7 @@ class TestBuyerMyTenders:
         assert data[0]["title"] == "Office Supplies Tender"
         assert data[1]["title"] == "IT Equipment Procurement"
         assert data[0]["buyer_org_name"] == "Acme Corp"
-        mock_get_tenders.assert_called_once_with(mock_conn, mock_user_org["organization_id"])
+        mock_get_tenders.assert_called_once_with(mock_conn, mock_user_org["organization_id"], status=None)
 
     @pytest.mark.asyncio
     @patch("app.modules.tenders.router.get_db_connection")

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import SignupModal from '@/components/SignupModal';
+import ForgotPasswordModal from '@/components/ForgotPasswordModal';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,6 +12,7 @@ export default function LoginPage() {
     password: '',
   });
   const [showSignupModal, setShowSignupModal] = useState(false);
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -161,9 +163,18 @@ export default function LoginPage() {
 
               {/* Password Field */}
               <div>
-                <label htmlFor="password" className="block text-sm font-semibold text-navy-900 mb-2">
-                  Password
-                </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label htmlFor="password" className="block text-sm font-semibold text-navy-900">
+                    Password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPasswordModal(true)}
+                    className="text-xs font-semibold text-accent-600 hover:text-accent-700 transition cursor-pointer"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
                 <input
                   type="password"
                   id="password"
@@ -213,6 +224,12 @@ export default function LoginPage() {
 
       {/* Signup Modal */}
       <SignupModal isOpen={showSignupModal} onClose={closeSignupModal} />
+
+      {/* Forgot Password Modal */}
+      <ForgotPasswordModal
+        isOpen={showForgotPasswordModal}
+        onClose={() => setShowForgotPasswordModal(false)}
+      />
     </main>
   );
 }
