@@ -1,0 +1,1626 @@
+\documentclass[11pt, a4paper]{article}
+
+% ============================================================
+% PACKAGES
+% ============================================================
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=0.9in]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage[table]{xcolor} % [table] option loads colortbl for \rowcolor support
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{parskip}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{tocloft}
+\usepackage{textcomp}
+\usepackage{microtype}
+
+% ============================================================
+% COLOR DEFINITIONS
+% ============================================================
+\definecolor{primaryblue}{HTML}{1A365D}
+\definecolor{accentblue}{HTML}{2B6CB0}
+\definecolor{lightbg}{HTML}{F8FAFC}
+\definecolor{darktext}{HTML}{1E293B}
+\definecolor{statusdone}{HTML}{16A34A}
+\definecolor{statuspartial}{HTML}{D97706}
+\definecolor{statusnot}{HTML}{DC2626}
+\definecolor{tableheader}{HTML}{1E293B}
+\definecolor{tablerow}{HTML}{F8FAFC}
+
+% ============================================================
+% HYPERLINK SETUP
+% ============================================================
+\hypersetup{
+    colorlinks=true,
+    linkcolor=accentblue,
+    urlcolor=accentblue,
+    citecolor=accentblue,
+    pdfauthor={ProcureNext Development Team},
+    pdftitle={ProcureNext — Implemented Features Report},
+    pdfsubject={Feature Report for Project Supervisor},
+}
+
+% ============================================================
+% HEADING STYLES
+% ============================================================
+\titleformat{\section}
+    {\color{primaryblue}\LARGE\bfseries}
+    {\thesection.}{0.5em}{}
+    [\vspace{-0.4em}\textcolor{primaryblue}{\rule{\textwidth}{1.2pt}}]
+
+\titleformat{\subsection}
+    {\color{primaryblue}\Large\bfseries}
+    {\thesubsection}{0.5em}{}
+
+\titleformat{\subsubsection}
+    {\color{accentblue}\large\bfseries}
+    {\thesubsubsection}{0.5em}{}
+
+\titlespacing*{\section}{0pt}{1.8em}{0.8em}
+\titlespacing*{\subsection}{0pt}{1.3em}{0.5em}
+\titlespacing*{\subsubsection}{0pt}{0.9em}{0.4em}
+
+% ============================================================
+% HEADER / FOOTER
+% ============================================================
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{primaryblue}{\textbf{ProcureNext}} --- Implemented Features Report}
+\fancyhead[R]{\small\textcolor{primaryblue}{August 2026}}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% ============================================================
+% TABLE STYLES & MACROS
+% ============================================================
+\setlength{\aboverulesep}{0pt}
+\setlength{\belowrulesep}{0pt}
+\renewcommand{\arraystretch}{1.3}
+
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcolumntype{R}[1]{>{\raggedleft\arraybackslash}p{#1}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+
+\newcommand{\tableheaderrow}{\rowcolor{tableheader}}
+\newcommand{\tableheadertext}[1]{\textcolor{white}{\textbf{#1}}}
+\newcommand{\altrow}{\rowcolor{tablerow}}
+
+% Status badges
+\newcommand{\statusdone}{\textcolor{statusdone}{\textbf{Done}}}
+\newcommand{\statusdonelimited}{\textcolor{statusdone}{\textbf{Done}}\,\textit{\small(Data limited)}}
+\newcommand{\statuspartial}{\textcolor{statuspartial}{\textbf{Partial}}}
+\newcommand{\statuspartialplus}{\textcolor{statuspartial}{\textbf{Partial+}}}
+\newcommand{\statuspartiallimited}{\textcolor{statuspartial}{\textbf{Partial}}\,\textit{\small(Data limited)}}
+\newcommand{\statusactive}{\textcolor{statusdone}{\textbf{Active}}}
+\newcommand{\statusnot}{\textcolor{statusnot}{\textbf{Not Implemented}}}
+
+% ============================================================
+% TOC FORMATTING
+% ============================================================
+\renewcommand{\cftsecfont}{\color{primaryblue}\bfseries}
+\renewcommand{\cftsecpagefont}{\color{primaryblue}\bfseries}
+\renewcommand{\cftsubsecfont}{\color{darktext}}
+\setlength{\cftbeforesecskip}{5pt}
+\setlength{\cftbeforesubsecskip}{2pt}
+
+% ============================================================
+% DOCUMENT BEGINS
+% ============================================================
+\begin{document}
+
+% ============================================================
+% TITLE PAGE
+% ============================================================
+\begin{titlepage}
+    \centering
+    \vspace*{2.5cm}
+
+    {\Huge\bfseries\textcolor{primaryblue}{ProcureNext}\par}
+    \vspace{0.4cm}
+    {\LARGE\textcolor{accentblue}{AI-Powered eProcurement Platform}\par}
+
+    \vspace{1.2cm}
+    {\textcolor{primaryblue}{\rule{0.6\textwidth}{2pt}}\par}
+    \vspace{1.2cm}
+
+    {\huge\bfseries Implemented Features Report\par}
+    \vspace{1.8cm}
+
+    \begin{tabular}{r l}
+        \textbf{Repository:}    & \href{https://github.com/hasanaranna/ProcureNext.git}{\texttt{\small https://github.com/hasanaranna/ProcureNext.git}} \\[6pt]
+        \textbf{Report Date:}   & August 30, 2026 \\[6pt]
+        \textbf{Prepared For:}  & Project Supervisor \\[6pt]
+        \textbf{Version:}       & 1.0 \\[6pt]
+        \textbf{Document Type:} & Technical Progress \& Architecture Report \\
+    \end{tabular}
+
+    \vfill
+
+    {\small\textcolor{darktext!70}{This report documents all implemented features of the ProcureNext platform,\\
+    mapped against the project's 25 functional requirements (FRs).}\par}
+
+\end{titlepage}
+
+% ============================================================
+% TABLE OF CONTENTS
+% ============================================================
+\newpage
+\tableofcontents
+\newpage
+
+% ============================================================
+% 1. EXECUTIVE SUMMARY
+% ============================================================
+\section{Executive Summary}
+
+ProcureNext is a full-stack, AI-powered electronic procurement (eProcurement) platform designed to digitize and streamline the public and private procurement lifecycle. The system supports three distinct user roles --- \textbf{Buyer Organizations}, \textbf{Vendor Organizations}, and \textbf{Platform Administrators} --- with end-to-end functionality spanning tender creation, vendor bidding, AI-assisted bid evaluation, real-time encrypted messaging, token-based monetization, and WORM-compliant audit logging.
+
+The platform is built as a microservices-oriented application comprising a \textbf{FastAPI backend}, a \textbf{Next.js frontend}, an \textbf{ML microservice} for document intelligence, and \textbf{Celery workers} for asynchronous task processing. All services are containerized via Docker Compose and backed by a \textbf{PostgreSQL database} hosted on \textbf{Supabase} with cloud object storage for documents.
+
+\vspace{0.8em}
+\noindent\textbf{Key accomplishments at the time of this report:}
+
+\begin{itemize}[leftmargin=1.5em, itemsep=3pt]
+    \item \textbf{25 functional requirements} defined; \textbf{13 fully implemented}, \textbf{7 partially implemented}, \textbf{5 pending integration}
+    \item \textbf{280 automated tests} passing across 18 test modules
+    \item \textbf{40+ REST API endpoints} implemented and mounted
+    \item \textbf{Real-time WebSocket messaging} with AES-256-GCM encryption
+    \item \textbf{AI-powered PDF tender parsing} and \textbf{LLM-assisted bid evaluation}
+    \item \textbf{Cryptographically chained, tamper-proof audit log} with WORM enforcement
+    \item \textbf{Full containerized deployment} via Docker Compose (6 services)
+\end{itemize}
+
+
+% ============================================================
+% 2. SYSTEM ARCHITECTURE OVERVIEW
+% ============================================================
+\section{System Architecture Overview}
+
+ProcureNext follows a layered, modular architecture with clear separation of concerns. The system is composed of five distinct layers, each with well-defined responsibilities.
+
+\subsection{Layer 1 --- Client Layer}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.2cm} L{4.5cm} Y}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Component} & \tableheadertext{Technology} & \tableheadertext{Responsibility} \\
+    \midrule
+    Web Application & Next.js 14 (React / TypeScript) & Server-side rendering, client-side interactivity, routing \\
+    \altrow
+    Communication & HTTP REST + WebSocket & API calls and real-time messaging \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Layer 2 --- API Gateway Layer (FastAPI)}
+
+\textbf{Middleware Stack:}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} C{2cm} Y}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Middleware} & \tableheadertext{Status} & \tableheadertext{Responsibility} \\
+    \midrule
+    CORS Middleware & Active & Cross-origin request handling for frontend communication \\
+    \altrow
+    Request Logging & Active & Structured JSON logging with request IDs and timing \\
+    Audit Middleware & Active & Auto-capture of state-changing operations to audit outbox \\
+    \altrow
+    Rate Limiter & Defined & Protection of public endpoints from abuse \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Mounted Module Routers:}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{2.6cm} L{4.2cm} Y}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Module} & \tableheadertext{Prefix} & \tableheadertext{Domain} \\
+    \midrule
+    auth & \texttt{/api/auth} & Login, registration, password reset \\
+    \altrow
+    organizations & \texttt{/orgs} & Organization CRUD, members, documents \\
+    tenders & \texttt{/tenders}, \texttt{/buyer} & Tender lifecycle, public browsing \\
+    \altrow
+    bids & \texttt{/bids} & Bid submission, comparison, evaluation \\
+    messaging & \texttt{/api/messages} & Encrypted DM, threads, WebSocket \\
+    \altrow
+    payments & \texttt{/payments} & Token balance, purchase, transactions \\
+    notifications & \texttt{/notifications} & In-app notification management \\
+    \altrow
+    admin & \texttt{/admin} & Platform moderation, pricing, verification \\
+    audit & \texttt{/admin/audit} & Audit log search, integrity verification \\
+    \altrow
+    users & \texttt{/api/users} & Profile, password, documents \\
+    contracts & \texttt{/contracts} & Contract lifecycle (stub) \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Layer 3 --- ML Microservice}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.2cm} L{4.5cm} Y}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Component} & \tableheadertext{Technology} & \tableheadertext{Responsibility} \\
+    \midrule
+    Tender Parser & Groq LLM + PyPDF2 & Extract structured fields from procurement PDFs \\
+    \altrow
+    Bid Evaluator & Groq LLM (4-stage) & Financial, compliance, semantic, and rubric scoring \\
+    Embedding Engine & SentenceTransformer & Generate 384-dim vectors for semantic similarity \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Layer 4 --- Task Queue Layer}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.2cm} L{4.5cm} Y}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Component} & \tableheadertext{Technology} & \tableheadertext{Responsibility} \\
+    \midrule
+    Celery Worker & Celery 5 & Asynchronous task execution \\
+    \altrow
+    Celery Beat & Beat Scheduler & Periodic task scheduling (auto-close, audit drain) \\
+    Message Broker & Redis 7 & Task queue broker and result backend \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Registered Background Tasks:}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{4.8cm} L{2.4cm} Y}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Task Name} & \tableheadertext{Schedule} & \tableheadertext{Responsibility} \\
+    \midrule
+    \texttt{\small upload\_tender\_documents} & On-demand & Async document upload to cloud storage \\
+    \altrow
+    \texttt{\small process\_pdf\_tender} & On-demand & PDF parsing via ML service \\
+    \texttt{\small send\_password\_reset\_email} & On-demand & Async email dispatch via SMTP \\
+    \altrow
+    \texttt{\small auto\_close\_expired\_tenders} & Hourly (Beat) & Close tenders past submission deadline \\
+    \texttt{\small process\_audit\_outbox} & Periodic (Beat) & Drain audit outbox and build hash chain \\
+    \altrow
+    \texttt{\small audit\_tamper\_detection} & Periodic (Beat) & Verify cryptographic integrity of audit logs \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Layer 5 --- Data Layer}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.2cm} L{4.5cm} Y}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Component} & \tableheadertext{Technology} & \tableheadertext{Responsibility} \\
+    \midrule
+    Primary Database & PostgreSQL 15 (+ pgvector) & 30+ relational tables, vector similarity indexes \\
+    \altrow
+    Cloud Storage & Supabase Storage & PDF documents, NID images, org certificates \\
+    Cache / Broker & Redis 7 Alpine & Celery broker, result backend, application cache \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+
+% ============================================================
+% 3. TECHNOLOGY STACK
+% ============================================================
+\section{Technology Stack}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{2.5cm} L{4.2cm} Y}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Layer} & \tableheadertext{Technology} & \tableheadertext{Purpose} \\
+    \midrule
+    Frontend & Next.js 14, React 18, TypeScript & Server-side rendered UI with client-side interactivity \\
+    \altrow
+    Styling & Tailwind CSS & Utility-first responsive design \\
+    Backend API & FastAPI (Python 3.11+) & Async REST API with automatic OpenAPI docs \\
+    \altrow
+    Database & PostgreSQL 15 + pgvector & Relational data storage + vector similarity search \\
+    Cloud Storage & Supabase Storage & Document and file hosting (PDFs, NID images) \\
+    \altrow
+    Task Queue & Celery + Redis & Background job processing (docs, emails, ML) \\
+    Cache / Broker & Redis 7 & Message broker for Celery and application caching \\
+    \altrow
+    ML Service & FastAPI + Groq LLM + SentenceTransformers & Document parsing, embeddings, bid evaluation \\
+    Authentication & JWT (HS256) + bcrypt & Access/refresh token pair with password hashing \\
+    \altrow
+    Encryption & AES-256-GCM & End-to-end message encryption at rest \\
+    Email & SMTP (Gmail) via Celery & Transactional email (invitations, password resets) \\
+    \altrow
+    Containerization & Docker + Docker Compose & Multi-service orchestration (6 containers) \\
+    Testing & pytest + pytest-asyncio & Automated unit and integration testing \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+
+% ============================================================
+% 4. DATABASE DESIGN
+% ============================================================
+\section{Database Design}
+
+The database schema consists of \textbf{30+ tables} organized into logical domains.
+
+\subsection{Core User and Authentication Tables}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{4.5cm} Y}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Table} & \tableheadertext{Purpose} \\
+    \midrule
+    \texttt{users} & Central user accounts with email, NID, password hash, 2FA flag, status \\
+    \altrow
+    \texttt{admins} & Platform administrator role assignments (SuperAdmin, PlatformAdmin) \\
+    \texttt{user\_verification} & NID document review status for KYC compliance \\
+    \altrow
+    \texttt{password\_reset\_tokens} & Time-limited (30-minute) cryptographic reset tokens \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Organization Tables}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{4.5cm} Y}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Table} & \tableheadertext{Purpose} \\
+    \midrule
+    \texttt{organizations} & Buyer/Vendor entities with verification status, credit balance, embeddings \\
+    \altrow
+    \texttt{organization\_employees} & User-to-org membership with role-based access \\
+    \texttt{user\_invitations} & Email-based employee invitation tokens with 7-day expiry \\
+    \altrow
+    \texttt{organization\_documents} & Trade License, TIN, VAT, RJSC verification documents \\
+    \texttt{document\_types} & Extensible document type catalog \\
+    \altrow
+    \texttt{enlisted\_vendors} & Buyer-Vendor business relationship tracking \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Tender and Bidding Tables}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{4.8cm} Y}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Table} & \tableheadertext{Purpose} \\
+    \midrule
+    \texttt{tenders} & Core tender entity with lifecycle status (Draft, Published, Closed, Awarded, Cancelled) \\
+    \altrow
+    \texttt{tender\_documents} & Uploaded procurement documents (PDFs, BOQ, scope of work) \\
+    \texttt{tender\_required\_documents} & Per-tender document requirements for bidders \\
+    \altrow
+    \texttt{tender\_categories} & Hierarchical tender classification \\
+    \texttt{procurement\_nature} & Goods, Works, Services, Consultancy \\
+    \altrow
+    \texttt{procurement\_method} & OTM, RFQ, RFP, ReverseAuction, Direct \\
+    \texttt{tender\_invitations} & Vendor invitations for restricted tenders \\
+    \altrow
+    \texttt{tender\_vendor\_suggestions} & AI-generated vendor recommendations with similarity scores \\
+    \texttt{bids} & Vendor bid submissions with financial amount and status tracking \\
+    \altrow
+    \texttt{bid\_documents} & Uploaded bid compliance documents linked to requirements \\
+    \texttt{bid\_securities} & Bid bond/security documentation \\
+    \altrow
+    \texttt{bid\_evaluation\_runs} & LLM-assisted evaluation run lifecycle tracking \\
+    \texttt{bid\_evaluations} & Per-bid scoring results (financial, document, semantic, LLM rubric) \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Award and Contract Tables}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{4.5cm} Y}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Table} & \tableheadertext{Purpose} \\
+    \midrule
+    \texttt{awards} & Winning bid selection records \\
+    \altrow
+    \texttt{contracts} & Post-award contract lifecycle (Active, Completed, Terminated) \\
+    \texttt{vendor\_performance} & Performance ratings and feedback with vector embeddings \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Payment and Credit Tables}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{4.5cm} Y}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Table} & \tableheadertext{Purpose} \\
+    \midrule
+    \texttt{payments} & Payment gateway transaction records \\
+    \altrow
+    \texttt{credit\_transactions} & Token purchase, deduction, and refund ledger \\
+    \texttt{platform\_pricing} & Configurable per-token price, tender publish cost, bid cost \\
+    \altrow
+    \texttt{token\_packages} & Admin-managed token bundles with pricing \\
+    \texttt{credit\_discounts} & Organization-specific pricing overrides \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Messaging Tables}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{4.5cm} Y}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Table} & \tableheadertext{Purpose} \\
+    \midrule
+    \texttt{message\_threads} & Intra-company and inter-company conversation threads \\
+    \altrow
+    \texttt{thread\_participants} & Thread membership with read tracking \\
+    \texttt{messages} & AES-256-GCM encrypted message content with IV storage \\
+    \altrow
+    \texttt{tender\_chat\_rooms} & Buyer-Vendor chat scoped to specific tenders \\
+    \texttt{group\_chat} & Organization-level group messaging \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Notification Tables}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{4.5cm} Y}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Table} & \tableheadertext{Purpose} \\
+    \midrule
+    \texttt{notification\_types} & Extensible notification type catalog \\
+    \altrow
+    \texttt{notifications} & Platform notifications with reference linking \\
+    \texttt{notification\_recipients} & Per-user delivery and read tracking \\
+    \altrow
+    \texttt{user\_notifications} & Direct user-level notifications \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Audit and Compliance Tables}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{4.5cm} Y}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Table} & \tableheadertext{Purpose} \\
+    \midrule
+    \texttt{audit\_outbox} & Transactional outbox for non-blocking event capture \\
+    \altrow
+    \texttt{audit\_logs} & WORM-compliant, cryptographically chained, append-only audit log \\
+    \texttt{audit\_archives} & Sealed batch archives with Merkle root verification \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\noindent\textbf{Key Enums:} \texttt{user\_status}, \texttt{organization\_type}, \texttt{verification\_status}, \texttt{role\_in\_org}, \texttt{tender\_status}, \texttt{tender\_visibility}, \texttt{bid\_status}, \texttt{contract\_status}, \texttt{transaction\_type}, \texttt{notification\_ref\_type}, \texttt{procurement\_nature\_val}, \texttt{procurement\_method\_val}
+
+
+% ============================================================
+% 5. IMPLEMENTED FEATURES BY FR
+% ============================================================
+\newpage
+\section{Implemented Features by Functional Requirement}
+
+% ---- FR-01 ----
+\subsection{FR-01: Landing Page and Public Interface}
+\noindent\textbf{Status:} \statusdone
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    Public Landing Page & Marketing homepage with platform overview, hero section, feature showcase, and call-to-action & Next.js server-rendered page \\
+    \altrow
+    Navigation & Header with links to About, News, Events, Help, Legal, Policies, Support & Dedicated route directories \\
+    Static Info Pages & About, Help, Legal, and Policy pages for platform information & Static Next.js pages \\
+    \altrow
+    Responsive Design & Mobile-first responsive layout using Tailwind CSS & Global CSS + Tailwind config \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+% ---- FR-02 ----
+\subsection{FR-02: Public Tender Browsing}
+\noindent\textbf{Status:} \statusdone{} \textit{(Fixed Post-Audit)}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    Public Tenders Listing & Browse all published public tenders without authentication & \texttt{\small GET /tenders/public/list} \\
+    \altrow
+    Tender Detail View & View full tender details including documents, deadlines, and budget & \texttt{\small GET /tenders/public/\{id\}} \\
+    API Path Correction & Fixed incorrect frontend API path (post-audit fix) & Removed broken proxy path \\
+    \altrow
+    Error State Handling & Shows proper error states when API is unreachable & Replaced hardcoded fallback \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+% ---- FR-03 ----
+\subsection{FR-03: Search and Discovery}
+\noindent\textbf{Status:} \statusdonelimited
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    Semantic Search & Vector-based similarity search matching tender descriptions & \texttt{\small pgvector} cosine similarity \\
+    \altrow
+    Keyword \& Filter Search & Search tenders by title, category, procurement nature and method & Database filter indexes \\
+    Embedding Query Pipeline & User search queries converted to 384-dim embeddings via ML service & \texttt{\small SentenceTransformer} model \\
+    \altrow
+    Data Volume Note & Search architecture and backend indexes are complete; production testing is subject to mock data volume & Fully functional engine \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+% ---- FR-04 ----
+\subsection{FR-04: Organization Registration and Onboarding}
+\noindent\textbf{Status:} \statusdone
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    Master Account Signup & Owner registers with full KYC details (name, email, NID, DOB, phone, org info) & \texttt{\small POST /orgs} \\
+    \altrow
+    Organization Types & Support for Buyer and Vendor organization types & \texttt{\small organization\_type} enum \\
+    Document Upload & Upload Trade License, TIN, VAT, and RJSC certificates & \texttt{\small POST /orgs/\{id\}/docs} \\
+    \altrow
+    Verification Status & Organization enters Pending status until admin verifies & \texttt{\small verification\_status} \\
+    Unique Join Code & Auto-generated unique join code for member onboarding & \texttt{\small unique\_join\_code} field \\
+    \altrow
+    NID Verification & Upload NID front and back images for identity verification & Supabase Storage \\
+    Credit Balance Init & New organizations receive 250 starter tokens & \texttt{\small credit\_balance = 250} \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+% ---- FR-05 ----
+\subsection{FR-05: User Authentication and Account Security}
+\noindent\textbf{Status:} \statusdone
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    User Login & Email + password authentication with JWT access/refresh token pair & \texttt{\small POST /api/auth/login} \\
+    \altrow
+    Access Token & 60-minute expiry JWT with user ID and email in payload & \texttt{\small create\_access\_token()} \\
+    Refresh Token & 7-day expiry JWT for session renewal & \texttt{\small create\_refresh\_token()} \\
+    \altrow
+    Password Hashing & bcrypt-based password hashing and verification & \texttt{\small bcrypt.hashpw()} \\
+    Change Password & Authenticated users can change their password & \texttt{\small PUT /api/users/me/pwd} \\
+    \altrow
+    Password Reset & Email-based reset with 30-minute cryptographic token & \texttt{\small POST /api/auth/forgot} \\
+    Reset Token Verify & Validates token existence, expiry, and single-use enforcement & \texttt{\small GET /api/auth/verify} \\
+    \altrow
+    Reset Confirmation & Updates password hash after valid token verification & \texttt{\small POST /api/auth/reset} \\
+    Token Security & Previous unused tokens auto-invalidated on new request & SQL-level invalidation \\
+    \altrow
+    Last Login Tracking & Records timestamp of each successful login & \texttt{\small UPDATE users ...} \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+% ---- FR-06 ----
+\subsection{FR-06: Organization Profile and Verification}
+\noindent\textbf{Status:} \statusdone
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    Org Profile & View and update organization details (name, address, website, description) & \texttt{\small GET/PUT /orgs/\{id\}} \\
+    \altrow
+    Document Mgmt & Upload and track verification documents with review status & \texttt{\small POST/GET .../documents} \\
+    Admin Verification & Platform admin reviews and approves/rejects org documents & \texttt{\small POST /admin/verify/\{id\}} \\
+    \altrow
+    Org Search & Search organizations by name and type & \texttt{\small GET /search-organization} \\
+    Vendor Enlistment & Buyer orgs can enlist verified vendors for future tenders & \texttt{\small enlisted\_vendors} table \\
+    \altrow
+    Org Directory & Browse and view verified organizations & Frontend listing pages \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+% ---- FR-07 ----
+\subsection{FR-07: Employee Invitation and Management}
+\noindent\textbf{Status:} \statusdone
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    Email Invitations & Owner invites employees via email with unique token link & \texttt{\small POST /orgs/\{id\}/invite} \\
+    \altrow
+    Invitation Accept & Invited user registers with pre-filled org association & \texttt{\small POST /auth/register} \\
+    Role Assignment & Owner assigns roles (ProcurementOfficer, Finance, Viewer, TenderReceiver) & \texttt{\small PUT .../members/role} \\
+    \altrow
+    Member Management & View, update roles, and remove organization members & GET/DELETE member endpoints \\
+    Invitation Expiry & Invitations automatically expire after 7 days & \texttt{\small expires\_at + 7 days} \\
+    \altrow
+    Invitation UI & Frontend section with pending/accepted status display & \texttt{\small InvitationSection.tsx} \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+% ---- FR-08 ----
+\subsection{FR-08: Tender Creation and Lifecycle Management}
+\noindent\textbf{Status:} \statusdone
+
+This is the most feature-rich module in the system, covering the complete tender lifecycle.
+
+\subsubsection{Tender Creation}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    Manual Creation & Create tender with title, description, category, nature/method, budget, deadlines, doc requirements & \texttt{\small POST /buyer/tender} \\
+    \altrow
+    One-Click PDF & Upload procurement PDF; AI extracts and auto-fills all tender fields & Async Celery + ML Service \\
+    Document Upload & Attach multiple PDFs (scope of work, BOQ, specifications) & Supabase Storage + Celery \\
+    \altrow
+    Required Docs List & Define which documents vendors must submit with bids & \texttt{\small tender\_required\_docs} \\
+    Procurement Class. & Nature (Goods/Works/Services/Consultancy) and Method (OTM/RFQ/RFP/Auction/Direct) & Lookup tables + enums \\
+    \altrow
+    Form Autosave & Draft autosave to localStorage for in-progress creation & Client-side persistence \\
+    Token Deduction & Publishing deducts tokens from buyer org balance & \texttt{\small credit\_transactions} \\
+    \altrow
+    Vector Embedding & Generated 384-dim embedding for semantic similarity & SentenceTransformer \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\subsubsection{Server-Side Draft Workflow}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    Save as Draft & Save tender without publishing (status = Draft) & \texttt{\small POST /buyer/draft} \\
+    \altrow
+    Draft Listing & Buyer sees draft tenders on dashboard & \texttt{\small GET /buyer/my-tenders} \\
+    Publish Draft & Promote a draft to Published with token deduction & \texttt{\small POST /tenders/\{id\}/pub} \\
+    \altrow
+    Edit Rules & Draft freely edited; Published only if no bids received & \texttt{\small PUT /tenders/\{id\}} \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\subsubsection{Edit, Cancel, Delete, and Auto-Close}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    Update Tender & Modify tender details (title, budget, deadlines, documents) & \texttt{\small PUT /tenders/\{id\}} \\
+    \altrow
+    Edit Page & Dedicated frontend page for editing tender details & \texttt{\small edit-tender/[id]/page} \\
+    Soft Cancel & Cancel a published tender (status \textrightarrow{} Cancelled) & \texttt{\small POST /tenders/.../withdraw} \\
+    \altrow
+    Hard Delete & Permanently delete a draft or no-bid tender & \texttt{\small DELETE /tenders/\{id\}} \\
+    Cancel vs Delete UX & Confirmation modals differentiate cancel from delete & Frontend dialogs \\
+    \altrow
+    Notif. Cleanup & Deleting a tender removes associated notifications & Cascading delete logic \\
+    Auto-Close Expired & Celery Beat job closes tenders past submission deadline & Hourly periodic task \\
+    \altrow
+    Status Badges & Visual status indicators on tender cards & \texttt{\small TenderCard.tsx} \\
+    Status Filters & Filter tenders by status on buyer dashboard & Enum-based filtering \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\subsubsection{Buyer Tender Workbench}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    My Tenders List & View all tenders created by buyer organization & \texttt{\small GET /buyer/jobs} \\
+    \altrow
+    Tender Detail & Full tender detail with tabs for bids, comparison, actions & \texttt{\small view-my-tender/[id]} \\
+    Bid Comparison & Side-by-side bid comparison with metrics & \texttt{\small GET /bids/.../compare} \\
+    \altrow
+    Accept Bid & Accept a winning bid and award the tender & \texttt{\small POST /bids/.../accept} \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+% ---- FR-09 ----
+\subsection{FR-09: Vendor Recommendations and Matching}
+\noindent\textbf{Status:} \statusdonelimited
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    Intelligent Matching & Match published tenders with vendor specializations via vector embeddings & \texttt{\small pgvector} cosine similarity \\
+    \altrow
+    Suggestion Table & Auto-generate vendor recommendation records per tender & \texttt{\small tender\_vendor\_suggestions} \\
+    Similarity Scoring & Float score indicating alignment between tender scope and vendor profile & Embedding dot product \\
+    \altrow
+    Data Volume Note & Recommendation architecture is fully implemented; recommendation breadth expands with production data & Fully functional pipeline \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+% ---- FR-10 ----
+\subsection{FR-10: Bid Submission and Management}
+\noindent\textbf{Status:} \statusdone
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    Browse Tenders & Vendor dashboard shows all available published tenders & Home page with search \\
+    \altrow
+    Bid Submission & Submit bid with financial amount, description, and required documents & \texttt{\small POST /bids/vendor/submit} \\
+    Document Upload & Upload compliance documents mapped to tender requirements & Supabase Storage upload \\
+    \altrow
+    Bid Update & Modify a submitted bid (amount, description, documents) & \texttt{\small PUT /bids/\{bid\_id\}} \\
+    Bid Withdrawal & Withdraw a submitted bid & \texttt{\small DELETE /bids/\{bid\_id\}} \\
+    \altrow
+    My Bids View & View all bids submitted by vendor organization & \texttt{\small GET /bids/vendor/my-bids} \\
+    Ongoing Tenders & Track awarded tenders where vendor is the winner & \texttt{\small ongoing-tenders/ page} \\
+    \altrow
+    Token Deduction & Bidding deducts tokens from vendor org balance & Credit transaction on submit \\
+    Document Download & Download bid documents via signed Supabase URLs & Signed URL generation \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+% ---- FR-15 ----
+\subsection{FR-15: Dashboard and Analytics}
+\noindent\textbf{Status:} \statuspartialplus
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    Buyer Dashboard & Overview of created tenders with status breakdown and quick actions & \texttt{\small home/page.tsx} \\
+    \altrow
+    Seller Dashboard & Live statistics (total bids, active tenders, awarded contracts) & Aggregated from API \\
+    Tender Search & Client-side search filtering by title, description, and org name & Real-time client filter \\
+    \altrow
+    Status-Based Tabs & Quick filters for Draft, Published, Closed, Awarded, Cancelled & Tab-based navigation \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+% ---- FR-16 ----
+\subsection{FR-16: Intra-Company Messaging and Real-Time Chat}
+\noindent\textbf{Status:} \statusdone
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    Intra-Company DM & 1-to-1 direct messaging between organization members & \texttt{\small POST /api/messages/dm} \\
+    \altrow
+    Msg Encryption & AES-256-GCM encryption of all message content at rest & \texttt{\small encryption.py} (12-byte IV) \\
+    Key Management & Server-managed 256-bit key from environment variable & \texttt{\small MESSAGE\_ENCRYPTION\_KEY} \\
+    \altrow
+    WebSocket Real-Time & Live message delivery via WebSocket connections & \texttt{\small ws://.../ws/messages} \\
+    Connection Mgr & Active WebSocket connections per user with multi-device support & \texttt{\small ConnectionManager} \\
+    \altrow
+    Ping/Pong & Client-server heartbeat to maintain persistent connections & \texttt{\small ping/pong protocol} \\
+    Contact Search & Search for colleagues within the same organization & \texttt{\small GET /contacts/search} \\
+    \altrow
+    Thread Listing & View all conversation threads with last message preview & \texttt{\small GET /api/messages/threads} \\
+    Message History & Paginated message history per thread with decryption & \texttt{\small GET .../messages} \\
+    \altrow
+    Send Message & Encrypted message with real-time broadcast to recipient & \texttt{\small POST .../messages} \\
+    Messaging Sidebar & Slide-out messaging UI accessible from any page & \texttt{\small MessagingSidebar.tsx} \\
+    \altrow
+    Read Tracking & Track when participants last read a thread & \texttt{\small last\_read\_at} field \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+% ---- FR-17 ----
+\subsection{FR-17: Inter-Company and Tender-Scoped Messaging}
+\noindent\textbf{Status:} \statuspartial
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    Tender Chat Rooms & Dedicated chat rooms scoped to specific tenders & \texttt{\small tender\_chat\_rooms} table \\
+    \altrow
+    Tender Messages & Buyer-to-Vendor clarification messages during bidding window & \texttt{\small tender\_chat\_messages} \\
+    Integration Status & Database schema and models defined; UI routing in progress & Backend schema active \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+% ---- FR-18 ----
+\subsection{FR-18: Token Economy and Payment System}
+\noindent\textbf{Status:} \statuspartial
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    Token Balance & View organization's current credit token balance & \texttt{\small GET /payments/balance} \\
+    \altrow
+    Platform Pricing & Configurable per-token price, tender publish cost, bid cost & \texttt{\small GET /payments/pricing} \\
+    Token Packages & Pre-defined token bundles with calculated savings & \texttt{\small GET /payments/packages} \\
+    \altrow
+    Token Purchase & Purchase tokens via payment gateway (sandbox simulation) & \texttt{\small POST /payments/purchase} \\
+    Transaction History & View purchase, deduction, and refund transaction ledger & \texttt{\small GET /payments/transactions} \\
+    \altrow
+    Credit Deduction & Automatic deduction on tender publish and bid submission & Service-level deduction \\
+    Transaction Ledger & Complete audit trail of all credit movements & \texttt{\small credit\_transactions} table \\
+    \altrow
+    Manage Tokens UI & Frontend for viewing balance, buying tokens, and history & \texttt{\small ManageTokensModal.tsx} \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\noindent\textit{Payment gateway: Currently using sandbox simulation. SSLCommerz integration is defined but not yet connected to live webhooks.}
+
+% ---- FR-20 ----
+\subsection{FR-20: In-App Notification System}
+\noindent\textbf{Status:} \statusdone
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    List Notifications & View all notifications with status filtering (all/unread/read) & \texttt{\small GET /notifications} \\
+    \altrow
+    Unread Count & Badge-style unread notification count for UI indicators & \texttt{\small GET .../unread-count} \\
+    Mark as Read & Mark individual notification as read & \texttt{\small PATCH .../\{id\}/read} \\
+    \altrow
+    Mark All Read & Bulk-mark all notifications as read & \texttt{\small PATCH .../read-all} \\
+    Delete Notification & Remove a specific notification & \texttt{\small DELETE .../\{id\}} \\
+    \altrow
+    Tender Notifications & Auto-generated notifications for tender events & \texttt{\small create\_notification()} \\
+    Notification Cleanup & Cascading cleanup when tender is deleted & Cascading delete logic \\
+    \altrow
+    Notification Types & Extensible notification type catalog & \texttt{\small notification\_types} table \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+% ---- FR-21 ----
+\subsection{FR-21: Admin Dashboard and Platform Moderation}
+\noindent\textbf{Status:} \statuspartialplus{} \textit{(Guards Added Post-Audit)}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    Admin Login & Dedicated admin auth with admin-role JWT claims & \texttt{\small POST /api/auth/admin/login} \\
+    \altrow
+    Admin Role Types & SuperAdmin and PlatformAdmin roles & \texttt{\small admin\_role\_type} enum \\
+    Auth Guards & All sensitive admin routes protected with \texttt{get\_current\_admin} & Post-audit fix \\
+    \altrow
+    Pending Accounts & View organizations awaiting verification approval & \texttt{\small GET /admin/pending-accounts} \\
+    Org Verification & Approve or reject organization with document review & \texttt{\small POST /admin/verify/\{id\}} \\
+    \altrow
+    Pricing Mgmt & Update platform-wide token pricing and activity costs & \texttt{\small POST /admin/update-price} \\
+    Package CRUD & Create, update, and delete token package bundles & \texttt{\small /admin/packages} \\
+    \altrow
+    Admin Dashboard UI & Dedicated admin interface with org review workflow & \texttt{\small admin-home/ page} \\
+    Request Detail & Modal for reviewing org details and verification documents & \texttt{\small PendingRequestDetailModal} \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+% ---- FR-22 ----
+\subsection{FR-22: Immutable Audit Trail and Compliance}
+\noindent\textbf{Status:} \statusactive{} \textit{(Activated Post-Audit)}
+
+This is a comprehensive, enterprise-grade audit system with multiple layers of protection.
+
+\subsubsection{Audit Middleware (Auto-Capture)}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    Auto Capture & Non-blocking middleware captures all state-changing operations & \texttt{\small AuditMiddleware} in \texttt{main.py} \\
+    \altrow
+    User Extraction & Extracts user identity from JWT Bearer token & JWT payload decoding \\
+    Request Metadata & Captures IP address, User-Agent, and response status code & Logged with audit event \\
+    \altrow
+    Selective Skipping & Skips non-auditable paths (docs, health, login, audit) & \texttt{\small SKIP\_PATH\_PREFIXES} \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\subsubsection{Transactional Outbox Pattern}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    Outbox Table & Non-blocking event buffer for audit events & \texttt{\small audit\_outbox} (PENDING) \\
+    \altrow
+    Background Draining & Celery task drains outbox and chains records cryptographically & \texttt{\small process\_audit\_outbox} \\
+    Failure Handling & Records marked FAILED with error messages on processing errors & Status column management \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\subsubsection{WORM-Compliant Cryptographic Audit Log}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    Append-Only Log & Immutable audit log --- inserts only, no updates or deletes & \texttt{\small audit\_logs} + trigger \\
+    \altrow
+    Crypto Chaining & Each entry references hash of previous (blockchain-style) & \texttt{\small previous\_hash, payload\_hash} \\
+    Tamper Detection & Periodic integrity verification walks the hash chain & \texttt{\small audit\_tamper\_detection} \\
+    \altrow
+    WORM Trigger & PostgreSQL trigger prevents UPDATE/DELETE/TRUNCATE & \texttt{\small trg\_protect\_audit\_logs} \\
+    Sequence Numbers & Monotonically increasing sequence for ordering/gap detection & \texttt{\small sequence\_number} BIGINT \\
+    \altrow
+    Event UUIDs & Globally unique event identifiers for deduplication & \texttt{\small event\_uuid} UUID UNIQUE \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\subsubsection{Audit API and Change Data Capture}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    Search Logs & Paginated, multi-filter audit log search & \texttt{\small GET /admin/audit/logs} \\
+    \altrow
+    Log Detail & Retrieve single audit entry by ID & \texttt{\small GET /admin/audit/logs/\{id\}} \\
+    Entity Trail & View complete audit history for a specific entity & \texttt{\small GET .../entity-trail} \\
+    \altrow
+    Integrity Check & Run on-demand hash chain verification & \texttt{\small POST .../verify-integrity} \\
+    Audit Stats & Summary statistics (entries, timestamp, chain health) & \texttt{\small GET /admin/audit/stats} \\
+    \altrow
+    Archive List & View sealed batch archives with Merkle root & \texttt{\small GET /admin/audit/archives} \\
+    CDC Triggers & Auto audit capture on INSERT/UPDATE/DELETE for critical tables & \texttt{\small fn\_cdc\_audit\_capture()} \\
+    \altrow
+    Old/New Values & Captures both old and new values as JSONB & \texttt{\small old\_values, new\_values} \\
+    Batch Sealing & Archive audit log batches with Merkle root verification & \texttt{\small seal\_audit\_archive\_batch()} \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+% ---- FR-24 ----
+\subsection{FR-24: Vendor Intelligence and Performance Analytics}
+\noindent\textbf{Status:} \statuspartiallimited
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    Performance Table & Database schema and models tracking vendor delivery metrics & \texttt{\small vendor\_performance} table \\
+    \altrow
+    Rating Embeddings & Vectorized performance feedback for similarity matching & \texttt{\small SentenceTransformer} \\
+    Data Volume Note & Analytics models and database infrastructure ready; statistical scoring expands with transaction history & Baseline active \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+% ---- FR-26 ----
+\subsection{FR-26: Public Content and Informational Pages}
+\noindent\textbf{Status:} \statuspartial
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    Static Content Pages & Dedicated Next.js pages for About, Help, Legal, Policies, Terms & Route directories under \texttt{app/} \\
+    \altrow
+    Placeholder Content & Baseline policy, terms, and legal structures currently populated with dummy copy & Dynamic CMS integration pending \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+
+% ---- AI/ML ----
+\subsection{AI/ML-Powered Features}
+\noindent\textbf{Status:} \statusdone
+
+\subsubsection{PDF Tender Parsing (Document Intelligence)}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    PDF Extraction & Extract raw text from uploaded procurement PDFs & \texttt{\small tender\_parser.py} \\
+    \altrow
+    LLM Field Extract & Use Groq LLM to extract structured fields from unstructured PDF text & System prompt \textrightarrow{} JSON \\
+    One-Click Create & Upload PDF, auto-fill tender fields, buyer reviews and publishes & Async Celery + ML service \\
+    \altrow
+    Extracted Fields & Title, description, eligibility, budget, deadlines, nature/method, required docs & \texttt{\small ProcurementDocument} schema \\
+    Embedding Gen & Generate 384-dim vector embeddings for semantic similarity & SentenceTransformer \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\subsubsection{Smart Bid Evaluation (LLM-Assisted Scoring)}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    Multi-Stage Eval & 4-stage: Financial, Document Compliance, Semantic Relevance, LLM Rubric & \texttt{\small bid\_evaluator.py} \\
+    \altrow
+    Financial Scoring & Automated scoring based on bid amount vs budget midpoint & \texttt{\small \_financial\_score\_for()} \\
+    Doc Compliance & Check which required documents were submitted vs missing & \texttt{\small compute\_compliance()} \\
+    \altrow
+    Semantic Relevance & Compare bid embedding against tender embedding & Cosine similarity \\
+    LLM Rubric & Groq LLM scores on clarity, completeness, feasibility (0--100) & \texttt{\small RUBRIC\_SYSTEM\_PROMPT} \\
+    \altrow
+    Risk Flags & AI identifies risk indicators (vague timelines, missing certs) & LLM rubric response \\
+    Weighted Composite & Configurable: Financial 20\%, Docs 20\%, Embed 5\%, LLM 55\% & \texttt{\small DEFAULT\_WEIGHT\_CONFIG} \\
+    \altrow
+    Run Tracking & Track lifecycle (pending, running, completed, failed) & \texttt{\small bid\_evaluation\_runs} table \\
+    Results Storage & Append-only --- re-runs create new rows, never overwrite & \texttt{\small bid\_evaluations} table \\
+    \altrow
+    Low Outlier Detect & Statistical detection of abnormally low bids & \texttt{\small is\_low\_outlier} flag \\
+    Evaluation UI & Frontend panel for triggering and viewing results & \texttt{\small BidEvaluationPanel.tsx} \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\subsubsection{ML Microservice}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    Dedicated Service & Separate FastAPI microservice for compute-intensive ML tasks & \texttt{\small ml/src/main.py} (port 8001) \\
+    \altrow
+    Stateless Design & Receives self-contained payloads; never queries the database & Clean separation \\
+    Model Caching & HuggingFace model cache mounted as Docker volume & Volume mount \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+
+% ---- Infrastructure ----
+\subsection{Infrastructure and Middleware}
+
+\subsubsection{Request Logging, CORS, and Health Check}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    Structured Logging & Every request/response logged as structured JSON with timing & \texttt{\small RequestLoggingMiddleware} \\
+    \altrow
+    Request ID & Unique request ID per request; returned in X-Request-Id header & UUID-based \\
+    Performance Timing & Request duration measured in milliseconds & \texttt{\small time.perf\_counter()} \\
+    \altrow
+    Path Redaction & Sensitive paths (/password, /login) sanitized in logs & \texttt{\small \_sanitize\_path()} \\
+    User Identification & Extracts authenticated user ID from JWT for log correlation & \texttt{\small \_extract\_user\_id()} \\
+    \altrow
+    CORS Support & Configured middleware allowing frontend-backend communication & \texttt{\small CORSMiddleware} \\
+    Health Endpoint & Application health check with database connectivity status & \texttt{\small GET /health} \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\subsubsection{Email Service and Cloud Storage}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y L{3.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Feature} & \tableheadertext{Description} & \tableheadertext{Implementation} \\
+    \midrule
+    Transactional Email & SMTP-based delivery for invitations, resets, notifications & \texttt{\small services/email.py} (Gmail) \\
+    \altrow
+    HTML Templates & Professionally designed responsive HTML email templates & Inline HTML generation \\
+    Celery Integration & Non-blocking email dispatch via background tasks & \texttt{\small send\_..\_email\_task.delay()} \\
+    \altrow
+    Fallback Mechanism & Falls back to async thread if Celery dispatch fails & \texttt{\small asyncio.to\_thread()} \\
+    Supabase Storage & File upload, download, and signed URL generation & \texttt{\small supabase\_storage.py} \\
+    \altrow
+    Path Sanitization & File paths sanitized and prefixed with UUID for uniqueness & \texttt{\small \_build\_object\_path()} \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+
+% ============================================================
+% 6. API ENDPOINT SUMMARY
+% ============================================================
+\newpage
+\section{API Endpoint Summary}
+
+\subsection{Authentication (\texttt{/api/auth})}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{C{1.5cm} L{5.5cm} Y}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Method} & \tableheadertext{Endpoint} & \tableheadertext{Description} \\
+    \midrule
+    \textbf{POST} & \texttt{/api/auth/login} & User login with JWT token pair \\
+    \altrow
+    \textbf{POST} & \texttt{/api/auth/register-user} & Employee registration via invitation token \\
+    \textbf{POST} & \texttt{/api/auth/admin/login} & Admin-specific login \\
+    \altrow
+    \textbf{POST} & \texttt{/api/auth/forgot-password} & Request password reset email \\
+    \textbf{GET} & \texttt{/api/auth/verify-reset-token} & Validate reset token \\
+    \altrow
+    \textbf{POST} & \texttt{/api/auth/reset-password} & Confirm password reset \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Organizations (\texttt{/orgs})}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{C{1.5cm} L{5.5cm} Y}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Method} & \tableheadertext{Endpoint} & \tableheadertext{Description} \\
+    \midrule
+    \textbf{POST} & \texttt{/orgs} & Create new organization (master signup) \\
+    \altrow
+    \textbf{GET} & \texttt{/orgs/\{org\_id\}} & Get organization details \\
+    \textbf{PUT} & \texttt{/orgs/\{org\_id\}} & Update organization info \\
+    \altrow
+    \textbf{POST} & \texttt{/orgs/\{org\_id\}/documents} & Upload verification documents \\
+    \textbf{GET} & \texttt{/orgs/\{org\_id\}/documents} & List verification documents \\
+    \altrow
+    \textbf{POST} & \texttt{/orgs/\{org\_id\}/invite} & Invite employee by email \\
+    \textbf{GET} & \texttt{/orgs/\{org\_id\}/members} & List organization members \\
+    \altrow
+    \textbf{PUT} & \texttt{/orgs/\{id\}/members/\{uid\}/role} & Update member role \\
+    \textbf{DELETE} & \texttt{/orgs/\{id\}/members/\{uid\}} & Remove member \\
+    \altrow
+    \textbf{GET} & \texttt{/search-organization} & Search organizations \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Tenders (\texttt{/tenders}, \texttt{/buyer})}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{C{1.5cm} L{5.5cm} Y}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Method} & \tableheadertext{Endpoint} & \tableheadertext{Description} \\
+    \midrule
+    \textbf{POST} & \texttt{/buyer/tender} & Create and publish tender with documents \\
+    \altrow
+    \textbf{POST} & \texttt{/buyer/draft-with-documents} & Save tender as draft \\
+    \textbf{GET} & \texttt{/buyer/jobs} & List buyer's tenders (filterable) \\
+    \altrow
+    \textbf{GET} & \texttt{/tenders/\{id\}} & Get tender details \\
+    \textbf{PUT} & \texttt{/tenders/\{id\}} & Update tender \\
+    \altrow
+    \textbf{POST} & \texttt{/tenders/\{id\}/publish} & Publish a draft tender \\
+    \textbf{POST} & \texttt{/tenders/\{id\}/withdraw} & Cancel/withdraw tender \\
+    \altrow
+    \textbf{DELETE} & \texttt{/tenders/\{id\}} & Delete tender \\
+    \textbf{GET} & \texttt{/tenders/public/list} & List public tenders (no auth) \\
+    \altrow
+    \textbf{GET} & \texttt{/tenders/public/\{id\}} & Public tender detail (no auth) \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Bids (\texttt{/bids})}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{C{1.5cm} L{5.5cm} Y}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Method} & \tableheadertext{Endpoint} & \tableheadertext{Description} \\
+    \midrule
+    \textbf{POST} & \texttt{/bids/vendor/submit-with-docs} & Submit bid with documents \\
+    \altrow
+    \textbf{GET} & \texttt{/bids/vendor/my-bids} & List vendor's submitted bids \\
+    \textbf{PUT} & \texttt{/bids/\{bid\_id\}} & Update submitted bid \\
+    \altrow
+    \textbf{DELETE} & \texttt{/bids/\{bid\_id\}} & Withdraw bid \\
+    \textbf{GET} & \texttt{/bids/buyer/tender/\{id\}/bids} & List bids for buyer's tender \\
+    \altrow
+    \textbf{GET} & \texttt{/bids/buyer/tender/\{id\}/compare} & Bid comparison analysis \\
+    \textbf{POST} & \texttt{/bids/.../accept/\{bid\_id\}} & Accept winning bid \\
+    \altrow
+    \textbf{POST} & \texttt{/bids/.../evaluate} & Trigger AI bid evaluation \\
+    \textbf{GET} & \texttt{/bids/.../evaluation/latest} & Get latest evaluation results \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Payments, Messaging, Notifications, Users, Admin}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{C{1.5cm} L{5.5cm} Y}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Method} & \tableheadertext{Endpoint} & \tableheadertext{Description} \\
+    \midrule
+    \multicolumn{3}{l}{\textbf{\textcolor{accentblue}{Payments (\texttt{/payments})}}} \\
+    \midrule
+    \textbf{GET} & \texttt{/payments/balance} & Get token balance \\
+    \altrow
+    \textbf{GET} & \texttt{/payments/pricing} & Get platform pricing \\
+    \textbf{GET} & \texttt{/payments/packages} & List token packages \\
+    \altrow
+    \textbf{POST} & \texttt{/payments/purchase} & Purchase tokens \\
+    \textbf{GET} & \texttt{/payments/transactions} & Transaction history \\
+    \midrule
+    \multicolumn{3}{l}{\textbf{\textcolor{accentblue}{Messaging (\texttt{/api/messages})}}} \\
+    \midrule
+    \altrow
+    \textbf{GET} & \texttt{/api/messages/contacts/search} & Search organization contacts \\
+    \textbf{GET} & \texttt{/api/messages/threads} & List conversation threads \\
+    \altrow
+    \textbf{POST} & \texttt{/api/messages/threads/dm} & Create/get DM thread \\
+    \textbf{POST} & \texttt{/api/messages/threads/\{id\}/msg} & Send message \\
+    \altrow
+    \textbf{WS} & \texttt{/ws/messages?token=} & Real-time WebSocket \\
+    \midrule
+    \multicolumn{3}{l}{\textbf{\textcolor{accentblue}{Notifications (\texttt{/notifications})}}} \\
+    \midrule
+    \textbf{GET} & \texttt{/notifications} & List notifications (filterable) \\
+    \altrow
+    \textbf{GET} & \texttt{/notifications/unread-count} & Unread notification count \\
+    \textbf{PATCH} & \texttt{/notifications/\{id\}/read} & Mark as read \\
+    \altrow
+    \textbf{PATCH} & \texttt{/notifications/read-all} & Mark all as read \\
+    \textbf{DELETE} & \texttt{/notifications/\{id\}} & Delete notification \\
+    \midrule
+    \multicolumn{3}{l}{\textbf{\textcolor{accentblue}{Users (\texttt{/api/users})}}} \\
+    \midrule
+    \altrow
+    \textbf{GET} & \texttt{/api/users/me} & Get user profile \\
+    \textbf{PUT} & \texttt{/api/users/me/profile} & Update profile \\
+    \altrow
+    \textbf{PUT} & \texttt{/api/users/me/password} & Change password \\
+    \textbf{POST} & \texttt{/api/users/me/documents} & Upload NID documents \\
+    \midrule
+    \multicolumn{3}{l}{\textbf{\textcolor{accentblue}{Admin (\texttt{/admin})}}} \\
+    \midrule
+    \altrow
+    \textbf{GET} & \texttt{/admin/pending-accounts} & Pending organization accounts \\
+    \textbf{POST} & \texttt{/admin/verify/\{org\_id\}} & Verify/reject organization \\
+    \altrow
+    \textbf{POST} & \texttt{/admin/update-price} & Update platform pricing \\
+    \textbf{GET} & \texttt{/admin/audit/logs} & Search audit logs \\
+    \altrow
+    \textbf{POST} & \texttt{/admin/audit/verify-integrity} & Verify hash chain \\
+    \midrule
+    \multicolumn{3}{l}{\textbf{\textcolor{accentblue}{System}}} \\
+    \midrule
+    \textbf{GET} & \texttt{/health} & Health check with DB status \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+
+% ============================================================
+% 7. TESTING AND QUALITY ASSURANCE
+% ============================================================
+\section{Testing and Quality Assurance}
+
+\subsection{Test Suite Overview}
+
+The project maintains a comprehensive automated test suite with \textbf{280 tests passing} across 18 test modules:
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{5.5cm} Y}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Test Module} & \tableheadertext{Coverage Area} \\
+    \midrule
+    \texttt{test\_auth/} & Login, registration, JWT token generation, password hashing \\
+    \altrow
+    \texttt{test\_admin/} & Admin login, auth guards (401/403), pending accounts, verification \\
+    \texttt{test\_organizations/} & Organization CRUD, member management, document upload \\
+    \altrow
+    \texttt{test\_tenders/} & Tender lifecycle (31 tests: service + router + Celery) \\
+    \texttt{test\_tenders/test\_tender\_delete.py} & Tender deletion with notification cascade cleanup \\
+    \altrow
+    \texttt{test\_bids/} & Bid submission, update, withdraw, comparison \\
+    \texttt{test\_evaluations/} & Bid evaluation run lifecycle \\
+    \altrow
+    \texttt{test\_payments/} & Balance, pricing, purchase, transactions \\
+    \texttt{test\_messaging/} & Thread creation, message encryption/decryption \\
+    \altrow
+    \texttt{test\_notifications/} & 14 tests: router, service, and middleware integration \\
+    \texttt{test\_users/} & 10 tests: profile, password change, document upload \\
+    \altrow
+    \texttt{test\_middleware/} & Request logging and audit outbox capture \\
+    \texttt{test\_audit/} & Log integrity verification, outbox processing \\
+    \altrow
+    \texttt{test\_core/} & Security utilities, pagination, database helpers \\
+    \texttt{test\_storage/} & Supabase file upload/download mocking \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Test Infrastructure}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{3.5cm} Y}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Component} & \tableheadertext{Technology} \\
+    \midrule
+    Framework & \texttt{pytest} + \texttt{pytest-asyncio} \\
+    \altrow
+    DB Mocking & \texttt{asyncpg} mock connections \\
+    API Testing & FastAPI \texttt{TestClient} \\
+    \altrow
+    Fixtures & Shared \texttt{conftest.py} with reusable fixtures \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+
+% ============================================================
+% 8. DEPLOYMENT ARCHITECTURE
+% ============================================================
+\section{Deployment Architecture}
+
+The application is fully containerized using Docker Compose with 6 services:
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{\textwidth}{L{2.5cm} L{3.8cm} C{1.4cm} Y}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Service} & \tableheadertext{Image} & \tableheadertext{Port} & \tableheadertext{Description} \\
+    \midrule
+    \texttt{db} & PostgreSQL 15 Alpine & 5433 & Primary database with pgvector extension \\
+    \altrow
+    \texttt{backend} & FastAPI (custom) & 8000 & REST API server with auto-reload \\
+    \texttt{redis} & Redis 7 Alpine & 6380 & Message broker and cache \\
+    \altrow
+    \texttt{ml} & FastAPI ML (custom) & 8001 & Document intelligence and bid evaluation \\
+    \texttt{celery\_worker} & Celery (custom) & --- & Background task worker with Beat scheduler \\
+    \altrow
+    \texttt{frontend} & Next.js 14 (custom) & 3000 & Server-side rendered React application \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\noindent\textbf{Key Infrastructure Features:}
+
+\begin{itemize}[leftmargin=1.5em, itemsep=3pt]
+    \item \textbf{Hot Reload:} Backend, frontend, and ML service all support live code reloading in development
+    \item \textbf{Volume Mounting:} Source code directories mounted for development; HuggingFace model cache persisted
+    \item \textbf{Service Dependencies:} Proper startup ordering (db, redis, ml, backend, celery, frontend)
+    \item \textbf{Environment Isolation:} Per-service \texttt{.env} files with Docker-internal networking
+\end{itemize}
+
+
+% ============================================================
+% 9. FR COVERAGE SUMMARY MATRIX
+% ============================================================
+\newpage
+\section{FR Coverage Summary Matrix}
+
+\setlength{\tabcolsep}{4pt}
+\begin{longtable}{C{1.4cm} L{4.0cm} C{2.4cm} L{6.8cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{FR} & \tableheadertext{Description} & \tableheadertext{Status} & \tableheadertext{Key Implementation} \\
+    \midrule
+    \endhead
+    FR-01 & Landing Page & \statusdone & Next.js public pages with responsive design \\
+    \altrow
+    FR-02 & Public Tender Browsing & \statusdone & Fixed API path + error states (post-audit) \\
+    FR-03 & Search and Discovery & \statusdonelimited & Vector embedding search; limited by data volume \\
+    \altrow
+    FR-04 & Organization Registration & \statusdone & Full KYC signup with Supabase document storage \\
+    FR-05 & Authentication \& Security & \statusdone & Login, JWT, password change/reset, last login \\
+    \altrow
+    FR-06 & Organization Profile & \statusdone & Profile CRUD, admin verification, vendor enlistment \\
+    FR-07 & Employee Management & \statusdone & Email invitations, role assignment, member CRUD \\
+    \altrow
+    FR-08 & Tender Lifecycle & \statusdone & Draft/publish/edit/cancel/delete/auto-close \\
+    FR-09 & Vendor Recommendations & \statusdonelimited & pgvector semantic matching; limited by data \\
+    \altrow
+    FR-10 & Bid Submission & \statusdone & Submit, update, withdraw with document upload \\
+    FR-11 & Bid Eval \& Award & \statuspartial & AI evaluation + bid accept; no formal NOA \\
+    \altrow
+    FR-12 & Restricted Tenders & \statusnot & Schema exists; access enforcement pending \\
+    FR-13 & Contracts Module & \statusnot & Table schema defined; CRUD stub only \\
+    \altrow
+    FR-15 & Dashboard Analytics & \statuspartialplus & Live seller stats; admin KPIs in progress \\
+    FR-16 & Intra-Company Messaging & \statusdone & Encrypted DM with WebSocket real-time delivery \\
+    \altrow
+    FR-17 & Inter-Company Messaging & \statuspartial & Tender-scoped chat schema; full flow pending \\
+    FR-18 & Payment and Tokens & \statuspartial & Token ledger real; payment gateway simulated \\
+    \altrow
+    FR-19 & Bid Bond and Refunds & \statusnot & Schema ready; no refund logic \\
+    FR-20 & Notifications & \statusdone & Full CRUD + auto-generation + cascade cleanup \\
+    \altrow
+    FR-21 & Admin Dashboard & \statuspartialplus & Auth guards, org verify, pricing; KPIs pending \\
+    FR-22 & Audit and Compliance & \statusactive & Full WORM audit chain with middleware \\
+    \altrow
+    FR-23 & Report Generation & \statusnot & Module stub exists \\
+    FR-24 & Vendor Intelligence & \statuspartiallimited & Performance tracking schema ready; data limited \\
+    \altrow
+    FR-25 & Payment Gateway (Live) & \statusnot & SSLCommerz stub; no webhook \\
+    FR-26 & CMS for Public Content & \statuspartial & Static informational pages with placeholder data \\
+    \bottomrule
+\end{longtable}
+
+\vspace{0.8em}
+
+\subsection{Summary Statistics}
+
+\begin{table}[H]
+\centering
+\begin{tabularx}{0.6\textwidth}{Y C{2cm}}
+    \toprule
+    \tableheaderrow
+    \tableheadertext{Category} & \tableheadertext{Count} \\
+    \midrule
+    Fully Implemented (Done / Active) & 13 \\
+    \altrow
+    Partially Implemented & 7 \\
+    Not Yet Implemented & 5 \\
+    \midrule
+    \textbf{Total Functional Requirements} & \textbf{25} \\
+    \bottomrule
+\end{tabularx}
+\end{table}
+
+\vspace{1.5em}
+
+\begin{center}
+    \textcolor{primaryblue}{\rule{0.4\textwidth}{1pt}}\\[1em]
+    \textit{\small This report was generated from a comprehensive analysis of the ProcureNext codebase,\\
+    including the database schema, backend API modules, ML microservice, frontend pages\\
+    and components, middleware stack, Celery tasks, and test suite.}
+\end{center}
+
+\end{document}
