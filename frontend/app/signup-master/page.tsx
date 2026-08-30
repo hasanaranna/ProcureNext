@@ -12,6 +12,12 @@ interface FileFields {
   additionalDocs: File[];
 }
 
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
 export default function SignupMasterPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
@@ -33,6 +39,7 @@ export default function SignupMasterPage() {
     additionalDocs: [],
   });
 
+  const [fileErrors, setFileErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -53,17 +60,34 @@ export default function SignupMasterPage() {
       const isImage = accept === "image/*";
       const isPdf = accept === ".pdf";
       if (isImage && !file.type.startsWith("image/")) {
-        alert("Please upload an image file.");
+        setFileErrors((prev) => ({ ...prev, [field]: "Please upload an image file (JPG, PNG)." }));
         e.target.value = "";
         return;
       }
       if (isPdf && file.type !== "application/pdf") {
-        alert("Please upload a PDF file.");
+        setFileErrors((prev) => ({ ...prev, [field]: "Please upload a valid PDF document." }));
+        e.target.value = "";
+        return;
+      }
+      if (file.size > 20 * 1024 * 1024) {
+        setFileErrors((prev) => ({ ...prev, [field]: "File size must not exceed 20MB." }));
         e.target.value = "";
         return;
       }
     }
+
+    setFileErrors((prev) => {
+      const copy = { ...prev };
+      delete copy[field];
+      return copy;
+    });
     setFiles((prev) => ({ ...prev, [field]: file }));
+  };
+
+  const removeSingleFile = (field: keyof Omit<FileFields, "additionalDocs">, inputId: string) => {
+    setFiles((prev) => ({ ...prev, [field]: null }));
+    const input = document.getElementById(inputId) as HTMLInputElement | null;
+    if (input) input.value = "";
   };
 
   const handleAdditionalDocs = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -85,8 +109,23 @@ export default function SignupMasterPage() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setIsSubmitting(true);
     setSubmitError("");
+
+    // Validate mandatory files
+    const errors: Record<string, string> = {};
+    if (!files.nidFront) errors.nidFront = "NID Front image is required";
+    if (!files.nidBack) errors.nidBack = "NID Back image is required";
+    if (!files.tradeLicense) errors.tradeLicense = "Trade License PDF is required";
+    if (!files.tinCertificate) errors.tinCertificate = "TIN Certificate PDF is required";
+    if (!files.vatCertificate) errors.vatCertificate = "VAT Certificate PDF is required";
+
+    if (Object.keys(errors).length > 0) {
+      setFileErrors(errors);
+      setSubmitError("Please upload all required mandatory documents highlighted below.");
+      return;
+    }
+
+    setIsSubmitting(true);
 
     try {
       const body = new FormData();
@@ -109,7 +148,7 @@ export default function SignupMasterPage() {
 
       const res = await fetch("/api/org/orgs", {
         method: "POST",
-        body, // No Content-Type header — browser sets multipart boundary
+        body,
       });
 
       if (res.ok) {
@@ -163,49 +202,6 @@ export default function SignupMasterPage() {
     );
   }
 
-  // ─── File upload component ─────────────────────────
-  const FileUploadZone = ({ 
-    id, label, sublabel, file, accept, onChangeFn, type = 'single' 
-  }: { 
-    id: string; label: string; sublabel?: string; file: File | null; accept: string; 
-    onChangeFn: (e: React.ChangeEvent<HTMLInputElement>) => void; type?: 'single' | 'image' 
-  }) => (
-    <div>
-      {sublabel && <p className="text-xs text-slate-500 mb-1.5 font-medium">{sublabel}</p>}
-      <label
-        htmlFor={id}
-        className={`flex flex-col items-center justify-center gap-2 px-4 py-5 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-300 ${
-          file 
-            ? 'border-emerald-300 bg-emerald-50 hover:border-emerald-400' 
-            : 'border-slate-300 bg-slate-50 hover:border-accent-400 hover:bg-accent-50'
-        }`}
-      >
-        {file ? (
-          <>
-            <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
-              <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <span className="text-xs text-slate-600 text-center truncate w-full font-medium">{file.name}</span>
-          </>
-        ) : (
-          <>
-            <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center">
-              <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-            </div>
-            <span className="text-xs text-slate-500 font-medium">
-              {type === 'image' ? 'Upload image' : 'Upload PDF'}
-            </span>
-          </>
-        )}
-        <input id={id} type="file" accept={accept} className="hidden" onChange={onChangeFn} />
-      </label>
-    </div>
-  );
-
   return (
     <main className="w-full min-h-screen flex items-center justify-center py-12 px-4 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800 relative overflow-x-hidden">
       {/* Decorative */}
@@ -228,11 +224,13 @@ export default function SignupMasterPage() {
 
           {/* Error Message */}
           {submitError && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm flex items-start gap-3">
-              <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="mb-6 p-4 bg-red-50 border-2 border-red-200 rounded-xl text-red-700 text-sm flex items-start gap-3 animate-fade-in">
+              <svg className="w-5 h-5 flex-shrink-0 mt-0.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              {submitError}
+              <div>
+                <strong className="font-bold">Error:</strong> {submitError}
+              </div>
             </div>
           )}
 
@@ -305,97 +303,181 @@ export default function SignupMasterPage() {
 
             {/* ── Section 2: Identity Documents ────────── */}
             <div className="space-y-5">
-              <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
-                <span className="w-7 h-7 rounded-lg bg-navy-900 text-white flex items-center justify-center text-xs font-bold">2</span>
-                <h3 className="text-sm font-bold text-navy-900 uppercase tracking-wide">Identity Documents</h3>
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                <div className="flex items-center gap-2">
+                  <span className="w-7 h-7 rounded-lg bg-navy-900 text-white flex items-center justify-center text-xs font-bold">2</span>
+                  <h3 className="text-sm font-bold text-navy-900 uppercase tracking-wide">Identity Documents</h3>
+                </div>
+                <span className="text-xs text-red-500 font-bold">* Both sides mandatory</span>
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-navy-900 mb-2">National ID (NID)</label>
-                <div className="grid grid-cols-2 gap-4">
-                  <FileUploadZone id="nidFront" label="NID Front" sublabel="Front Side" file={files.nidFront} accept="image/*" type="image"
-                    onChangeFn={(e) => handleSingleFile("nidFront", "image/*", e)} />
-                  <FileUploadZone id="nidBack" label="NID Back" sublabel="Back Side" file={files.nidBack} accept="image/*" type="image"
-                    onChangeFn={(e) => handleSingleFile("nidBack", "image/*", e)} />
+                <label className="block text-sm font-semibold text-navy-900 mb-2">
+                  National ID (NID) <span className="text-red-500">*</span>
+                  <span className="text-xs font-normal text-slate-400 ml-2">(Upload clear JPG or PNG images)</span>
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* NID Front */}
+                  <div className={`p-4 border-2 rounded-2xl transition-all ${
+                    fileErrors.nidFront ? 'border-red-400 bg-red-50/60' : files.nidFront ? 'border-emerald-300 bg-emerald-50/50' : 'border-slate-300 bg-slate-50'
+                  }`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-navy-900">NID Front Side <span className="text-red-500">*</span></span>
+                      {files.nidFront ? (
+                        <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">✓ Attached</span>
+                      ) : (
+                        <span className="text-[10px] bg-red-100 text-red-700 font-bold px-2 py-0.5 rounded-full">Required</span>
+                      )}
+                    </div>
+                    {files.nidFront ? (
+                      <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-xl border border-slate-200">
+                        <span className="text-xs text-navy-900 font-medium truncate">{files.nidFront.name} ({formatFileSize(files.nidFront.size)})</span>
+                        <button type="button" onClick={() => removeSingleFile("nidFront", "nidFront")} className="text-red-500 hover:text-red-700 p-1 text-xs font-bold">
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <label htmlFor="nidFront" className="flex flex-col items-center justify-center p-4 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-accent-400 bg-white transition">
+                        <svg className="w-6 h-6 text-slate-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span className="text-xs font-semibold text-accent-600">Select Image (Front)</span>
+                        <input id="nidFront" type="file" accept="image/*" className="hidden" onChange={(e) => handleSingleFile("nidFront", "image/*", e)} />
+                      </label>
+                    )}
+                    {fileErrors.nidFront && <p className="text-xs text-red-600 font-semibold mt-1.5">{fileErrors.nidFront}</p>}
+                  </div>
+
+                  {/* NID Back */}
+                  <div className={`p-4 border-2 rounded-2xl transition-all ${
+                    fileErrors.nidBack ? 'border-red-400 bg-red-50/60' : files.nidBack ? 'border-emerald-300 bg-emerald-50/50' : 'border-slate-300 bg-slate-50'
+                  }`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-navy-900">NID Back Side <span className="text-red-500">*</span></span>
+                      {files.nidBack ? (
+                        <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">✓ Attached</span>
+                      ) : (
+                        <span className="text-[10px] bg-red-100 text-red-700 font-bold px-2 py-0.5 rounded-full">Required</span>
+                      )}
+                    </div>
+                    {files.nidBack ? (
+                      <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-xl border border-slate-200">
+                        <span className="text-xs text-navy-900 font-medium truncate">{files.nidBack.name} ({formatFileSize(files.nidBack.size)})</span>
+                        <button type="button" onClick={() => removeSingleFile("nidBack", "nidBack")} className="text-red-500 hover:text-red-700 p-1 text-xs font-bold">
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <label htmlFor="nidBack" className="flex flex-col items-center justify-center p-4 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-accent-400 bg-white transition">
+                        <svg className="w-6 h-6 text-slate-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span className="text-xs font-semibold text-accent-600">Select Image (Back)</span>
+                        <input id="nidBack" type="file" accept="image/*" className="hidden" onChange={(e) => handleSingleFile("nidBack", "image/*", e)} />
+                      </label>
+                    )}
+                    {fileErrors.nidBack && <p className="text-xs text-red-600 font-semibold mt-1.5">{fileErrors.nidBack}</p>}
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* ── Section 3: Regulatory Documents ──────── */}
             <div className="space-y-5">
-              <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
-                <span className="w-7 h-7 rounded-lg bg-navy-900 text-white flex items-center justify-center text-xs font-bold">3</span>
-                <h3 className="text-sm font-bold text-navy-900 uppercase tracking-wide">Regulatory Documents</h3>
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                <div className="flex items-center gap-2">
+                  <span className="w-7 h-7 rounded-lg bg-navy-900 text-white flex items-center justify-center text-xs font-bold">3</span>
+                  <h3 className="text-sm font-bold text-navy-900 uppercase tracking-wide">Regulatory Documents</h3>
+                </div>
+                <span className="text-xs text-slate-400">PDF format required</span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-navy-900 mb-2">Trade License</label>
-                  <label htmlFor="tradeLicense"
-                    className={`flex items-center gap-3 px-4 py-3 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-300 ${files.tradeLicense ? 'border-emerald-300 bg-emerald-50' : 'border-slate-300 bg-slate-50 hover:border-accent-400'}`}>
-                    {files.tradeLicense ? (
-                      <>
-                        <svg className="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        <span className="text-xs text-slate-700 truncate font-medium">{files.tradeLicense.name}</span>
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-5 h-5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                        </svg>
-                        <span className="text-xs text-slate-500">Upload PDF</span>
-                      </>
-                    )}
-                    <input id="tradeLicense" type="file" accept=".pdf" className="hidden" onChange={(e) => handleSingleFile("tradeLicense", ".pdf", e)} />
-                  </label>
+                {/* Trade License */}
+                <div className={`p-4 border-2 rounded-2xl transition-all ${
+                  fileErrors.tradeLicense ? 'border-red-400 bg-red-50/60' : files.tradeLicense ? 'border-emerald-300 bg-emerald-50/50' : 'border-slate-300 bg-slate-50'
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-navy-900 truncate">Trade License <span className="text-red-500">*</span></span>
+                    {files.tradeLicense && <span className="text-[10px] text-emerald-700 font-bold">✓ PDF</span>}
+                  </div>
+                  {files.tradeLicense ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-slate-700 font-medium truncate">{files.tradeLicense.name}</p>
+                      <p className="text-[10px] text-slate-400">{formatFileSize(files.tradeLicense.size)}</p>
+                      <button type="button" onClick={() => removeSingleFile("tradeLicense", "tradeLicense")}
+                        className="text-xs text-red-500 hover:text-red-700 font-semibold">
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <label htmlFor="tradeLicense" className="flex flex-col items-center justify-center p-3 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-accent-400 bg-white transition text-center">
+                      <svg className="w-5 h-5 text-slate-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      <span className="text-xs font-semibold text-accent-600">Upload PDF</span>
+                      <input id="tradeLicense" type="file" accept=".pdf" className="hidden" onChange={(e) => handleSingleFile("tradeLicense", ".pdf", e)} />
+                    </label>
+                  )}
+                  {fileErrors.tradeLicense && <p className="text-xs text-red-600 font-semibold mt-1.5">{fileErrors.tradeLicense}</p>}
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-navy-900 mb-2">TIN Certificate</label>
-                  <label htmlFor="tinCertificate"
-                    className={`flex items-center gap-3 px-4 py-3 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-300 ${files.tinCertificate ? 'border-emerald-300 bg-emerald-50' : 'border-slate-300 bg-slate-50 hover:border-accent-400'}`}>
-                    {files.tinCertificate ? (
-                      <>
-                        <svg className="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        <span className="text-xs text-slate-700 truncate font-medium">{files.tinCertificate.name}</span>
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-5 h-5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                        </svg>
-                        <span className="text-xs text-slate-500">Upload PDF</span>
-                      </>
-                    )}
-                    <input id="tinCertificate" type="file" accept=".pdf" className="hidden" onChange={(e) => handleSingleFile("tinCertificate", ".pdf", e)} />
-                  </label>
+                {/* TIN Certificate */}
+                <div className={`p-4 border-2 rounded-2xl transition-all ${
+                  fileErrors.tinCertificate ? 'border-red-400 bg-red-50/60' : files.tinCertificate ? 'border-emerald-300 bg-emerald-50/50' : 'border-slate-300 bg-slate-50'
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-navy-900 truncate">TIN Certificate <span className="text-red-500">*</span></span>
+                    {files.tinCertificate && <span className="text-[10px] text-emerald-700 font-bold">✓ PDF</span>}
+                  </div>
+                  {files.tinCertificate ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-slate-700 font-medium truncate">{files.tinCertificate.name}</p>
+                      <p className="text-[10px] text-slate-400">{formatFileSize(files.tinCertificate.size)}</p>
+                      <button type="button" onClick={() => removeSingleFile("tinCertificate", "tinCertificate")}
+                        className="text-xs text-red-500 hover:text-red-700 font-semibold">
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <label htmlFor="tinCertificate" className="flex flex-col items-center justify-center p-3 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-accent-400 bg-white transition text-center">
+                      <svg className="w-5 h-5 text-slate-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      <span className="text-xs font-semibold text-accent-600">Upload PDF</span>
+                      <input id="tinCertificate" type="file" accept=".pdf" className="hidden" onChange={(e) => handleSingleFile("tinCertificate", ".pdf", e)} />
+                    </label>
+                  )}
+                  {fileErrors.tinCertificate && <p className="text-xs text-red-600 font-semibold mt-1.5">{fileErrors.tinCertificate}</p>}
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-navy-900 mb-2">VAT Certificate</label>
-                  <label htmlFor="vatCertificate"
-                    className={`flex items-center gap-3 px-4 py-3 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-300 ${files.vatCertificate ? 'border-emerald-300 bg-emerald-50' : 'border-slate-300 bg-slate-50 hover:border-accent-400'}`}>
-                    {files.vatCertificate ? (
-                      <>
-                        <svg className="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        <span className="text-xs text-slate-700 truncate font-medium">{files.vatCertificate.name}</span>
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-5 h-5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                        </svg>
-                        <span className="text-xs text-slate-500">Upload PDF</span>
-                      </>
-                    )}
-                    <input id="vatCertificate" type="file" accept=".pdf" className="hidden" onChange={(e) => handleSingleFile("vatCertificate", ".pdf", e)} />
-                  </label>
+                {/* VAT Certificate */}
+                <div className={`p-4 border-2 rounded-2xl transition-all ${
+                  fileErrors.vatCertificate ? 'border-red-400 bg-red-50/60' : files.vatCertificate ? 'border-emerald-300 bg-emerald-50/50' : 'border-slate-300 bg-slate-50'
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-navy-900 truncate">VAT Certificate <span className="text-red-500">*</span></span>
+                    {files.vatCertificate && <span className="text-[10px] text-emerald-700 font-bold">✓ PDF</span>}
+                  </div>
+                  {files.vatCertificate ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-slate-700 font-medium truncate">{files.vatCertificate.name}</p>
+                      <p className="text-[10px] text-slate-400">{formatFileSize(files.vatCertificate.size)}</p>
+                      <button type="button" onClick={() => removeSingleFile("vatCertificate", "vatCertificate")}
+                        className="text-xs text-red-500 hover:text-red-700 font-semibold">
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <label htmlFor="vatCertificate" className="flex flex-col items-center justify-center p-3 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-accent-400 bg-white transition text-center">
+                      <svg className="w-5 h-5 text-slate-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                      <span className="text-xs font-semibold text-accent-600">Upload PDF</span>
+                      <input id="vatCertificate" type="file" accept=".pdf" className="hidden" onChange={(e) => handleSingleFile("vatCertificate", ".pdf", e)} />
+                    </label>
+                  )}
+                  {fileErrors.vatCertificate && <p className="text-xs text-red-600 font-semibold mt-1.5">{fileErrors.vatCertificate}</p>}
                 </div>
               </div>
 
@@ -405,13 +487,13 @@ export default function SignupMasterPage() {
                   Additional Regulatory Documents
                   <span className="ml-2 text-xs font-normal text-slate-400">(Optional)</span>
                 </label>
-                <p className="text-xs text-slate-400 mb-2">Any other supporting documents (PDF, images, etc.)</p>
+                <p className="text-xs text-slate-400 mb-2">Any other supporting documents (PDF, images, ISO certifications, etc.)</p>
                 <label htmlFor="additionalDocs"
                   className="flex items-center gap-3 px-4 py-3 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 cursor-pointer hover:border-accent-400 hover:bg-accent-50 transition-all duration-300">
                   <svg className="w-5 h-5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
-                  <span className="text-sm text-slate-500">Click to add documents</span>
+                  <span className="text-sm text-slate-500 font-medium">Click to add additional documents</span>
                   <input id="additionalDocs" type="file" multiple className="hidden" onChange={handleAdditionalDocs} />
                 </label>
 
@@ -424,10 +506,10 @@ export default function SignupMasterPage() {
                           <svg className="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                           </svg>
-                          <span className="text-sm text-slate-700 truncate">{file.name}</span>
+                          <span className="text-xs text-slate-700 font-medium truncate">{file.name} ({formatFileSize(file.size)})</span>
                         </div>
                         <button type="button" onClick={() => removeAdditionalDoc(index)}
-                          className="text-red-400 hover:text-red-600 text-sm font-semibold ml-3 flex-shrink-0 transition">
+                          className="text-red-500 hover:text-red-700 text-xs font-bold ml-3 flex-shrink-0 transition">
                           Remove
                         </button>
                       </div>
@@ -446,17 +528,18 @@ export default function SignupMasterPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
-                  Submitting...
+                  <span>Submitting Application...</span>
                 </>
               ) : (
-                "Create Master Account"
+                "Submit Application"
               )}
             </button>
 
-            {/* Login Link */}
-            <p className="text-center text-slate-500 text-sm">
+            <p className="text-center text-sm text-slate-500">
               Already have an account?{" "}
-              <a href="/login" className="text-accent-600 font-semibold hover:text-accent-700 transition">Login here</a>
+              <button type="button" onClick={() => router.push("/login")} className="text-accent-600 hover:text-accent-700 font-semibold">
+                Sign in
+              </button>
             </p>
           </form>
         </div>

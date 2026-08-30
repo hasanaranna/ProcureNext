@@ -11,7 +11,12 @@ from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, s
 from fastapi.responses import JSONResponse
 from app.core.db import get_db_connection
 from app.modules.auth.dependencies import get_current_user_org
-from app.modules.bids.schemas import BidResponse, BidListItem
+from app.modules.bids.schemas import (
+    BidResponse,
+    BidListItem,
+    BidUpdateRequest,
+    TenderBidComparisonResponse,
+)
 from app.modules.bids.service import (
     submit_bid_with_documents, 
     get_bid_by_tender_and_vendor, 
@@ -19,13 +24,18 @@ from app.modules.bids.service import (
     get_bid_document_by_id,
     get_bid_document_details_for_download,
     get_bids_for_buyer_tender,
+    get_tender_bid_comparison,
     accept_bid_for_tender,
-    get_vendor_submitted_bids
+    get_vendor_submitted_bids,
+    update_bid,
+    delete_bid,
+    delete_bid_document
 )
 from app.services.supabase_storage import generate_signed_url, download_file_bytes
 from app.utils.filename_utils import sanitize_filename, get_content_disposition
 
 router = APIRouter(prefix="/bids", tags=["Bids"])
+
 
 TEMP_UPLOAD_DIR = os.getenv("UPLOAD_DIR", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../uploads")))
 os.makedirs(TEMP_UPLOAD_DIR, exist_ok=True)
@@ -93,6 +103,7 @@ async def submit_bid(
 
     vendor_org_id = current_user.get("organization_id", 1)
     org_user_id = current_user.get("org_user_id", 1)
+    user_id = current_user.get("user_id") or current_user.get("org_user_id", 1)
 
     # 3. Save to DB and dispatch background task
     try:
@@ -101,6 +112,7 @@ async def submit_bid(
                 connection=connection,
                 vendor_org_id=vendor_org_id,
                 submitted_by=org_user_id,
+                user_id=user_id,
                 tender_id=tender_id,
                 financial_amount=financial_amount,
                 files_data=files_data,
@@ -108,7 +120,16 @@ async def submit_bid(
             )
             return new_bid
     except Exception as e:
+        for f in files_data:
+            if os.path.exists(f["local_path"]):
+                try:
+                    os.remove(f["local_path"])
+                except Exception:
+                    pass
+        if isinstance(e, HTTPException):
+            raise e
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
 
 @router.get("/vendor/tender/{tender_id}", response_model=BidResponse)
 async def get_vendor_bid_for_tender(
@@ -244,7 +265,36 @@ async def get_buyer_bids_for_tender(
         logging.getLogger("uvicorn.error").exception(f"Error fetching buyer bids for tender {tender_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
 
+
+@router.get("/buyer/tender/{tender_id}/compare", response_model=TenderBidComparisonResponse)
+async def compare_buyer_bids_for_tender(
+    tender_id: int,
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    Fetch multi-dimensional side-by-side comparison of all bids for a specific tender.
+    Buyer only. Includes financial metrics, vendor reputation, document compliance, and securities.
+    """
+    buyer_org_id = current_user.get("organization_id")
+    if not buyer_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            comparison_data = await get_tender_bid_comparison(connection, tender_id, buyer_org_id)
+            return comparison_data
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Tender not found.")
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
 @router.post("/buyer/{bid_id}/accept")
+
 async def accept_bid(
     bid_id: int,
     current_user: dict = Depends(get_current_user_org)
@@ -332,3 +382,98 @@ async def stream_bid_document(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to stream document: {e}")
+
+
+@router.put("/{bid_id}", response_model=BidResponse)
+async def update_existing_bid(
+    bid_id: int,
+    payload: BidUpdateRequest,
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    Update a bid's financial amount, description, or status.
+    Vendor only. Cannot update an accepted bid or bid for closed/awarded/cancelled tenders.
+    """
+    vendor_org_id = current_user.get("organization_id")
+    if not vendor_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            updated_bid = await update_bid(
+                connection=connection,
+                bid_id=bid_id,
+                vendor_org_id=vendor_org_id,
+                financial_amount=payload.financial_amount,
+                description=payload.description,
+                status=payload.status.value if payload.status else None,
+            )
+            return updated_bid
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Bid not found.")
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="You do not have permission to update this bid.")
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
+@router.delete("/{bid_id}")
+async def delete_existing_bid(
+    bid_id: int,
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    Delete a bid and clean up all associated documents and storage files.
+    Vendor only. Cannot delete an accepted bid.
+    """
+    vendor_org_id = current_user.get("organization_id")
+    if not vendor_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            result = await delete_bid(connection, bid_id, vendor_org_id)
+            return result
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Bid not found.")
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="You do not have permission to delete this bid.")
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
+@router.delete("/documents/{doc_id}")
+async def delete_single_bid_document(
+    doc_id: int,
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    Delete a single bid document from storage and database.
+    Vendor only. Cannot delete if bid is accepted.
+    """
+    vendor_org_id = current_user.get("organization_id")
+    if not vendor_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            result = await delete_bid_document(connection, doc_id, vendor_org_id)
+            return result
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="You do not have permission to delete this document.")
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")

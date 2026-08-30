@@ -1,23 +1,103 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import TenderCard from '@/components/TenderCard';
 import SlidingToggle from '@/components/SlidingToggle';
 import MessagingSidebar from '@/components/MessagingSidebar';
 import OrgManagementModal from '@/components/OrgManagementModal';
+import ManageTokensModal from '@/components/ManageTokensModal';
 
 export default function HomePage() {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
+  const [totalUnreadMessages, setTotalUnreadMessages] = useState(0);
   const [upperCollapsed, setUpperCollapsed] = useState(false);
   const [mode, setMode] = useState<'buyer' | 'seller'>('buyer');
   const [activeTab, setActiveTab] = useState<'recommended' | 'enlisted'>('recommended');
   const [modeFadeIn, setModeFadeIn] = useState(true);
   const [tabFadeIn, setTabFadeIn] = useState(true);
   const [showOrgManagement, setShowOrgManagement] = useState(false);
+  const [showManageTokens, setShowManageTokens] = useState(false);
+  const [tokenBalance, setTokenBalance] = useState<number | null>(null);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifTab, setNotifTab] = useState<'unread' | 'read'>('unread');
+  const notifModalRef = useRef<HTMLDivElement>(null);
+
+  interface Notification {
+    notification_id: number;
+    user_id: number;
+    title: string;
+    message: string;
+    type: string;
+    action_url: string | null;
+    is_read: boolean;
+    created_at: string;
+  }
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loadingBalance, setLoadingBalance] = useState(true);
+
+  // Fetch notifications
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const [notifRes, countRes] = await Promise.all([
+          fetch('/api/notifications/list?status=all'),
+          fetch('/api/notifications/unread-count'),
+        ]);
+        if (notifRes.ok) {
+          const data = await notifRes.json();
+          setNotifications(data);
+        }
+        if (countRes.ok) {
+          const data = await countRes.json();
+          setUnreadCount(data.count);
+        }
+      } catch (err) {
+        console.error('Failed to fetch notifications:', err);
+      }
+    };
+    fetchNotifications();
+  }, []);
+
+  const timeAgo = (dateStr: string) => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins} min ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs} hr ago`;
+    const days = Math.floor(hrs / 24);
+    if (days === 1) return 'Yesterday';
+    return `${days} days ago`;
+  };
+
+  const markAsRead = async (id: number) => {
+    try {
+      const res = await fetch(`/api/notifications/${id}/read`, { method: 'PATCH' });
+      if (res.ok) {
+        setNotifications(prev => prev.map(n => n.notification_id === id ? { ...n, is_read: true } : n));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (err) {
+      console.error('Failed to mark notification as read:', err);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      const res = await fetch('/api/notifications/read-all', { method: 'PATCH' });
+      if (res.ok) {
+        setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+        setUnreadCount(0);
+      }
+    } catch (err) {
+      console.error('Failed to mark all as read:', err);
+    }
+  };
 
   // Load user data from localStorage
   const [userData, setUserData] = useState<{
@@ -33,7 +113,26 @@ export default function HomePage() {
       if (stored) {
         setUserData(JSON.parse(stored));
       }
+      const cachedBalance = localStorage.getItem('org_token_balance');
+      if (cachedBalance !== null && !isNaN(Number(cachedBalance))) {
+        setTokenBalance(Number(cachedBalance));
+        setLoadingBalance(false);
+      }
     } catch { }
+
+    // Fetch live organization token balance
+    fetch('/api/payments/balance')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && typeof data.credit_balance === 'number') {
+          setTokenBalance(data.credit_balance);
+          try {
+            localStorage.setItem('org_token_balance', data.credit_balance.toString());
+          } catch { }
+        }
+      })
+      .catch((err) => console.error('Failed to fetch balance:', err))
+      .finally(() => setLoadingBalance(false));
   }, []);
 
   const handleModeSwitch = (newMode: 'buyer' | 'seller') => {
@@ -71,8 +170,10 @@ export default function HomePage() {
   const [buyerTenders, setBuyerTenders] = useState<TenderItem[]>([]);
   const [sellerTenders, setSellerTenders] = useState<TenderItem[]>([]);
   const [tendersLoading, setTendersLoading] = useState(false);
+  const [filterStatus, setFilterStatus] = useState<'all' | 'published' | 'accepted'>('all');
+  const [enlistedOrgs, setEnlistedOrgs] = useState<Array<{ organization_id: number; organization_name: string; organization_type: string }>>([]);
 
-  // Fetch tenders when mode changes
+  // Fetch tenders when mode or activeTab changes
   useEffect(() => {
     const fetchTenders = async () => {
       setTendersLoading(true);
@@ -84,7 +185,10 @@ export default function HomePage() {
             setBuyerTenders(data);
           }
         } else {
-          const res = await fetch('/api/tenders/seller/all-tenders');
+          const endpoint = activeTab === 'enlisted'
+            ? '/api/tenders/seller/all-tenders?enlisted_only=true'
+            : '/api/tenders/seller/all-tenders';
+          const res = await fetch(endpoint);
           if (res.ok) {
             const data = await res.json();
             setSellerTenders(data);
@@ -97,7 +201,23 @@ export default function HomePage() {
       }
     };
     fetchTenders();
-  }, [mode]);
+  }, [mode, activeTab]);
+
+  // Fetch enlisted organizations
+  useEffect(() => {
+    const fetchEnlisted = async () => {
+      try {
+        const res = await fetch('/api/org/enlisted');
+        if (res.ok) {
+          const data = await res.json();
+          setEnlistedOrgs(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch enlisted orgs:', err);
+      }
+    };
+    fetchEnlisted();
+  }, []);
 
   const user = {
     name: userData.full_name || 'User',
@@ -120,11 +240,12 @@ export default function HomePage() {
   };
 
   // Sidebar nav items
-  const navItems = [
-    { label: 'Update Credentials', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) },
-    { label: 'Change Password', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>) },
-    { label: 'Payment Methods', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10a1 1 0 011-1h16a1 1 0 011 1v7a1 1 0 01-1 1H4a1 1 0 01-1-1v-7z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 6V4a2 2 0 012-2h6a2 2 0 012 2v2" /></svg>) },
-    { label: 'Manage Tokens', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) },
+  const navItems: Array<{ label: string; href?: string; onClick?: () => void; icon: React.ReactNode }> = [
+    { label: 'Find Organizations', href: '/organizations', icon: (<svg className="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>) },
+    { label: 'Ongoing Tenders', href: '/ongoing-tenders', icon: (<svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>) },
+    { label: 'Manage Tokens', onClick: () => setShowManageTokens(true), icon: (<svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) },
+    { label: 'Update Credentials', href: '#', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) },
+    { label: 'Change Password', href: '#', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>) },
   ];
 
   const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
@@ -171,10 +292,19 @@ export default function HomePage() {
         <ul className="space-y-1">
           {navItems.map((item, i) => (
             <li key={i}>
-              <a href="#" className="flex items-center gap-3 p-3 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-all duration-200">
+              <button
+                onClick={() => {
+                  if (item.onClick) {
+                    item.onClick();
+                  } else if (item.href && item.href !== '#') {
+                    router.push(item.href);
+                  }
+                }}
+                className="w-full flex items-center gap-3 p-3 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition-all duration-200 text-left cursor-pointer"
+              >
                 {item.icon}
                 {(sidebarOpen || isMobile) && <span className="text-sm font-medium">{item.label}</span>}
-              </a>
+              </button>
             </li>
           ))}
         </ul>
@@ -246,6 +376,22 @@ export default function HomePage() {
                   onChange={(v) => handleModeSwitch(v as 'buyer' | 'seller')}
                 />
 
+                {/* Notification Bell */}
+                <button
+                  onClick={() => setShowNotifications(true)}
+                  className="relative p-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 hover:border-accent-400/40 text-white transition-all duration-200 shadow-sm"
+                  title="Notifications"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-accent-500 text-white text-[10px] font-black flex items-center justify-center shadow-lg border border-navy-900">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+
                 {/* Search */}
                 <div className="flex-1 md:flex-initial" style={{ minWidth: '180px' }}>
                   <input type="text" placeholder="Search tenders..."
@@ -253,13 +399,23 @@ export default function HomePage() {
                 </div>
 
                 {/* Token capsule */}
-                <div className="rounded-xl px-4 py-2 flex items-center gap-2 whitespace-nowrap bg-white/10 border border-white/10">
+                <button
+                  onClick={() => setShowManageTokens(true)}
+                  className="rounded-xl px-4 py-2 flex items-center gap-2 whitespace-nowrap bg-white/10 hover:bg-white/15 border border-white/10 hover:border-amber-400/30 transition-all duration-200 cursor-pointer shadow-sm group"
+                  title="Manage Organization Tokens (Shared Pool)"
+                >
                   <span className="text-slate-400 text-sm font-medium">Tokens:</span>
-                  <span className="text-white text-lg font-black">250</span>
-                  <svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <span className="text-white text-lg font-black group-hover:text-amber-300 transition min-w-[28px] text-center inline-flex items-center justify-center">
+                    {tokenBalance !== null ? (
+                      tokenBalance.toLocaleString()
+                    ) : (
+                      <span className="inline-block w-8 h-4 bg-white/20 rounded animate-pulse"></span>
+                    )}
+                  </span>
+                  <svg className="w-5 h-5 text-yellow-400 group-hover:scale-110 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                </div>
+                </button>
 
                 {isOwner && (
                   <button onClick={() => setShowOrgManagement(true)}
@@ -284,26 +440,53 @@ export default function HomePage() {
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="text-slate-400 text-xs font-semibold">Total Published Tenders</p>
-                            <p className="text-2xl font-black text-white mt-1">12</p>
+                            <p className="text-2xl font-black text-white mt-1">{buyerTenders.filter(t => t.status === 'Published').length}</p>
                           </div>
                           <div className="w-10 h-10 bg-gradient-to-br from-accent-500 to-accent-600 rounded-xl flex items-center justify-center text-white text-lg shadow-lg">📊</div>
                         </div>
                       </div>
-                      <div className="bg-white/10 rounded-2xl p-4 border border-white/10 backdrop-blur-sm">
+                      <div
+                        onClick={() => router.push('/ongoing-tenders')}
+                        className="bg-white/10 hover:bg-white/15 rounded-2xl p-4 border border-white/10 backdrop-blur-sm cursor-pointer transition group"
+                      >
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-slate-400 text-xs font-semibold">Accepted Tenders</p>
-                            <p className="text-2xl font-black text-white mt-1">8</p>
+                            <div className="flex items-center gap-1">
+                              <p className="text-slate-400 text-xs font-semibold group-hover:text-emerald-300 transition-colors">Accepted / Ongoing Tenders</p>
+                              <span className="text-xs text-slate-400">→</span>
+                            </div>
+                            <p className="text-2xl font-black text-white mt-1">{buyerTenders.filter(t => t.status === 'Awarded').length}</p>
                           </div>
                           <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-xl flex items-center justify-center text-white text-lg shadow-lg">📦</div>
                         </div>
                       </div>
                       <div className="bg-white/10 rounded-2xl p-4 border border-white/10 backdrop-blur-sm sm:col-span-2">
-                        <p className="text-slate-400 text-xs font-semibold mb-2">Enlisted Vendors (5)</p>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-slate-400 text-xs font-semibold">
+                            Enlisted Vendors ({enlistedOrgs.filter(o => o.organization_type === 'Vendor').length})
+                          </p>
+                          <button
+                            onClick={() => router.push('/organizations')}
+                            className="text-xs text-accent-300 hover:text-white font-bold transition flex items-center gap-1"
+                          >
+                            + Find Vendors →
+                          </button>
+                        </div>
                         <div className="flex flex-wrap gap-2">
-                          {['Global Supplies Co.', 'Tech Solutions Ltd.', 'Modern Furnishings', 'CleanPro Services', 'Enterprise Software'].map(v => (
-                            <span key={v} className="px-3 py-1 rounded-full text-xs text-white bg-white/10 border border-white/10 font-medium">{v}</span>
-                          ))}
+                          {enlistedOrgs.filter(o => o.organization_type === 'Vendor').length === 0 ? (
+                            <span className="text-xs text-slate-400 italic">No vendors enlisted yet. Explore the directory to enlist trusted suppliers.</span>
+                          ) : (
+                            enlistedOrgs.filter(o => o.organization_type === 'Vendor').map(v => (
+                              <button
+                                key={v.organization_id}
+                                onClick={() => router.push(`/organizations/${v.organization_id}`)}
+                                className="px-3 py-1 rounded-full text-xs text-white bg-white/10 hover:bg-white/20 border border-white/10 font-medium transition cursor-pointer flex items-center gap-1"
+                              >
+                                <span>⭐</span>
+                                <span>{v.organization_name}</span>
+                              </button>
+                            ))
+                          )}
                         </div>
                       </div>
                     </>
@@ -318,21 +501,48 @@ export default function HomePage() {
                           <div className="w-10 h-10 bg-gradient-to-br from-accent-500 to-accent-600 rounded-xl flex items-center justify-center text-white text-lg shadow-lg">📊</div>
                         </div>
                       </div>
-                      <div className="bg-white/10 rounded-2xl p-4 border border-white/10 backdrop-blur-sm">
+                      <div
+                        onClick={() => router.push('/ongoing-tenders')}
+                        className="bg-white/10 hover:bg-white/15 rounded-2xl p-4 border border-white/10 backdrop-blur-sm cursor-pointer transition group"
+                      >
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-slate-400 text-xs font-semibold">Accepted Bids</p>
+                            <div className="flex items-center gap-1">
+                              <p className="text-slate-400 text-xs font-semibold group-hover:text-emerald-300 transition-colors">Accepted Bids / Ongoing</p>
+                              <span className="text-xs text-slate-400">→</span>
+                            </div>
                             <p className="text-2xl font-black text-white mt-1">6</p>
                           </div>
                           <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-xl flex items-center justify-center text-white text-lg shadow-lg">✅</div>
                         </div>
                       </div>
                       <div className="bg-white/10 rounded-2xl p-4 border border-white/10 backdrop-blur-sm sm:col-span-2">
-                        <p className="text-slate-400 text-xs font-semibold mb-2">Enlisted Buyers (4)</p>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-slate-400 text-xs font-semibold">
+                            Enlisted Buyers ({enlistedOrgs.filter(o => o.organization_type === 'Buyer').length})
+                          </p>
+                          <button
+                            onClick={() => router.push('/organizations')}
+                            className="text-xs text-accent-300 hover:text-white font-bold transition flex items-center gap-1"
+                          >
+                            + Find Buyers →
+                          </button>
+                        </div>
                         <div className="flex flex-wrap gap-2">
-                          {['Acme Corporation', 'BuildRight Inc.', 'Metro Industries', 'Summit Holdings'].map(v => (
-                            <span key={v} className="px-3 py-1 rounded-full text-xs text-white bg-white/10 border border-white/10 font-medium">{v}</span>
-                          ))}
+                          {enlistedOrgs.filter(o => o.organization_type === 'Buyer').length === 0 ? (
+                            <span className="text-xs text-slate-400 italic">No buyers enlisted yet. Explore the directory to find verified buyers.</span>
+                          ) : (
+                            enlistedOrgs.filter(o => o.organization_type === 'Buyer').map(b => (
+                              <button
+                                key={b.organization_id}
+                                onClick={() => router.push(`/organizations/${b.organization_id}`)}
+                                className="px-3 py-1 rounded-full text-xs text-white bg-white/10 hover:bg-white/20 border border-white/10 font-medium transition cursor-pointer flex items-center gap-1"
+                              >
+                                <span>⭐</span>
+                                <span>{b.organization_name}</span>
+                              </button>
+                            ))
+                          )}
                         </div>
                       </div>
                     </>
@@ -378,13 +588,23 @@ export default function HomePage() {
                         <div className="bg-navy-900 rounded-xl px-4 py-2 flex items-center gap-2">
                           <label htmlFor="filter-dropdown" className="text-slate-300 font-medium text-sm">Filter:</label>
                           <select id="filter-dropdown"
+                            value={filterStatus}
+                            onChange={(e) => setFilterStatus(e.target.value as any)}
                             className="bg-white text-navy-900 font-medium text-sm outline-none cursor-pointer rounded-lg px-2 py-1">
                             <option value="all">Show All</option>
                             <option value="published">Published</option>
-                            <option value="accepted">Accepted</option>
+                            <option value="accepted">Accepted / Awarded</option>
                           </select>
                         </div>
-                        <button onClick={() => router.push('/new-tender')}
+                        <button onClick={() => router.push('/organizations')}
+                          className="px-4 py-2 rounded-xl bg-cyan-50 text-cyan-800 border border-cyan-300 font-bold hover:bg-cyan-100 transition-all text-sm flex items-center gap-1.5 shadow-sm">
+                          🌐 Find Organizations
+                        </button>
+                        <button onClick={() => router.push('/ongoing-tenders')}
+                          className="px-4 py-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold hover:bg-emerald-100 transition-all text-sm flex items-center gap-1.5 shadow-sm">
+                          📋 Ongoing Tenders
+                        </button>
+                        <button type="button" onClick={() => router.push('/new-tender')}
                           className="px-6 py-2 rounded-xl bg-gradient-to-r from-accent-500 to-accent-600 text-white font-bold hover:from-accent-600 hover:to-accent-700 transition-all shadow-lg hover:shadow-xl hover:scale-[1.02] text-sm">
                           + Create Tender
                         </button>
@@ -399,23 +619,25 @@ export default function HomePage() {
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                           </svg>
                         </div>
-                      ) : buyerTenders.length === 0 ? (
+                      ) : buyerTenders.filter(t => filterStatus === 'all' ? true : filterStatus === 'published' ? t.status === 'Published' : (t.status === 'Awarded' || t.status === 'Accepted')).length === 0 ? (
                         <div className="col-span-full text-center py-16">
                           <svg className="w-12 h-12 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                           </svg>
-                          <p className="text-slate-400 text-lg font-medium">No tenders yet. Create your first tender!</p>
+                          <p className="text-slate-400 text-lg font-medium">No tenders found matching your filter.</p>
                         </div>
                       ) : (
-                        buyerTenders.map((tender) => (
-                          <TenderCard
-                            key={tender.tender_id}
-                            title={tender.title}
-                            subtitle={tender.description}
-                            vendor={tender.buyer_org_name}
-                            onClick={() => router.push(`/view-my-tender/${tender.tender_id}`)}
-                          />
-                        ))
+                        buyerTenders
+                          .filter(t => filterStatus === 'all' ? true : filterStatus === 'published' ? t.status === 'Published' : (t.status === 'Awarded' || t.status === 'Accepted'))
+                          .map((tender) => (
+                            <TenderCard
+                              key={tender.tender_id}
+                              title={tender.title}
+                              subtitle={tender.description}
+                              vendor={tender.buyer_org_name}
+                              onClick={() => router.push(`/view-my-tender/${tender.tender_id}`)}
+                            />
+                          ))
                       )}
                     </div>
                   </div>
@@ -424,10 +646,20 @@ export default function HomePage() {
                 <div className="rounded-xl p-4 md:p-8">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                     <h2 className="text-2xl font-black text-navy-900">Available Tenders</h2>
-                    <button onClick={() => router.push('/view-my-bids')}
-                      className="px-6 py-2 rounded-xl bg-gradient-to-r from-accent-500 to-accent-600 text-white font-bold hover:from-accent-600 hover:to-accent-700 transition-all shadow-lg hover:shadow-xl hover:scale-[1.02] text-sm">
-                      View My Bids
-                    </button>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <button onClick={() => router.push('/organizations')}
+                        className="px-4 py-2 rounded-xl bg-cyan-50 text-cyan-800 border border-cyan-300 font-bold hover:bg-cyan-100 transition-all text-sm flex items-center gap-1.5 shadow-sm">
+                        🌐 Find Organizations
+                      </button>
+                      <button onClick={() => router.push('/ongoing-tenders')}
+                        className="px-4 py-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 font-bold hover:bg-emerald-100 transition-all text-sm flex items-center gap-1.5 shadow-sm">
+                        📋 Ongoing Tenders
+                      </button>
+                      <button onClick={() => router.push('/view-my-bids')}
+                        className="px-6 py-2 rounded-xl bg-gradient-to-r from-accent-500 to-accent-600 text-white font-bold hover:from-accent-600 hover:to-accent-700 transition-all shadow-lg hover:shadow-xl hover:scale-[1.02] text-sm">
+                        View My Bids
+                      </button>
+                    </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {tendersLoading ? (
@@ -438,11 +670,26 @@ export default function HomePage() {
                         </svg>
                       </div>
                     ) : sellerTenders.length === 0 ? (
-                      <div className="col-span-full text-center py-16">
+                      <div className="col-span-full text-center py-16 bg-slate-50 rounded-2xl border border-slate-200">
                         <svg className="w-12 h-12 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                         </svg>
-                        <p className="text-slate-400 text-lg font-medium">No tenders available at the moment.</p>
+                        {activeTab === 'enlisted' ? (
+                          <>
+                            <p className="text-navy-900 text-lg font-bold">No tenders from your enlisted buyers</p>
+                            <p className="text-slate-400 text-sm mt-1 max-w-md mx-auto mb-4">
+                              Enlist trusted buyer organizations from the directory to see their active and exclusive tenders here.
+                            </p>
+                            <button
+                              onClick={() => router.push('/organizations')}
+                              className="px-5 py-2.5 bg-accent-600 hover:bg-accent-700 text-white font-bold text-xs rounded-xl transition shadow"
+                            >
+                              + Discover & Enlist Buyers
+                            </button>
+                          </>
+                        ) : (
+                          <p className="text-slate-400 text-lg font-medium">No tenders available at the moment.</p>
+                        )}
                       </div>
                     ) : (
                       sellerTenders.map((tender) => (
@@ -479,9 +726,14 @@ export default function HomePage() {
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
+          {totalUnreadMessages > 0 && (
+            <span className="absolute -top-1.5 -left-1.5 min-w-[20px] h-[20px] px-1 rounded-full bg-accent-500 text-white text-[10px] font-black flex items-center justify-center shadow-lg border-2 border-navy-900 animate-pulse">
+              {totalUnreadMessages > 99 ? '99+' : totalUnreadMessages}
+            </span>
+          )}
         </button>
 
-        <MessagingSidebar isOpen={rightSidebarOpen} onClose={() => setRightSidebarOpen(false)} />
+        <MessagingSidebar isOpen={rightSidebarOpen} onClose={() => setRightSidebarOpen(false)} onUnreadCountChange={setTotalUnreadMessages} />
       </div>
 
       {/* Organization Management Modal */}
@@ -489,6 +741,144 @@ export default function HomePage() {
         isOpen={showOrgManagement}
         onClose={() => setShowOrgManagement(false)}
       />
+
+      {/* Manage Tokens Modal */}
+      <ManageTokensModal
+        isOpen={showManageTokens}
+        onClose={() => setShowManageTokens(false)}
+        onBalanceUpdate={(newBal) => {
+          setTokenBalance(newBal);
+          try {
+            localStorage.setItem('org_token_balance', newBal.toString());
+          } catch { }
+        }}
+      />
+      {/* Notifications Modal */}
+      {showNotifications && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-end"
+          style={{ backdropFilter: 'blur(2px)', background: 'rgba(15,23,42,0.55)' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowNotifications(false); }}
+        >
+          <div
+            ref={notifModalRef}
+            className="mt-16 mr-4 md:mr-8 w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            style={{ background: 'linear-gradient(160deg, #0f2744 0%, #0f172a 100%)', border: '1px solid rgba(20,184,166,0.25)', maxHeight: '80vh' }}
+          >
+            {/* Header row */}
+            <div className="flex items-center justify-between px-5 pt-4 pb-3">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-accent-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                <h2 className="text-white font-bold text-base">Notifications</h2>
+              </div>
+              <button
+                onClick={() => setShowNotifications(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Tab bar */}
+            <div className="flex border-b border-white/10 px-5">
+              {(['unread', 'read'] as const).map((tab) => {
+                const count = tab === 'unread' ? notifications.filter(n => !n.is_read).length : notifications.filter(n => n.is_read).length;
+                const active = notifTab === tab;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setNotifTab(tab)}
+                    className={`relative pb-2.5 mr-5 text-sm font-semibold transition-colors capitalize ${active ? 'text-accent-300' : 'text-slate-500 hover:text-slate-300'
+                      }`}
+                  >
+                    {tab === 'unread' ? 'Unread' : 'Read'}
+                    {count > 0 && (
+                      <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${active ? 'bg-accent-500/30 text-accent-300' : 'bg-white/10 text-slate-400'
+                        }`}>
+                        {count}
+                      </span>
+                    )}
+                    {active && (
+                      <span className="absolute bottom-0 left-0 right-0 h-[2px] rounded-full bg-accent-400" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Notification list */}
+            <div className="overflow-y-auto flex-1">
+              {(() => {
+                const filtered = notifications.filter(n => notifTab === 'unread' ? !n.is_read : n.is_read);
+                const iconMap: Record<string, React.ReactNode> = {
+                  BidUpdate: <span className="text-lg">📩</span>,
+                  Award: <span className="text-lg">🏆</span>,
+                  Deadline: <span className="text-lg">⏰</span>,
+                  Enlist: <span className="text-lg">🤝</span>,
+                  TenderUpdate: <span className="text-lg">📋</span>,
+                  System: <span className="text-lg">⚠️</span>,
+                  Verification: <span className="text-lg">✅</span>,
+                };
+                if (filtered.length === 0) {
+                  return (
+                    <div className="flex flex-col items-center justify-center py-14 text-center px-6">
+                      <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-3">
+                        <svg className="w-6 h-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                        </svg>
+                      </div>
+                      <p className="text-slate-400 text-sm font-medium">
+                        {notifTab === 'unread' ? 'You\'re all caught up!' : 'No read notifications yet.'}
+                      </p>
+                    </div>
+                  );
+                }
+                return filtered.map((notif) => (
+                  <div
+                    key={notif.notification_id}
+                    className={`flex gap-3 px-5 py-4 border-b border-white/5 transition-colors hover:bg-white/5 cursor-pointer ${!notif.is_read ? 'bg-accent-500/5' : ''
+                      }`}
+                    onClick={() => {
+                      if (!notif.is_read) markAsRead(notif.notification_id);
+                      if (notif.action_url) router.push(notif.action_url);
+                    }}
+                  >
+                    <div className="flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center bg-white/10">
+                      {iconMap[notif.type] || <span className="text-lg">🔔</span>}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className={`text-sm font-semibold leading-snug ${!notif.is_read ? 'text-white' : 'text-slate-300'}`}>
+                          {notif.title}
+                        </p>
+                        {!notif.is_read && (
+                          <span className="flex-shrink-0 w-2 h-2 rounded-full bg-accent-400 mt-1" />
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">{notif.message}</p>
+                      <p className="text-[10px] text-slate-500 mt-1.5 font-medium">{timeAgo(notif.created_at)}</p>
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3 border-t border-white/10 flex justify-center">
+              <button
+                onClick={markAllAsRead}
+                className="text-xs text-accent-400 hover:text-accent-300 font-semibold transition"
+              >
+                Mark all as read
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

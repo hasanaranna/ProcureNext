@@ -156,6 +156,16 @@ async def generate_signed_url_optional(object_path: str | None, expires_in: int 
     return await generate_signed_url(object_path, expires_in)
 
 
+def _normalize_object_path(path: str) -> str:
+    if not path:
+        return ""
+    if path.startswith("http://") or path.startswith("https://"):
+        marker = f"/{BUCKET_NAME}/"
+        if marker in path:
+            return path.split(marker, 1)[1]
+    return path.lstrip("/")
+
+
 async def delete_files(object_paths: list[str]) -> None:
     """Delete one or more objects from Supabase Storage (private bucket).
 
@@ -164,7 +174,9 @@ async def delete_files(object_paths: list[str]) -> None:
                       e.g. ``['registrations/user/nid/abc_front.jpg', ...]``).
                       Empty list is a no-op.
     """
-    if not object_paths:
+    clean_paths = [_normalize_object_path(p) for p in object_paths if p]
+    clean_paths = [p for p in clean_paths if p]
+    if not clean_paths:
         return
 
     supabase_url, service_role_key = _get_supabase_config()
@@ -178,7 +190,7 @@ async def delete_files(object_paths: list[str]) -> None:
                 "Authorization": f"Bearer {service_role_key}",
                 "apikey": service_role_key,
             },
-            json={"prefixes": object_paths},
+            json={"prefixes": clean_paths},
         )
 
     # 200 = all deleted, 400 w/ partial results also acceptable (some may not exist).
@@ -188,6 +200,7 @@ async def delete_files(object_paths: list[str]) -> None:
             status_code=502,
             detail=f"Failed to delete files from Supabase Storage: {response.text}",
         )
+
 
 
 

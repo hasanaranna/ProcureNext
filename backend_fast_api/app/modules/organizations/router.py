@@ -71,7 +71,14 @@ from pydantic import BaseModel
 
 from app.core.db import get_db_connection
 from app.modules.auth.dependencies import get_current_user_org
-from app.modules.organizations.schemas import OrgCreateRequest, OrgCreateResponse, OrgInvitationCreateRequest
+from app.modules.organizations.schemas import (
+    OrgCreateRequest,
+    OrgCreateResponse,
+    OrgInvitationCreateRequest,
+    OrgSearchItem,
+    EnlistedOrgItem,
+    OrgProfileResponse
+)
 from app.modules.organizations.service import (
     create_master_organization,
     create_or_update_invitation,
@@ -79,9 +86,20 @@ from app.modules.organizations.service import (
     get_organization_members,
     update_member_role,
     get_organization_invitations,
-    delete_organization_invitation
+    delete_organization_invitation,
+    search_organizations,
+    enlist_organization,
+    delist_organization,
+    get_enlisted_organizations,
+    get_organization_profile
 )
-from app.services.supabase_storage import build_registration_prefix, upload_optional_file, upload_optional_files
+from app.services.supabase_storage import (
+    build_registration_prefix,
+    upload_optional_file,
+    upload_optional_files,
+    delete_files
+)
+from app.tasks.notification_tasks import send_pending_account_admin_alert_task
 
 router = APIRouter(prefix="/api/org", tags=["organizations"])
 
@@ -107,50 +125,107 @@ async def create_organization(
     additional_docs: list[UploadFile] = File(default=[], alias="additionalDocs"),
 ) -> OrgCreateResponse:
     storage_prefix = build_registration_prefix(email)
-
-    nid_front_url = await upload_optional_file(nid_front, f"{storage_prefix}/nid")
-    nid_back_url = await upload_optional_file(nid_back, f"{storage_prefix}/nid")
-    trade_license_url = await upload_optional_file(trade_license, f"{storage_prefix}/org")
-    tin_certificate_url = await upload_optional_file(tin_certificate, f"{storage_prefix}/org")
-    vat_certificate_url = await upload_optional_file(vat_certificate, f"{storage_prefix}/org")
-    additional_document_urls = await upload_optional_files(additional_docs, f"{storage_prefix}/org/additional")
-
-    payload = OrgCreateRequest(
-        full_name=name,
-        email=email,
-        phone=phone,
-        nid=nid,
-        date_of_birth=date_of_birth,
-        password=password,
-        organization_name=organization_name,
-        organization_type=organization_type,
-        address=address,
-        website=website,
-        description=description,
-        nid_front_url=nid_front_url,
-        nid_back_url=nid_back_url,
-        trade_license_url=trade_license_url,
-        tin_certificate_url=tin_certificate_url,
-        vat_certificate_url=vat_certificate_url,
-        additional_document_urls=additional_document_urls,
-    )
-
-    print(
-        f"[POST /api/org/orgs] body={payload.model_dump(exclude={'password'})}",
-        flush=True,
-    )
+    uploaded_files: list[str] = []
 
     try:
+        # 1. Pre-validate that user doesn't already exist before uploading files
         async with get_db_connection() as connection:
-            return await create_master_organization(connection, payload)
-    except HTTPException:
-        raise
-    except asyncpg.PostgresError as exc:
-        print(f"[DB ERROR] {exc}", flush=True)
-        raise HTTPException(status_code=500, detail=f"Database Error: {str(exc)}") from exc
+            existing_user = await connection.fetchrow(
+                "SELECT user_id, email, nid FROM users WHERE email = $1 OR nid = $2",
+                email,
+                nid,
+            )
+            if existing_user is not None:
+                if existing_user["email"] == email:
+                    raise HTTPException(status_code=409, detail="A user with this email already exists.")
+                raise HTTPException(status_code=409, detail="A user with this NID already exists.")
+
+        # 2. Upload files tracking all uploaded paths for cleanup if later step fails
+        nid_front_url = await upload_optional_file(nid_front, f"{storage_prefix}/nid")
+        if nid_front_url:
+            uploaded_files.append(nid_front_url)
+
+        nid_back_url = await upload_optional_file(nid_back, f"{storage_prefix}/nid")
+        if nid_back_url:
+            uploaded_files.append(nid_back_url)
+
+        trade_license_url = await upload_optional_file(trade_license, f"{storage_prefix}/org")
+        if trade_license_url:
+            uploaded_files.append(trade_license_url)
+
+        tin_certificate_url = await upload_optional_file(tin_certificate, f"{storage_prefix}/org")
+        if tin_certificate_url:
+            uploaded_files.append(tin_certificate_url)
+
+        vat_certificate_url = await upload_optional_file(vat_certificate, f"{storage_prefix}/org")
+        if vat_certificate_url:
+            uploaded_files.append(vat_certificate_url)
+
+        additional_document_urls = await upload_optional_files(additional_docs, f"{storage_prefix}/org/additional")
+        uploaded_files.extend(additional_document_urls)
+
+        payload = OrgCreateRequest(
+            full_name=name,
+            email=email,
+            phone=phone,
+            nid=nid,
+            date_of_birth=date_of_birth,
+            password=password,
+            organization_name=organization_name,
+            organization_type=organization_type,
+            address=address,
+            website=website,
+            description=description,
+            nid_front_url=nid_front_url,
+            nid_back_url=nid_back_url,
+            trade_license_url=trade_license_url,
+            tin_certificate_url=tin_certificate_url,
+            vat_certificate_url=vat_certificate_url,
+            additional_document_urls=additional_document_urls,
+        )
+
+        print(
+            f"[POST /api/org/orgs] body={payload.model_dump(exclude={'password'})}",
+            flush=True,
+        )
+
+        async with get_db_connection() as connection:
+            result = await create_master_organization(connection, payload)
+
+        # Notify all admins about the new pending account
+        try:
+            async with get_db_connection() as connection:
+                admin_rows = await connection.fetch(
+                    "SELECT u.email FROM admins a JOIN users u ON a.user_id = u.user_id"
+                )
+                admin_emails = [row["email"] for row in admin_rows]
+                if admin_emails:
+                    send_pending_account_admin_alert_task.delay(
+                        admin_emails=admin_emails,
+                        applicant_name=name,
+                        org_name=organization_name,
+                        org_type=organization_type,
+                    )
+        except Exception as notify_exc:
+            print(f"[NOTIFY WARNING] Failed to send admin alerts: {notify_exc}", flush=True)
+
+        return result
     except Exception as exc:
+        # Clean up any files that were uploaded to Supabase Storage if the operation failed!
+        if uploaded_files:
+            try:
+                await delete_files(uploaded_files)
+            except Exception as del_exc:
+                print(f"[STORAGE CLEANUP ERROR] {del_exc}", flush=True)
+
+        if isinstance(exc, HTTPException):
+            raise exc
+        if isinstance(exc, asyncpg.PostgresError):
+            print(f"[DB ERROR] {exc}", flush=True)
+            raise HTTPException(status_code=500, detail=f"Database Error: {str(exc)}") from exc
         print(f"[SYSTEM ERROR] {exc}", flush=True)
         raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
 
 
 @router.get("/invitation-details")
@@ -245,6 +320,118 @@ async def update_member_role_endpoint(
                 new_role=payload.role,
                 current_user_role=current_user["role_in_org"]
             )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
+@router.get("/search", response_model=list[OrgSearchItem])
+async def search_orgs(
+    q: str | None = None,
+    type: str | None = None,
+    limit: int = 50,
+    current_user: dict = Depends(get_current_user_org)
+) -> list[dict]:
+    """
+    Search organizations by keyword (name, description, address) and optional type filter.
+    Returns whether each organization is currently enlisted by the caller's organization.
+    """
+    current_org_id = current_user.get("organization_id")
+    try:
+        async with get_db_connection() as connection:
+            return await search_organizations(
+                connection=connection,
+                query=q,
+                org_type=type,
+                current_org_id=current_org_id,
+                limit=limit
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
+@router.get("/profile/{org_id}", response_model=OrgProfileResponse)
+async def get_org_profile(
+    org_id: int,
+    current_user: dict = Depends(get_current_user_org)
+) -> dict:
+    """
+    Get the full public profile of an organization, including verified documents from Supabase,
+    published tenders, and performance rating.
+    """
+    current_org_id = current_user.get("organization_id")
+    try:
+        async with get_db_connection() as connection:
+            profile = await get_organization_profile(connection, org_id, current_org_id)
+            if not profile:
+                raise HTTPException(status_code=404, detail="Organization not found.")
+            return profile
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
+@router.get("/enlisted", response_model=list[EnlistedOrgItem])
+async def list_enlisted(
+    current_user: dict = Depends(get_current_user_org)
+) -> list[dict]:
+    """
+    List all organizations currently enlisted by the caller's organization.
+    """
+    current_org_id = current_user.get("organization_id")
+    if not current_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            return await get_enlisted_organizations(connection, current_org_id)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
+@router.post("/enlist/{target_org_id}")
+async def enlist_org_endpoint(
+    target_org_id: int,
+    current_user: dict = Depends(get_current_user_org)
+) -> dict:
+    """
+    Enlist target organization as a vendor or buyer counterpart.
+    """
+    current_org_id = current_user.get("organization_id")
+    org_user_id = current_user.get("org_user_id")
+    if not current_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            return await enlist_organization(connection, current_org_id, target_org_id, org_user_id)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
+@router.delete("/enlist/{target_org_id}")
+async def delist_org_endpoint(
+    target_org_id: int,
+    current_user: dict = Depends(get_current_user_org)
+) -> dict:
+    """
+    Delist / remove target organization from caller organization's enlisted list.
+    """
+    current_org_id = current_user.get("organization_id")
+    if not current_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            return await delist_organization(connection, current_org_id, target_org_id)
     except HTTPException:
         raise
     except Exception as exc:

@@ -41,8 +41,7 @@ boto3
 # --- Email ---
 fastapi-mail
 
-# --- PDF Processing (triggers to ML service) ---
-python-multipart
+# --- File uploads ---
 aiofiles
 
 # --- WebSocket support (for real-time notifications/chat) ---

@@ -1,11 +1,21 @@
 # ============================================================
 # notifications/schemas.py - Notification Pydantic Schemas
 # ============================================================
-# SCHEMAS TO DEFINE:
-# - NotificationResponse: id, title, message, type, is_read,
-#   created_at, action_url (optional deep link)
-# - NotificationListResponse: paginated list
-# - UnreadCountResponse: count
-# - NotificationCreate: (internal) title, message, type,
-#   target_user_id, action_url
-# ============================================================
+
+from pydantic import BaseModel
+from datetime import datetime
+
+
+class NotificationResponse(BaseModel):
+    notification_id: int
+    user_id: int
+    title: str
+    message: str
+    type: str
+    action_url: str | None = None
+    is_read: bool
+    created_at: datetime
+
+
+class UnreadCountResponse(BaseModel):
+    count: int

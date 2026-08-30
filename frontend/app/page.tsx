@@ -2,21 +2,35 @@
 
 import { useRouter } from "next/navigation";
 
+import Link from "next/link";
+
 export default function Home() {
   const router = useRouter();
   return (
     <main className="w-full">
       {/* ── Sticky Navigation ──────────────────────────── */}
-      <nav className="fixed top-0 left-0 right-0 z-50 glass-dark">
+      <nav className="fixed top-0 left-0 right-0 z-50 glass-dark border-b border-white/10">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
+          <Link href="/" className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent-400 to-accent-600 flex items-center justify-center shadow-lg">
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
             </div>
             <span className="text-xl font-bold text-white tracking-tight">ProcureNext</span>
+          </Link>
+
+          <div className="hidden lg:flex items-center gap-6 text-sm font-medium text-slate-300">
+            <Link href="/public-tenders" className="text-accent-400 font-bold hover:text-accent-300 transition">Active Tenders</Link>
+            <Link href="/about" className="hover:text-white transition">About</Link>
+            <Link href="/policies" className="hover:text-white transition">Policies</Link>
+            <Link href="/legal" className="hover:text-white transition">Legal Notices</Link>
+            <Link href="/news" className="hover:text-white transition">News</Link>
+            <Link href="/events" className="hover:text-white transition">Events</Link>
+            <Link href="/help" className="hover:text-white transition">Help & Support</Link>
           </div>
+
+
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push("/login")}
@@ -185,19 +199,64 @@ export default function Home() {
       </section>
 
       {/* ── Footer ─────────────────────────────────────── */}
-      <footer className="w-full py-8 px-6 bg-navy-950 border-t border-white/5">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-accent-500/20 flex items-center justify-center">
-              <svg className="w-4 h-4 text-accent-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
+      <footer className="w-full py-12 px-6 bg-navy-950 border-t border-white/10">
+        <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
+          {/* Col 1 */}
+          <div className="space-y-3 col-span-2 md:col-span-1">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-accent-500/20 flex items-center justify-center">
+                <svg className="w-4 h-4 text-accent-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <span className="text-base font-bold text-white">ProcureNext</span>
             </div>
-            <span className="text-sm font-semibold text-slate-400">ProcureNext</span>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Enterprise digital procurement and tender management platform with cryptographic audit security.
+            </p>
           </div>
-          <p className="text-xs text-slate-600">© {new Date().getFullYear()} ProcureNext. All rights reserved.</p>
+
+          {/* Col 2 */}
+          <div className="space-y-2">
+            <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">About & Policies</h4>
+            <ul className="space-y-1.5 text-xs text-slate-400">
+              <li><Link href="/about" className="hover:text-accent-400 transition">About Platform</Link></li>
+              <li><Link href="/policies" className="hover:text-accent-400 transition">Procurement Policies</Link></li>
+              <li><Link href="/legal" className="hover:text-accent-400 transition">Legal Notices & Terms</Link></li>
+            </ul>
+          </div>
+
+          {/* Col 3 */}
+          <div className="space-y-2">
+            <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">Updates & Support</h4>
+            <ul className="space-y-1.5 text-xs text-slate-400">
+              <li><Link href="/news" className="hover:text-accent-400 transition">News & Announcements</Link></li>
+              <li><Link href="/events" className="hover:text-accent-400 transition">Events & Webinars</Link></li>
+              <li><Link href="/help" className="hover:text-accent-400 transition">Help & Support FAQ</Link></li>
+            </ul>
+          </div>
+
+          {/* Col 4 */}
+          <div className="space-y-2">
+            <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">Portals</h4>
+            <ul className="space-y-1.5 text-xs text-slate-400">
+              <li><Link href="/login" className="hover:text-accent-400 transition">User Login</Link></li>
+              <li><Link href="/signup-master" className="hover:text-accent-400 transition">Register Organization</Link></li>
+              <li><Link href="/admin-login" className="hover:text-accent-400 transition">Admin Portal</Link></li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="max-w-6xl mx-auto pt-6 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+          <p>© {new Date().getFullYear()} ProcureNext Technologies Ltd. All rights reserved.</p>
+          <div className="flex gap-4">
+            <Link href="/policies" className="hover:text-slate-400">Privacy Policy</Link>
+            <Link href="/legal" className="hover:text-slate-400">Terms of Service</Link>
+            <Link href="/help" className="hover:text-slate-400">Support</Link>
+          </div>
         </div>
       </footer>
     </main>
   );
 }
+

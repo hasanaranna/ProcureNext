@@ -148,7 +148,7 @@ CREATE TABLE organizations (
     verification_status  verification_status DEFAULT 'Pending',
     tin_number           TEXT,
     bin_number           TEXT,
-    credit_balance       INT                 DEFAULT 0,
+    credit_balance       INT                 DEFAULT 250,
     unique_join_code     VARCHAR(50)         UNIQUE,
     org_embedding        VECTOR(768),
     created_at           TIMESTAMP           DEFAULT NOW()
@@ -222,11 +222,26 @@ CREATE TABLE procurement_nature (
     name        procurement_nature_val  UNIQUE NOT NULL
 );
 
+INSERT INTO procurement_nature (name) VALUES
+    ('Goods'),
+    ('Works'),
+    ('Services'),
+    ('Consultancy')
+ON CONFLICT (name) DO NOTHING;
+
 CREATE TABLE procurement_method (
     method_id   SERIAL                  PRIMARY KEY,
     method_code procurement_method_val  UNIQUE NOT NULL,
     description TEXT
 );
+
+INSERT INTO procurement_method (method_code, description) VALUES
+    ('OTM', 'Open Tendering Method'),
+    ('RFQ', 'Request for Quotation'),
+    ('RFP', 'Request for Proposal'),
+    ('ReverseAuction', 'Reverse Auction'),
+    ('Direct', 'Direct Procurement')
+ON CONFLICT (method_code) DO NOTHING;
 
 CREATE TABLE tender_categories (
     category_id     SERIAL          PRIMARY KEY,
@@ -248,6 +263,7 @@ CREATE TABLE tenders (
     method_id           INT             REFERENCES procurement_method(method_id),
     title               VARCHAR(500)    NOT NULL,
     description         TEXT            NOT NULL,
+    eligibility_of_tenderer TEXT,
     visibility_type     tender_visibility DEFAULT 'Public',
     budget_min          NUMERIC(18,2),
     budget_max          NUMERIC(18,2),
@@ -259,7 +275,7 @@ CREATE TABLE tenders (
     tender_opening_date TIMESTAMP,
     submission_deadline TIMESTAMP,
     status              tender_status   DEFAULT 'Draft',
-    embedding           VECTOR(768),
+    embedding           VECTOR(384),
     created_at          TIMESTAMP       DEFAULT NOW(),
     updated_at          TIMESTAMP       DEFAULT NOW()
 );
@@ -322,7 +338,7 @@ CREATE TABLE bids (
 CREATE TABLE bid_documents (
     bid_doc_id      SERIAL      PRIMARY KEY,
     bid_id          INT         NOT NULL REFERENCES bids(bid_id) ON DELETE CASCADE,
-    doc_type_id     INT         NOT NULL REFERENCES document_types(type_id),
+    req_doc_id      INT         NOT NULL REFERENCES tender_required_documents(req_doc_id) ON DELETE CASCADE,
     file_path       TEXT,
     uploaded_at     TIMESTAMP   DEFAULT NOW()
 );
@@ -388,12 +404,35 @@ CREATE TABLE payments (
 CREATE TABLE credit_transactions (
     transaction_id      SERIAL              PRIMARY KEY,
     organization_id     INT                 NOT NULL REFERENCES organizations(organization_id),
+    user_id             INT                 REFERENCES users(user_id) ON DELETE SET NULL,
     payment_id          INT                 REFERENCES payments(transaction_id),
     amount              NUMERIC(18,2)       NOT NULL,
     transaction_type    transaction_type    NOT NULL,
     payment_reference   VARCHAR(255),
     balance_after       NUMERIC(18,2),
+    description         TEXT,
+    payment_method      VARCHAR(50),
     created_at          TIMESTAMP           DEFAULT NOW()
+);
+
+CREATE TABLE platform_pricing (
+    pricing_id          SERIAL              PRIMARY KEY,
+    price_per_token     NUMERIC(10, 2)      NOT NULL DEFAULT 1.00,
+    tender_publish_cost INT                 NOT NULL DEFAULT 50,
+    bid_cost            INT                 NOT NULL DEFAULT 20,
+    updated_by          INT                 REFERENCES users(user_id) ON DELETE SET NULL,
+    updated_at          TIMESTAMP           DEFAULT NOW()
+);
+
+CREATE TABLE token_packages (
+    package_id          SERIAL              PRIMARY KEY,
+    package_name        VARCHAR(100)        NOT NULL,
+    token_amount        INT                 NOT NULL CHECK (token_amount > 0),
+    price_bdt           NUMERIC(10, 2)      NOT NULL CHECK (price_bdt > 0),
+    badge               VARCHAR(50),
+    is_active           BOOLEAN             DEFAULT TRUE,
+    created_at          TIMESTAMP           DEFAULT NOW(),
+    updated_at          TIMESTAMP           DEFAULT NOW()
 );
 
 CREATE TABLE credit_discounts (
@@ -570,3 +609,146 @@ CREATE INDEX idx_thread_participants_user   ON thread_participants(user_id);
 CREATE INDEX idx_thread_participants_thread ON thread_participants(thread_id);
 CREATE INDEX idx_messages_thread            ON messages(thread_id, sent_at);
 CREATE INDEX idx_messages_sender            ON messages(sender_user_id);
+
+-- ============================================================
+-- MODULE 13: IMMUTABLE AUDIT & COMPLIANCE (WORM & CDC)
+-- ============================================================
+
+-- Transactional Outbox for resilient non-blocking event capture
+CREATE TABLE IF NOT EXISTS audit_outbox (
+    outbox_id       BIGSERIAL PRIMARY KEY,
+    event_uuid      UUID NOT NULL DEFAULT gen_random_uuid(),
+    action_type     VARCHAR(64) NOT NULL,
+    entity_type     VARCHAR(64) NOT NULL,
+    entity_id       VARCHAR(64) NOT NULL,
+    user_id         INT REFERENCES users(user_id) ON DELETE SET NULL,
+    user_email      VARCHAR(255),
+    ip_address      VARCHAR(45),
+    user_agent      VARCHAR(512),
+    old_values      JSONB,
+    new_values      JSONB,
+    change_diff     JSONB,
+    status          VARCHAR(20) NOT NULL DEFAULT 'PENDING', -- PENDING, PROCESSED, FAILED
+    error_message   TEXT,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    processed_at    TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_outbox_pending ON audit_outbox(outbox_id) WHERE status = 'PENDING';
+CREATE INDEX IF NOT EXISTS idx_audit_outbox_created ON audit_outbox(created_at);
+
+-- WORM-Compliant Append-Only Cryptographic Audit Log Table
+CREATE TABLE IF NOT EXISTS audit_logs (
+    log_id          BIGSERIAL PRIMARY KEY,
+    sequence_number BIGINT UNIQUE NOT NULL,
+    event_uuid      UUID UNIQUE NOT NULL,
+    user_id         INT REFERENCES users(user_id) ON DELETE SET NULL,
+    user_email      VARCHAR(255),
+    action_type     VARCHAR(64) NOT NULL,
+    entity_type     VARCHAR(64) NOT NULL,
+    entity_id       VARCHAR(64) NOT NULL,
+    old_values      JSONB,
+    new_values      JSONB,
+    change_diff     JSONB,
+    ip_address      VARCHAR(45),
+    user_agent      VARCHAR(512),
+    timestamp       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    previous_hash   VARCHAR(64) NOT NULL,
+    payload_hash    VARCHAR(64) NOT NULL,
+    hash_signature  VARCHAR(64) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_seq        ON audit_logs(sequence_number DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp  ON audit_logs(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_entity     ON audit_logs(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user       ON audit_logs(user_id, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action     ON audit_logs(action_type, timestamp DESC);
+
+-- Air-Gapped / Sealed Batch Archives tracking
+CREATE TABLE IF NOT EXISTS audit_archives (
+    archive_id      BIGSERIAL PRIMARY KEY,
+    batch_reference VARCHAR(128) UNIQUE NOT NULL,
+    sequence_start  BIGINT NOT NULL,
+    sequence_end    BIGINT NOT NULL,
+    record_count    INT NOT NULL,
+    genesis_hash    VARCHAR(64) NOT NULL,
+    terminal_hash   VARCHAR(64) NOT NULL,
+    merkle_root     VARCHAR(64) NOT NULL,
+    storage_path    VARCHAR(512) NOT NULL,
+    file_size_bytes BIGINT NOT NULL,
+    sealed_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    verified_at     TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_archives_seq ON audit_archives(sequence_start, sequence_end);
+
+-- Database-Level WORM Enforcement (Hard Trigger: Revoke modification)
+CREATE OR REPLACE FUNCTION prevent_audit_log_modification()
+RETURNS TRIGGER AS $$
+BEGIN
+    RAISE EXCEPTION 'SECURITY VIOLATION: audit_logs is append-only. Modification (UPDATE, DELETE, TRUNCATE) is strictly prohibited by WORM compliance policy.'
+    USING ERRCODE = '55000';
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_protect_audit_logs ON audit_logs;
+CREATE TRIGGER trg_protect_audit_logs
+BEFORE UPDATE OR DELETE OR TRUNCATE ON audit_logs
+FOR EACH STATEMENT EXECUTE FUNCTION prevent_audit_log_modification();
+
+-- Change Data Capture (CDC) Trigger Function for Critical Operational Tables
+CREATE OR REPLACE FUNCTION fn_cdc_audit_capture()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_entity_type VARCHAR(64);
+    v_entity_id   VARCHAR(64);
+    v_action_type VARCHAR(64);
+    v_old_json    JSONB := NULL;
+    v_new_json    JSONB := NULL;
+BEGIN
+    v_entity_type := TG_TABLE_NAME::VARCHAR;
+    
+    IF (TG_OP = 'INSERT') THEN
+        v_action_type := 'INSERT';
+        v_new_json    := to_jsonb(NEW);
+        v_entity_id   := COALESCE(v_new_json->>'tender_id', v_new_json->>'bid_id', v_new_json->>'award_id', v_new_json->>'contract_id', v_new_json->>'payment_id', v_new_json->>'organization_id', v_new_json->>'user_id', v_new_json->>'id', 'UNKNOWN');
+    ELSIF (TG_OP = 'UPDATE') THEN
+        v_action_type := 'UPDATE';
+        v_old_json    := to_jsonb(OLD);
+        v_new_json    := to_jsonb(NEW);
+        v_entity_id   := COALESCE(v_new_json->>'tender_id', v_new_json->>'bid_id', v_new_json->>'award_id', v_new_json->>'contract_id', v_new_json->>'payment_id', v_new_json->>'organization_id', v_new_json->>'user_id', v_new_json->>'id', 'UNKNOWN');
+    ELSIF (TG_OP = 'DELETE') THEN
+        v_action_type := 'DELETE';
+        v_old_json    := to_jsonb(OLD);
+        v_entity_id   := COALESCE(v_old_json->>'tender_id', v_old_json->>'bid_id', v_old_json->>'award_id', v_old_json->>'contract_id', v_old_json->>'payment_id', v_old_json->>'organization_id', v_old_json->>'user_id', v_old_json->>'id', 'UNKNOWN');
+    END IF;
+
+    -- Insert into transactional outbox
+    INSERT INTO audit_outbox (
+        action_type,
+        entity_type,
+        entity_id,
+        user_id,
+        user_email,
+        old_values,
+        new_values,
+        ip_address
+    ) VALUES (
+        v_action_type,
+        v_entity_type,
+        v_entity_id,
+        NULL,
+        current_user,
+        v_old_json,
+        v_new_json,
+        inet_client_addr()::VARCHAR
+    );
+
+    IF (TG_OP = 'DELETE') THEN
+        RETURN OLD;
+    ELSE
+        RETURN NEW;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+

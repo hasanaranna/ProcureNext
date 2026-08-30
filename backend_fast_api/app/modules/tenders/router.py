@@ -77,18 +77,142 @@ import os
 import json
 import uuid
 import shutil
-from typing import List
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
+from typing import List, Optional
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Query, status
 from fastapi.responses import JSONResponse
+from celery.result import AsyncResult
 from app.core.db import get_db_connection
 from app.modules.auth.dependencies import get_current_user_org
-from app.modules.tenders.schemas import TenderCreateRequest, TenderResponse, TenderListItem, TenderDetailResponse, UpdateTenderReqDocAccessRequest
-from app.modules.tenders.service import publish_tender_with_documents, get_buyer_tenders, get_all_published_tenders, get_tender_detail, update_tender_required_document_roles
+from app.modules.tenders.schemas import (
+    TenderCreateRequest,
+    TenderResponse,
+    TenderListItem,
+    TenderDetailResponse,
+    UpdateTenderReqDocAccessRequest,
+    OngoingTenderListItem,
+    OngoingTenderDetail,
+    PublicTenderListItem,
+    PublicTenderDetailResponse,
+    TenderPdfExtractResponse,
+    TenderPdfJobResponse,
+    TenderPdfJobStatus,
+)
+from app.modules.tenders.service import (
+    publish_tender_with_documents,
+    get_buyer_tenders,
+    get_all_published_tenders,
+    get_tender_detail,
+    update_tender_required_document_roles,
+    get_ongoing_tenders,
+    get_ongoing_tender_detail,
+    delete_tender,
+    delete_tender_document,
+    get_public_active_tenders,
+    get_public_tender_detail,
+)
+from app.services.ml_client import parse_and_embed_tender_pdf
+from app.tasks.celery_app import celery_app
+from app.tasks.ml_tasks import create_tender_from_pdf_task
 
 router = APIRouter(prefix="/tenders", tags=["Tenders"])
 
+
 TEMP_UPLOAD_DIR = os.getenv("UPLOAD_DIR", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../uploads")))
 os.makedirs(TEMP_UPLOAD_DIR, exist_ok=True)
+
+@router.post("/extract-from-pdf", response_model=TenderPdfExtractResponse)
+async def extract_from_pdf(
+    file: UploadFile = File(...)
+):
+    """
+    Send only the PDF to extract structured JSON and 384-dimensional vector embedding.
+    """
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided")
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported")
+
+    try:
+        content = await file.read()
+        parsed = await parse_and_embed_tender_pdf(content)
+        return TenderPdfExtractResponse(
+            title=parsed.title,
+            description=parsed.description,
+            procurement_nature=parsed.procurement_nature,
+            procurement_method=parsed.procurement_method,
+            category=parsed.category,
+            eligibility_of_tenderer=parsed.eligibility_of_tenderer,
+            budget_min=parsed.budget_min,
+            budget_max=parsed.budget_max,
+            submission_deadline=parsed.submission_deadline,
+            tender_public_date=parsed.tender_public_date,
+            pre_bid_meeting=parsed.pre_bid_meeting,
+            tender_opening_date=parsed.tender_opening_date,
+            embedding=parsed.embedding
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse PDF: {e}")
+
+
+@router.post("/buyer/create-from-pdf", response_model=TenderPdfJobResponse, status_code=status.HTTP_202_ACCEPTED)
+async def create_tender_from_pdf(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    Queue async tender creation from PDF.
+    Poll GET /buyer/create-from-pdf/jobs/{task_id} for the result.
+    """
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided")
+
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported")
+
+    safe_filename = f"{uuid.uuid4().hex}_{file.filename}"
+    local_path = os.path.join(TEMP_UPLOAD_DIR, safe_filename)
+
+    try:
+        with open(local_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save temporary PDF file: {e}")
+
+    buyer_id = current_user.get("organization_id", 1)
+    org_user_id = current_user.get("org_user_id", 1)
+    user_id = current_user.get("user_id") or current_user.get("org_user_id", 1)
+
+    task = create_tender_from_pdf_task.delay(
+        buyer_id=buyer_id,
+        org_user_id=org_user_id,
+        user_id=user_id,
+        pdf_path=local_path,
+        original_filename=file.filename,
+    )
+
+    return TenderPdfJobResponse(
+        task_id=task.id,
+        status="processing",
+        message="Tender PDF processing started.",
+    )
+
+
+@router.get("/buyer/create-from-pdf/jobs/{task_id}", response_model=TenderPdfJobStatus)
+async def get_create_tender_from_pdf_job(task_id: str):
+    result = AsyncResult(task_id, app=celery_app)
+
+    if result.state == "PENDING":
+        return TenderPdfJobStatus(task_id=task_id, status="processing")
+    if result.state == "STARTED":
+        return TenderPdfJobStatus(task_id=task_id, status="processing")
+    if result.state == "SUCCESS":
+        return TenderPdfJobStatus(task_id=task_id, status="completed", result=result.result)
+    if result.state == "FAILURE":
+        error_message = str(result.result) if result.result else "Tender PDF processing failed."
+        return TenderPdfJobStatus(task_id=task_id, status="failed", error=error_message)
+
+    return TenderPdfJobStatus(task_id=task_id, status=result.state.lower())
+
 
 @router.post("/buyer/publish-with-documents", response_model=TenderResponse, status_code=status.HTTP_201_CREATED)
 async def publish_with_documents(
@@ -132,24 +256,32 @@ async def publish_with_documents(
             "custom_name": custom_name
         })
 
-    # Dummy organization_id retrieval for buyer (in a real app, this comes from current_user)
-    # Using 1 for simplicity since this is a POC. The real auth logic needs to fetch it.
     buyer_id = current_user.get("organization_id", 1)
     org_user_id = current_user.get("org_user_id", 1)
+    user_id = current_user.get("user_id") or current_user.get("org_user_id", 1)
 
-    # 3. Save to DB and Dispatch background task
     try:
         async with get_db_connection() as connection:
             new_tender = await publish_tender_with_documents(
                 connection=connection,
                 buyer_id=buyer_id,
-                user_id=org_user_id,
+                org_user_id=org_user_id,
+                user_id=user_id,
                 tender_data=tender_req,
                 files_data=files_data
             )
             return new_tender
     except Exception as e:
+        for f in files_data:
+            if os.path.exists(f["local_path"]):
+                try:
+                    os.remove(f["local_path"])
+                except Exception:
+                    pass
+        if isinstance(e, HTTPException):
+            raise e
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
 
 
 @router.get("/buyer/my-tenders", response_model=List[TenderListItem])
@@ -171,17 +303,64 @@ async def list_buyer_tenders(
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
 
 
+@router.get("/public/active", response_model=List[PublicTenderListItem])
+async def list_active_public_tenders(
+    category_id: Optional[int] = Query(None),
+    search: Optional[str] = Query(None),
+):
+    """
+    Public Read-Only Endpoint: Browse currently active published tenders.
+    Accessible without authentication by unregistered visitors.
+    """
+    try:
+        async with get_db_connection() as connection:
+            return await get_public_active_tenders(
+                connection=connection,
+                category_id=category_id,
+                search=search,
+            )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
+@router.get("/public/{tender_id}", response_model=PublicTenderDetailResponse)
+async def get_public_tender_detail_endpoint(
+    tender_id: int,
+):
+    """
+    Public Read-Only Endpoint: Retrieve complete public notice, scope,
+    administrative/legal details, key dates, financial terms, and eligibility checklist.
+    Accessible without authentication.
+    """
+    try:
+        async with get_db_connection() as connection:
+            tender = await get_public_tender_detail(connection, tender_id)
+            if tender is None:
+                raise HTTPException(status_code=404, detail="Public tender not found or is restricted/closed.")
+            return tender
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
 @router.get("/seller/all-tenders", response_model=List[TenderListItem])
+
 async def list_all_tenders_for_seller(
+    enlisted_only: bool = False,
     current_user: dict = Depends(get_current_user_org)
 ):
     """
-    List all published tenders for seller browsing.
+    List all published tenders for seller browsing, optionally filtered by enlisted buyers.
     """
     try:
         vendor_org_id = current_user.get("organization_id")
         async with get_db_connection() as connection:
-            tenders = await get_all_published_tenders(connection, vendor_org_id=vendor_org_id)
+            tenders = await get_all_published_tenders(
+                connection,
+                vendor_org_id=vendor_org_id,
+                enlisted_only=enlisted_only
+            )
             return tenders
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
@@ -310,4 +489,106 @@ async def update_required_document_access(
             return {"message": "Document access updated successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
+@router.get("/ongoing", response_model=List[OngoingTenderListItem])
+async def list_ongoing_tenders(
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    List all ongoing (awarded) tenders for the current user's organization.
+    Supports both Buyer and Vendor organizations.
+    """
+    org_id = current_user.get("organization_id")
+    if not org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            tenders = await get_ongoing_tenders(connection, org_id)
+            return tenders
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
+@router.get("/ongoing/{tender_id}", response_model=OngoingTenderDetail)
+async def get_ongoing_tender(
+    tender_id: int,
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    Get full details for a specific ongoing (awarded) tender.
+    Accessible only if the caller's organization is the buyer or the winning vendor.
+    """
+    org_id = current_user.get("organization_id")
+    if not org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            tender = await get_ongoing_tender_detail(connection, tender_id, org_id)
+            if not tender:
+                raise HTTPException(status_code=404, detail="Ongoing tender not found or access denied.")
+            return tender
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
+@router.delete("/{tender_id}")
+async def delete_existing_tender(
+    tender_id: int,
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    Delete a tender and clean up all associated records and storage files.
+    Buyer only. Cannot delete awarded tenders.
+    """
+    buyer_org_id = current_user.get("organization_id")
+    if not buyer_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            result = await delete_tender(connection, tender_id, buyer_org_id)
+            return result
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Tender not found.")
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="You do not have permission to delete this tender.")
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+
+@router.delete("/documents/{doc_id}")
+async def delete_single_tender_document(
+    doc_id: int,
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    Delete a single tender document from storage and database.
+    Buyer only.
+    """
+    buyer_org_id = current_user.get("organization_id")
+    if not buyer_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            result = await delete_tender_document(connection, doc_id, buyer_org_id)
+            return result
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="You do not have permission to delete this document.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
 

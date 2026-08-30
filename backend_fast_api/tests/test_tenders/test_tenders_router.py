@@ -194,7 +194,35 @@ class TestSellerAllTenders:
         # All returned tenders should be Published
         for tender in data:
             assert tender["status"] == "Published"
-        mock_get_tenders.assert_called_once_with(mock_conn, vendor_org_id=mock_user_org["organization_id"])
+        mock_get_tenders.assert_called_once_with(
+            mock_conn, 
+            vendor_org_id=mock_user_org["organization_id"],
+            enlisted_only=False
+        )
+
+    @pytest.mark.asyncio
+    @patch("app.modules.tenders.router.get_db_connection")
+    @patch("app.modules.tenders.router.get_all_published_tenders")
+    async def test_returns_enlisted_buyers_tenders_only(
+        self, mock_get_tenders, mock_db, client, mock_user_org, sample_tender_list, auth_headers
+    ):
+        """When enlisted_only=true, should only fetch tenders from enlisted buyers."""
+        app.dependency_overrides[get_current_user_org] = lambda: mock_user_org
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+        mock_get_tenders.return_value = [sample_tender_list[0]]
+
+        resp = await client.get("/tenders/seller/all-tenders?enlisted_only=true", headers=auth_headers)
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["title"] == "Office Supplies Tender"
+        mock_get_tenders.assert_called_once_with(
+            mock_conn, 
+            vendor_org_id=mock_user_org["organization_id"],
+            enlisted_only=True
+        )
 
     @pytest.mark.asyncio
     @patch("app.modules.tenders.router.get_db_connection")

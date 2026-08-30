@@ -4,21 +4,33 @@
 
 import asyncpg
 from app.tasks.document_tasks import upload_bid_documents_to_supabase
+from app.modules.payments.service import deduct_tokens_for_bid_submission
+from app.modules.notifications.service import create_notification
+from app.tasks.notification_tasks import (
+    send_bid_received_email_task,
+    send_bid_accepted_email_task,
+    send_bid_rejected_email_task,
+)
 
 
 async def submit_bid_with_documents(
     connection: asyncpg.Connection,
     vendor_org_id: int,
     submitted_by: int,
+    user_id: int,
     tender_id: int,
     financial_amount: float,
     files_data: list[dict],
     description: str | None = None,
 ) -> dict:
     """
-    Creates a bid in Submitted state and queues background file upload.
+    Creates a bid in Submitted state, deducts tokens, and queues background file upload.
     Mirrors the tender publishing flow exactly.
     """
+
+    # Fetch tender title for transaction description
+    tender_row = await connection.fetchrow("SELECT title FROM tenders WHERE tender_id = $1", tender_id)
+    tender_title = tender_row["title"] if tender_row else None
 
     query = """
         INSERT INTO bids (
@@ -28,21 +40,76 @@ async def submit_bid_with_documents(
         RETURNING *;
     """
 
-    row = await connection.fetchrow(
-        query,
-        vendor_org_id,
-        submitted_by,
-        tender_id,
-        financial_amount,
-        description,
-        "Submitted",
-    )
+    async with connection.transaction():
+        row = await connection.fetchrow(
+            query,
+            vendor_org_id,
+            submitted_by,
+            tender_id,
+            financial_amount,
+            description,
+            "Submitted",
+        )
 
-    bid_id = row["bid_id"]
+        bid_id = row["bid_id"]
+
+        # Deduct configured tokens from vendor organization
+        await deduct_tokens_for_bid_submission(
+            connection=connection,
+            organization_id=vendor_org_id,
+            user_id=user_id,
+            tender_id=tender_id,
+            bid_id=bid_id,
+            tender_title=tender_title,
+        )
 
     if files_data:
         # Dispatch Celery task to upload the local files to Supabase
         upload_bid_documents_to_supabase.delay(bid_id, files_data)
+
+    # Notify the buyer (tender owner) about the new bid
+    try:
+        buyer_info = await connection.fetchrow(
+            """
+            SELECT
+                u.user_id,
+                u.email,
+                u.full_name,
+                vo.organization_name AS vendor_org_name
+            FROM tenders t
+            JOIN organization_employees oe
+                ON t.buyer_id = oe.organization_id
+                AND oe.role_in_org = 'Owner'
+            JOIN users u ON oe.user_id = u.user_id
+            LEFT JOIN organizations vo ON vo.organization_id = $2
+            WHERE t.tender_id = $1
+            """,
+            tender_id, vendor_org_id,
+        )
+        if buyer_info:
+            vendor_org_name = buyer_info["vendor_org_name"]
+            t_title = tender_title or "Untitled Tender"
+
+            # Create in-app notification
+            await create_notification(
+                connection,
+                user_id=buyer_info["user_id"],
+                title="New Bid Received",
+                message=f"{vendor_org_name} has submitted a bid on your tender \"{t_title}\".",
+                notification_type="BidUpdate",
+                action_url=f"/view-my-tender/{tender_id}",
+            )
+
+            # Send email via Celery
+            send_bid_received_email_task.delay(
+                to_email=buyer_info["email"],
+                buyer_name=buyer_info["full_name"] or "Buyer",
+                tender_title=t_title,
+                vendor_name=vendor_org_name or "A vendor",
+                tender_id=tender_id,
+            )
+    except Exception as notify_exc:
+        print(f"[NOTIFY WARNING] Failed to send bid notification: {notify_exc}", flush=True)
 
     return dict(row)
 
@@ -65,10 +132,15 @@ async def get_bid_by_tender_and_vendor(
     bid_dict = dict(bid_row)
 
     docs_query = """
-        SELECT bd.bid_doc_id, bd.file_path, COALESCE(trd.custom_doc_name, dt.type_name, 'Document') as document_type, trd.allowed_roles
+        SELECT 
+            bd.bid_doc_id, 
+            bd.file_path, 
+            COALESCE(dt.type_name, trd.custom_doc_name, 'Document') AS document_type,
+            trd.allowed_roles,
+            bd.req_doc_id
         FROM bid_documents bd
-        LEFT JOIN public.tender_required_documents trd ON bd.req_doc_id = trd.req_doc_id
-        LEFT JOIN document_types dt ON bd.req_doc_id = dt.type_id
+        LEFT JOIN tender_required_documents trd ON bd.req_doc_id = trd.req_doc_id
+        LEFT JOIN document_types dt ON trd.doc_type_id = dt.type_id
         WHERE bd.bid_id = $1
     """
     docs_rows = await connection.fetch(docs_query, bid_dict["bid_id"])
@@ -142,10 +214,16 @@ async def get_bids_for_buyer_tender(
 
     # Fetch documents for these bids
     docs_query = """
-        SELECT bd.bid_id, bd.bid_doc_id, bd.file_path, COALESCE(trd.custom_doc_name, dt.type_name, 'Document') as document_type, trd.allowed_roles
+        SELECT 
+            bd.bid_id, 
+            bd.bid_doc_id, 
+            bd.file_path, 
+            COALESCE(dt.type_name, trd.custom_doc_name, 'Document') AS document_type,
+            trd.allowed_roles,
+            bd.req_doc_id
         FROM bid_documents bd
-        LEFT JOIN public.tender_required_documents trd ON bd.req_doc_id = trd.req_doc_id
-        LEFT JOIN document_types dt ON bd.req_doc_id = dt.type_id
+        LEFT JOIN tender_required_documents trd ON bd.req_doc_id = trd.req_doc_id
+        LEFT JOIN document_types dt ON trd.doc_type_id = dt.type_id
         WHERE bd.bid_id = ANY($1)
     """
     docs_rows = await connection.fetch(docs_query, bid_ids)
@@ -227,6 +305,88 @@ async def accept_bid_for_tender(
         """
         await connection.execute(insert_award_query, bid_id, user_id, tender_id)
 
+        # Notify the winning vendor about bid acceptance
+        try:
+            vendor_info = await connection.fetchrow(
+                """
+                SELECT u.user_id, u.email, u.full_name,
+                       t.title as tender_title,
+                       buyer_org.organization_name as buyer_org_name
+                FROM bids b
+                JOIN organization_employees oe ON b.vendor_org_id = oe.organization_id AND oe.role_in_org = 'Owner'
+                JOIN users u ON oe.user_id = u.user_id
+                JOIN tenders t ON b.tender_id = t.tender_id
+                JOIN organizations buyer_org ON t.buyer_id = buyer_org.organization_id
+                WHERE b.bid_id = $1
+                """,
+                bid_id,
+            )
+            if vendor_info:
+                # Create in-app notification
+                await create_notification(
+                    connection,
+                    user_id=vendor_info["user_id"],
+                    title="Bid Accepted!",
+                    message=f"Your bid on \"{vendor_info['tender_title']}\" has been accepted by {vendor_info['buyer_org_name']}.",
+                    notification_type="Award",
+                    action_url=f"/ongoing-tenders",
+                )
+
+                # Send email via Celery
+                send_bid_accepted_email_task.delay(
+                    to_email=vendor_info["email"],
+                    vendor_name=vendor_info["full_name"] or "Vendor",
+                    tender_title=vendor_info["tender_title"] or "Tender",
+                    buyer_org_name=vendor_info["buyer_org_name"] or "Buyer",
+                    tender_id=tender_id,
+                )
+        except Exception as notify_exc:
+            print(f"[NOTIFY WARNING] Failed to send bid accepted notification: {notify_exc}", flush=True)
+
+        # Notify all losing vendors
+        try:
+            losing_vendors = await connection.fetch(
+                """
+                SELECT
+                    u.user_id,
+                    u.email,
+                    u.full_name,
+                    t.title AS tender_title,
+                    buyer_org.organization_name AS buyer_org_name
+                FROM bids b
+                JOIN organization_employees oe
+                    ON b.vendor_org_id = oe.organization_id
+                    AND oe.role_in_org = 'Owner'
+                JOIN users u ON oe.user_id = u.user_id
+                JOIN tenders t ON b.tender_id = t.tender_id
+                JOIN organizations buyer_org ON t.buyer_id = buyer_org.organization_id
+                WHERE b.tender_id = $1
+                  AND b.bid_id != $2
+                  AND b.status = 'Rejected'
+                """,
+                tender_id,
+                bid_id,
+            )
+            for loser in losing_vendors:
+                # In-app notification
+                await create_notification(
+                    connection,
+                    user_id=loser["user_id"],
+                    title="Bid Not Selected",
+                    message=f"Your bid on \"{loser['tender_title']}\" was not selected by {loser['buyer_org_name']}.",
+                    notification_type="BidUpdate",
+                    action_url="/ongoing-tenders",
+                )
+                # Email via Celery
+                send_bid_rejected_email_task.delay(
+                    to_email=loser["email"],
+                    vendor_name=loser["full_name"] or "Vendor",
+                    tender_title=loser["tender_title"] or "Tender",
+                    buyer_org_name=loser["buyer_org_name"] or "Buyer",
+                )
+        except Exception as notify_exc:
+            print(f"[NOTIFY WARNING] Failed to send losing-vendor notifications: {notify_exc}", flush=True)
+
         return accepted_bid
 
 async def get_vendor_submitted_bids(
@@ -246,3 +406,430 @@ async def get_vendor_submitted_bids(
     """
     bids_rows = await connection.fetch(bids_query, vendor_org_id)
     return [dict(r) for r in bids_rows]
+
+
+async def update_bid(
+    connection: asyncpg.Connection,
+    bid_id: int,
+    vendor_org_id: int,
+    financial_amount: float | None = None,
+    description: str | None = None,
+    status: str | None = None,
+) -> dict:
+    """
+    Update bid details (financial amount, description, status).
+    Only the owning vendor organization can update the bid.
+    Cannot update if bid is already Accepted or if the tender is Awarded/Closed/Cancelled.
+    """
+    # 1. Fetch bid and associated tender status
+    bid_row = await connection.fetchrow("""
+        SELECT b.*, t.status as tender_status
+        FROM bids b
+        JOIN tenders t ON b.tender_id = t.tender_id
+        WHERE b.bid_id = $1
+    """, bid_id)
+
+    if not bid_row:
+        raise KeyError("Bid not found")
+
+    if bid_row["vendor_org_id"] != vendor_org_id:
+        raise PermissionError("You do not have permission to update this bid.")
+
+    if bid_row["status"] == "Accepted":
+        raise ValueError("Cannot update an accepted bid.")
+
+    if bid_row["tender_status"] in ("Closed", "Awarded", "Cancelled"):
+        raise ValueError(f"Cannot update bid for a tender that is already {bid_row['tender_status']}.")
+
+    # 2. Build dynamic update statement
+    fields = []
+    args = []
+    idx = 1
+
+    if financial_amount is not None:
+        fields.append(f"financial_amount = ${idx}")
+        args.append(financial_amount)
+        idx += 1
+
+    if description is not None:
+        fields.append(f"description = ${idx}")
+        args.append(description)
+        idx += 1
+
+    if status is not None:
+        fields.append(f"status = ${idx}")
+        args.append(status)
+        idx += 1
+
+    if fields:
+        fields.append("updated_at = NOW()")
+        args.append(bid_id)
+        update_query = f"UPDATE bids SET {', '.join(fields)} WHERE bid_id = ${idx} RETURNING *"
+        updated_row = await connection.fetchrow(update_query, *args)
+        result = dict(updated_row)
+    else:
+        result = dict(bid_row)
+
+    # 3. Attach documents to response
+    docs_query = """
+        SELECT 
+            bd.bid_doc_id, 
+            bd.file_path, 
+            COALESCE(dt.type_name, trd.custom_doc_name, 'Document') AS document_type
+        FROM bid_documents bd
+        LEFT JOIN tender_required_documents trd ON bd.req_doc_id = trd.req_doc_id
+        LEFT JOIN document_types dt ON trd.doc_type_id = dt.type_id
+        WHERE bd.bid_id = $1
+    """
+    docs_rows = await connection.fetch(docs_query, bid_id)
+    result["documents"] = [dict(r) for r in docs_rows]
+
+    return result
+
+
+async def delete_bid(
+    connection: asyncpg.Connection,
+    bid_id: int,
+    vendor_org_id: int
+) -> dict:
+    """
+    Deletes a bid, associated DB records (bid documents, securities, notifications),
+    and cleans up all associated storage files from Supabase.
+    Only the owning vendor organization can delete the bid.
+    Accepted bids cannot be deleted.
+    """
+    from app.services.supabase_storage import delete_files
+    import logging
+    logger = logging.getLogger(__name__)
+
+    # 1. Verify bid exists and ownership
+    bid_row = await connection.fetchrow(
+        "SELECT bid_id, vendor_org_id, status, tender_id FROM bids WHERE bid_id = $1",
+        bid_id
+    )
+    if not bid_row:
+        raise KeyError("Bid not found")
+
+    if bid_row["vendor_org_id"] != vendor_org_id:
+        raise PermissionError("You do not have permission to delete this bid.")
+
+    if bid_row["status"] == "Accepted":
+        raise ValueError("Cannot delete an accepted bid.")
+
+    # 2. Gather storage files for cleanup
+    bid_docs = await connection.fetch(
+        "SELECT file_path FROM bid_documents WHERE bid_id = $1", bid_id
+    )
+    bid_secs = await connection.fetch(
+        "SELECT bid_security_doc_path FROM bid_securities WHERE bid_id = $1", bid_id
+    )
+
+    storage_paths = [r["file_path"] for r in bid_docs if r.get("file_path")]
+    storage_paths.extend([r["bid_security_doc_path"] for r in bid_secs if r.get("bid_security_doc_path")])
+
+    # 3. Perform database cascading deletions within a transaction
+    async with connection.transaction():
+        # Notifications — delete any notifications pointing to this bid's tender page
+        await connection.execute("""
+            DELETE FROM notifications
+            WHERE action_url = $1
+        """, f"/view-my-tender/{bid_row['tender_id']}")
+
+        # Bid documents and securities
+        await connection.execute("DELETE FROM bid_documents WHERE bid_id = $1", bid_id)
+        await connection.execute("DELETE FROM bid_securities WHERE bid_id = $1", bid_id)
+
+        # Bid record
+        await connection.execute("DELETE FROM bids WHERE bid_id = $1", bid_id)
+
+    # 4. Clean up storage files after successful DB transaction
+    if storage_paths:
+        try:
+            await delete_files(storage_paths)
+        except Exception as e:
+            logger.warning(f"Failed to delete storage files for bid {bid_id}: {e}")
+
+    return {"message": "Bid and all associated documents deleted successfully.", "bid_id": bid_id}
+
+
+async def delete_bid_document(
+    connection: asyncpg.Connection,
+    doc_id: int,
+    vendor_org_id: int
+) -> dict:
+    """
+    Deletes a specific bid document from storage and database.
+    Only the owning vendor organization can delete the document.
+    Cannot delete if bid is already Accepted.
+    """
+    from app.services.supabase_storage import delete_files
+    import logging
+    logger = logging.getLogger(__name__)
+
+    doc_row = await connection.fetchrow("""
+        SELECT bd.bid_doc_id, bd.file_path, b.vendor_org_id, b.status as bid_status
+        FROM bid_documents bd
+        JOIN bids b ON bd.bid_id = b.bid_id
+        WHERE bd.bid_doc_id = $1
+    """, doc_id)
+
+    if not doc_row:
+        raise KeyError("Document not found")
+
+    if doc_row["vendor_org_id"] != vendor_org_id:
+        raise PermissionError("You do not have permission to delete this document.")
+
+    if doc_row["bid_status"] == "Accepted":
+        raise ValueError("Cannot delete documents for an accepted bid.")
+
+    file_path = doc_row["file_path"]
+
+    await connection.execute("DELETE FROM bid_documents WHERE bid_doc_id = $1", doc_id)
+
+    if file_path:
+        try:
+            await delete_files([file_path])
+        except Exception as e:
+            logger.warning(f"Failed to delete storage file {file_path}: {e}")
+
+    return {"message": "Bid document deleted successfully.", "doc_id": doc_id}
+
+
+async def get_tender_bid_comparison(
+    connection: asyncpg.Connection,
+    tender_id: int,
+    buyer_org_id: int
+) -> dict:
+    """
+    Fetch comprehensive side-by-side comparison data for all bids submitted on a tender.
+    Includes financial metrics, budget deviations, vendor credibility & ratings,
+    compliance matrices against required documents, and bid securities.
+    """
+    # 1. Verify tender ownership
+    tender_row = await connection.fetchrow("""
+        SELECT tender_id, title, status, budget_min, budget_max, buyer_id
+        FROM tenders
+        WHERE tender_id = $1 AND buyer_id = $2
+    """, tender_id, buyer_org_id)
+
+    if not tender_row:
+        exists = await connection.fetchval("SELECT 1 FROM tenders WHERE tender_id = $1", tender_id)
+        if exists:
+            raise PermissionError("You do not have permission to view bids for this tender.")
+        raise KeyError("Tender not found")
+
+    budget_min = float(tender_row["budget_min"]) if tender_row["budget_min"] is not None else None
+    budget_max = float(tender_row["budget_max"]) if tender_row["budget_max"] is not None else None
+
+    # 2. Fetch tender required documents
+    req_docs_rows = await connection.fetch("""
+        SELECT req_doc_id, custom_doc_name, is_mandatory, allowed_roles
+        FROM tender_required_documents
+        WHERE tender_id = $1
+        ORDER BY req_doc_id
+    """, tender_id)
+    required_documents = [dict(r) for r in req_docs_rows]
+
+    # 3. Fetch bids with vendor organization details, ratings, completed contracts, enlistment status
+    bids_query = """
+        SELECT 
+            b.bid_id,
+            b.vendor_org_id,
+            b.submitted_by,
+            b.tender_id,
+            b.financial_amount,
+            b.description,
+            b.status,
+            b.submitted_at,
+            b.updated_at,
+            o.organization_name AS vendor_name,
+            o.address AS vendor_address,
+            o.website AS vendor_website,
+            o.verification_status AS vendor_verification_status,
+            COALESCE(vr.avg_rating, 0.0) AS vendor_rating,
+            COALESCE(vr.total_ratings_count, 0) AS total_ratings_count,
+            COALESCE(vc.completed_contracts_count, 0) AS completed_contracts_count,
+            CASE WHEN ev.enlisted_org_id IS NOT NULL THEN true ELSE false END AS is_enlisted
+        FROM bids b
+        JOIN organizations o ON b.vendor_org_id = o.organization_id
+        LEFT JOIN (
+            SELECT 
+                vendor_org_id, 
+                ROUND(AVG(rating)::numeric, 1)::float AS avg_rating,
+                COUNT(*)::int AS total_ratings_count
+            FROM vendor_performance
+            GROUP BY vendor_org_id
+        ) vr ON b.vendor_org_id = vr.vendor_org_id
+        LEFT JOIN (
+            SELECT 
+                wb.vendor_org_id,
+                COUNT(*)::int AS completed_contracts_count
+            FROM contracts c
+            JOIN awards a ON c.award_id = a.award_id
+            JOIN bids wb ON a.winning_bid_id = wb.bid_id
+            WHERE c.status = 'Completed'
+            GROUP BY wb.vendor_org_id
+        ) vc ON b.vendor_org_id = vc.vendor_org_id
+        LEFT JOIN enlisted_vendors ev ON ev.org_id = $2 AND ev.enlisted_org_id = b.vendor_org_id
+        WHERE b.tender_id = $1
+        ORDER BY b.submitted_at ASC
+    """
+    bids_rows = await connection.fetch(bids_query, tender_id, buyer_org_id)
+    raw_bids = [dict(r) for r in bids_rows]
+
+    bid_ids = [b["bid_id"] for b in raw_bids]
+
+    # 4. Fetch bid documents
+    docs_by_bid: dict[int, list[dict]] = {}
+    if bid_ids:
+        docs_rows = await connection.fetch("""
+            SELECT 
+                bd.bid_id, 
+                bd.bid_doc_id, 
+                bd.req_doc_id,
+                bd.file_path, 
+                COALESCE(dt.type_name, trd.custom_doc_name, 'Document') AS document_type
+            FROM bid_documents bd
+            LEFT JOIN tender_required_documents trd ON bd.req_doc_id = trd.req_doc_id
+            LEFT JOIN document_types dt ON trd.doc_type_id = dt.type_id
+            WHERE bd.bid_id = ANY($1)
+        """, bid_ids)
+
+        for doc in docs_rows:
+            b_id = doc["bid_id"]
+            if b_id not in docs_by_bid:
+                docs_by_bid[b_id] = []
+            docs_by_bid[b_id].append(dict(doc))
+
+    # 5. Fetch bid securities
+    secs_by_bid: dict[int, list[dict]] = {}
+    if bid_ids:
+        secs_rows = await connection.fetch("""
+            SELECT security_id, bid_id, security_amount, security_type, bid_security_doc_path, valid_until
+            FROM bid_securities
+            WHERE bid_id = ANY($1)
+        """, bid_ids)
+
+        for sec in secs_rows:
+            b_id = sec["bid_id"]
+            if b_id not in secs_by_bid:
+                secs_by_bid[b_id] = []
+            secs_by_bid[b_id].append(dict(sec))
+
+    # 6. Calculate summary metrics
+    amounts = [float(b["financial_amount"]) for b in raw_bids if b["financial_amount"] is not None]
+    min_amount = min(amounts) if amounts else None
+    max_amount = max(amounts) if amounts else None
+    avg_amount = round(sum(amounts) / len(amounts), 2) if amounts else None
+
+    lowest_bid_id = None
+    if min_amount is not None:
+        for b in raw_bids:
+            if b["financial_amount"] is not None and float(b["financial_amount"]) == min_amount:
+                lowest_bid_id = b["bid_id"]
+                break
+
+    # 7. Build evaluated bids with compliance matrices and analytics
+    evaluated_bids = []
+    fully_compliant_count = 0
+
+    for b in raw_bids:
+        b_id = b["bid_id"]
+        b_docs = docs_by_bid.get(b_id, [])
+        b_secs = secs_by_bid.get(b_id, [])
+
+        amount = float(b["financial_amount"]) if b["financial_amount"] is not None else None
+
+        # Budget variance
+        budget_variance_pct = None
+        if amount is not None and budget_max is not None and budget_max > 0:
+            budget_variance_pct = round(((amount - budget_max) / budget_max) * 100, 1)
+
+        # Average variance
+        avg_variance_pct = None
+        if amount is not None and avg_amount is not None and avg_amount > 0:
+            avg_variance_pct = round(((amount - avg_amount) / avg_amount) * 100, 1)
+
+        # Build compliance matrix
+        # Map submitted docs by req_doc_id
+        submitted_by_req_doc: dict[int, dict] = {}
+        for d in b_docs:
+            if d.get("req_doc_id"):
+                submitted_by_req_doc[d["req_doc_id"]] = d
+
+        compliance_matrix = []
+        mandatory_missing = 0
+        total_req = len(required_documents)
+        submitted_req_count = 0
+
+        for req in required_documents:
+            r_id = req["req_doc_id"]
+            is_mand = req.get("is_mandatory", True)
+            submitted_doc = submitted_by_req_doc.get(r_id)
+
+            is_submitted = submitted_doc is not None
+            if is_submitted:
+                submitted_req_count += 1
+            elif is_mand:
+                mandatory_missing += 1
+
+            compliance_matrix.append({
+                "req_doc_id": r_id,
+                "custom_doc_name": req.get("custom_doc_name") or "Document",
+                "is_mandatory": is_mand,
+                "is_submitted": is_submitted,
+                "bid_doc_id": submitted_doc["bid_doc_id"] if submitted_doc else None,
+                "file_path": submitted_doc["file_path"] if submitted_doc else None
+            })
+
+        if total_req > 0:
+            compliance_score_pct = round((submitted_req_count / total_req) * 100, 1)
+        else:
+            compliance_score_pct = 100.0
+
+        mandatory_satisfied = (mandatory_missing == 0)
+        if mandatory_satisfied and (compliance_score_pct >= 100.0 or total_req == 0):
+            fully_compliant_count += 1
+
+        is_lowest = (b_id == lowest_bid_id)
+
+        evaluated_bids.append({
+            **b,
+            "financial_amount": amount,
+            "vendor_rating": float(b.get("vendor_rating", 0.0)),
+            "total_ratings_count": int(b.get("total_ratings_count", 0)),
+            "completed_contracts_count": int(b.get("completed_contracts_count", 0)),
+            "is_enlisted": bool(b.get("is_enlisted", False)),
+            "budget_variance_pct": budget_variance_pct,
+            "avg_variance_pct": avg_variance_pct,
+            "is_lowest_bid": is_lowest,
+            "compliance_score_pct": compliance_score_pct,
+            "mandatory_docs_satisfied": mandatory_satisfied,
+            "documents": b_docs,
+            "compliance_matrix": compliance_matrix,
+            "securities": b_secs
+        })
+
+    summary = {
+        "total_bids": len(raw_bids),
+        "min_amount": min_amount,
+        "max_amount": max_amount,
+        "avg_amount": avg_amount,
+        "budget_min": budget_min,
+        "budget_max": budget_max,
+        "lowest_bid_id": lowest_bid_id,
+        "fully_compliant_bids_count": fully_compliant_count
+    }
+
+    return {
+        "tender_id": tender_id,
+        "tender_title": tender_row["title"],
+        "tender_status": tender_row["status"],
+        "budget_min": budget_min,
+        "budget_max": budget_max,
+        "required_documents": required_documents,
+        "summary": summary,
+        "bids": evaluated_bids
+    }
+
+

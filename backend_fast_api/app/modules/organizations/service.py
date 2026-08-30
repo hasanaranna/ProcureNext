@@ -140,6 +140,19 @@ async def create_master_organization(
             user_id,
         )
 
+        # Record advance grant of 250 tokens in transaction history
+        await connection.execute(
+            """
+            INSERT INTO credit_transactions (
+                organization_id, user_id, amount, transaction_type,
+                payment_reference, balance_after, description, payment_method
+            )
+            VALUES ($1, $2, 250, 'Purchase', 'ADVANCE-GRANT', 250, 'Advance Platform Grant: 250 Free Tokens', 'Welcome Bonus')
+            """,
+            organization_id,
+            user_id,
+        )
+
         document_urls = {
             "TradeLicense": payload.trade_license_url,
             "TIN": payload.tin_certificate_url,
@@ -218,17 +231,35 @@ async def create_or_update_invitation(
     email: str,
     token: str,
 ) -> dict:
-    """Create a new invitation or re-issue an existing one with fresh timestamps."""
+    """Create a new invitation or re-issue an existing one with fresh timestamps and send email."""
+    import os
+    import asyncio
+
+    # Check if this email already belongs to an active employee of this organization
+    already_member = await connection.fetchval(
+        """
+        SELECT 1 
+        FROM organization_employees oe
+        JOIN users u ON oe.user_id = u.user_id
+        WHERE oe.organization_id = $1 AND u.email = $2
+        """,
+        organization_id,
+        email,
+    )
+    if already_member:
+        raise HTTPException(
+            status_code=400,
+            detail=f"A user with email '{email}' is already a member of your organization.",
+        )
+
     existing = await connection.fetchrow(
         """
         SELECT invitation_id
         FROM user_invitations
         WHERE organization_id = $1
-          AND invited_by = $2
-          AND email = $3
+          AND email = $2
         """,
         organization_id,
-        invited_by,
         email,
     )
 
@@ -237,15 +268,18 @@ async def create_or_update_invitation(
             """
             UPDATE user_invitations
             SET token = $1,
+                status = 'Pending',
+                invited_by = $2,
                 created_at = NOW(),
                 expires_at = NOW() + INTERVAL '7 days'
-            WHERE invitation_id = $2
+            WHERE invitation_id = $3
             RETURNING invitation_id, organization_id, invited_by, email, token, status, created_at, expires_at
             """,
             token,
+            invited_by,
             existing["invitation_id"],
         )
-        message = "Invitation updated."
+        message = "Invitation updated and email sent."
     else:
         invitation = await connection.fetchrow(
             """
@@ -264,10 +298,51 @@ async def create_or_update_invitation(
             email,
             token,
         )
-        message = "Invitation created."
+        message = "Invitation created and email sent."
 
     if invitation is None:
         raise HTTPException(status_code=500, detail="Failed to create invitation: query returned None.")
+
+    # Retrieve organization and inviter details for the email
+    org_info = await connection.fetchrow(
+        """
+        SELECT o.organization_name, u.full_name as inviter_name
+        FROM organizations o
+        LEFT JOIN users u ON u.user_id = $2
+        WHERE o.organization_id = $1
+        """,
+        organization_id,
+        invited_by,
+    )
+    org_name = org_info["organization_name"] if org_info else "Your Organization"
+    inviter_name = org_info["inviter_name"] if org_info else None
+
+    # Construct the full invitation link
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+    invite_link = f"{frontend_url}/signup-user?token={token}"
+
+    # Asynchronously dispatch email via Celery task (with fallback to direct async threadpool)
+    try:
+        from app.tasks.notification_tasks import send_invitation_email_task
+        send_invitation_email_task.delay(
+            to_email=email,
+            org_name=org_name,
+            invite_link=invite_link,
+            inviter_name=inviter_name,
+        )
+        print(f"[INVITATION] Dispatched Celery email task to {email}", flush=True)
+    except Exception as task_exc:
+        print(f"[INVITATION CELERY FALLBACK] {task_exc}. Using background thread...", flush=True)
+        from app.services.email import send_employee_invitation_email
+        asyncio.create_task(
+            asyncio.to_thread(
+                send_employee_invitation_email,
+                to_email=email,
+                org_name=org_name,
+                invite_link=invite_link,
+                inviter_name=inviter_name,
+            )
+        )
 
     return {
         "message": message,
@@ -382,3 +457,240 @@ async def delete_organization_invitation(
         raise HTTPException(status_code=404, detail="Pending invitation not found.")
         
     return {"message": "Invitation canceled successfully."}
+
+
+async def search_organizations(
+    connection: asyncpg.Connection,
+    query: str | None = None,
+    org_type: str | None = None,
+    current_org_id: int | None = None,
+    limit: int = 50
+) -> list[dict]:
+    """
+    Search organizations by keyword (name, description, address) and optional type filter.
+    Includes is_enlisted flag for the caller's organization.
+    """
+    sql = """
+        SELECT 
+            o.organization_id,
+            o.organization_name,
+            o.organization_type,
+            o.address,
+            o.website,
+            o.description,
+            o.verification_status,
+            o.tin_number,
+            o.bin_number,
+            o.created_at,
+            CASE 
+                WHEN $1::int IS NOT NULL THEN EXISTS (
+                    SELECT 1 FROM enlisted_vendors ev 
+                    WHERE ev.org_id = $1 AND ev.enlisted_org_id = o.organization_id
+                )
+                ELSE FALSE
+            END AS is_enlisted
+        FROM organizations o
+        WHERE ($2::text IS NULL OR o.organization_name ILIKE '%' || $2 || '%' OR o.description ILIKE '%' || $2 || '%' OR o.address ILIKE '%' || $2 || '%')
+          AND ($3::text IS NULL OR o.organization_type::text = $3)
+          AND ($1::int IS NULL OR o.organization_id != $1)
+        ORDER BY o.organization_name ASC
+        LIMIT $4;
+    """
+    rows = await connection.fetch(sql, current_org_id, query, org_type, limit)
+    return [dict(row.items()) for row in rows]
+
+
+async def enlist_organization(
+    connection: asyncpg.Connection,
+    current_org_id: int,
+    target_org_id: int,
+    org_user_id: int
+) -> dict:
+    """
+    Add target organization to caller organization's enlisted vendors / buyers list.
+    """
+    if current_org_id == target_org_id:
+        raise HTTPException(status_code=400, detail="An organization cannot enlist itself.")
+
+    target_exists = await connection.fetchval(
+        "SELECT organization_id FROM organizations WHERE organization_id = $1",
+        target_org_id
+    )
+    if not target_exists:
+        raise HTTPException(status_code=404, detail="Target organization not found.")
+
+    await connection.execute(
+        """
+        INSERT INTO enlisted_vendors (org_id, enlisted_org_id, enlisted_by)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (org_id, enlisted_org_id) DO NOTHING;
+        """,
+        current_org_id, target_org_id, org_user_id
+    )
+    return {"message": "Organization enlisted successfully.", "enlisted_org_id": target_org_id}
+
+
+async def delist_organization(
+    connection: asyncpg.Connection,
+    current_org_id: int,
+    target_org_id: int
+) -> dict:
+    """
+    Remove target organization from caller organization's enlisted list.
+    """
+    result = await connection.execute(
+        "DELETE FROM enlisted_vendors WHERE org_id = $1 AND enlisted_org_id = $2",
+        current_org_id, target_org_id
+    )
+    if result == "DELETE 0":
+        raise HTTPException(status_code=404, detail="Organization is not in your enlisted list.")
+
+    return {"message": "Organization delisted successfully.", "delisted_org_id": target_org_id}
+
+
+async def get_enlisted_organizations(
+    connection: asyncpg.Connection,
+    current_org_id: int
+) -> list[dict]:
+    """
+    Retrieve all organizations enlisted by the caller's organization.
+    """
+    query = """
+        SELECT 
+            o.organization_id,
+            o.organization_name,
+            o.organization_type,
+            o.address,
+            o.website,
+            o.description,
+            o.verification_status,
+            ev.enlisted_at
+        FROM enlisted_vendors ev
+        JOIN organizations o ON ev.enlisted_org_id = o.organization_id
+        WHERE ev.org_id = $1
+        ORDER BY ev.enlisted_at DESC;
+    """
+    rows = await connection.fetch(query, current_org_id)
+    return [dict(row.items()) for row in rows]
+
+
+async def get_organization_profile(
+    connection: asyncpg.Connection,
+    target_org_id: int,
+    current_org_id: int | None = None
+) -> dict | None:
+    """
+    Retrieve public organization profile including verified documents from Supabase,
+    published tenders summary (if buyer), performance rating (if vendor), and member counts.
+    """
+    from app.services.supabase_storage import generate_signed_url
+
+    org_row = await connection.fetchrow(
+        """
+        SELECT 
+            organization_id,
+            organization_name,
+            organization_type,
+            address,
+            website,
+            description,
+            verification_status,
+            tin_number,
+            bin_number,
+            created_at
+        FROM organizations
+        WHERE organization_id = $1
+        """,
+        target_org_id
+    )
+    if not org_row:
+        return None
+
+    profile = dict(org_row.items())
+
+    # Check enlistment status
+    is_enlisted = False
+    if current_org_id and current_org_id != target_org_id:
+        is_enlisted = bool(await connection.fetchval(
+            "SELECT 1 FROM enlisted_vendors WHERE org_id = $1 AND enlisted_org_id = $2",
+            current_org_id, target_org_id
+        ))
+    profile["is_enlisted"] = is_enlisted
+
+    # Member count
+    member_count = await connection.fetchval(
+        "SELECT COUNT(*) FROM organization_employees WHERE organization_id = $1",
+        target_org_id
+    )
+    profile["member_count"] = member_count or 0
+
+    # Documents from organization_documents (TradeLicense, TIN, VAT, RJSC)
+    docs_query = """
+        SELECT 
+            od.document_id, 
+            dt.type_name AS document_type, 
+            od.file_path, 
+            od.review_status, 
+            od.uploaded_at
+        FROM organization_documents od
+        JOIN document_types dt ON od.document_type_id = dt.type_id
+        WHERE od.organization_id = $1
+        ORDER BY od.uploaded_at DESC;
+    """
+    doc_rows = await connection.fetch(docs_query, target_org_id)
+    documents = []
+    for d in doc_rows:
+        d_dict = dict(d.items())
+        if d_dict.get("file_path"):
+            try:
+                signed_url = await generate_signed_url(d_dict["file_path"], expires_in=3600)
+                d_dict["file_url"] = signed_url
+            except Exception:
+                d_dict["file_url"] = None
+        else:
+            d_dict["file_url"] = None
+        documents.append(d_dict)
+    profile["documents"] = documents
+
+    # Published tenders (if Buyer)
+    tenders_query = """
+        SELECT tender_id, title, description, budget_min, budget_max, submission_deadline, status, created_at
+        FROM tenders
+        WHERE buyer_id = $1 AND status = 'Published'
+        ORDER BY created_at DESC
+        LIMIT 10;
+    """
+    tender_rows = await connection.fetch(tenders_query, target_org_id)
+    profile["published_tenders"] = [dict(t.items()) for t in tender_rows]
+
+    # Performance reviews (if Vendor)
+    perf_query = """
+        SELECT 
+            COALESCE(AVG(rating), 0.0) AS average_rating,
+            COUNT(*) AS total_reviews
+        FROM vendor_performance
+        WHERE vendor_org_id = $1;
+    """
+    perf_row = await connection.fetchrow(perf_query, target_org_id)
+    if perf_row and perf_row["total_reviews"] > 0:
+        recent_feedback_query = """
+            SELECT rating, feedback, completion_status, recorded_at
+            FROM vendor_performance
+            WHERE vendor_org_id = $1 AND feedback IS NOT NULL
+            ORDER BY recorded_at DESC
+            LIMIT 5;
+        """
+        fb_rows = await connection.fetch(recent_feedback_query, target_org_id)
+        profile["performance"] = {
+            "average_rating": float(perf_row["average_rating"]),
+            "total_reviews": perf_row["total_reviews"],
+            "recent_feedback": [dict(fb.items()) for fb in fb_rows]
+        }
+    else:
+        profile["performance"] = {
+            "average_rating": 0.0,
+            "total_reviews": 0,
+            "recent_feedback": []
+        }
+
+    return profile

@@ -39,11 +39,12 @@ interface ContactResult {
 interface MessagingSidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  onUnreadCountChange?: (count: number) => void;
 }
 
 // ─── Component ───────────────────────────────────────────────
 
-export default function MessagingSidebar({ isOpen, onClose }: MessagingSidebarProps) {
+export default function MessagingSidebar({ isOpen, onClose, onUnreadCountChange }: MessagingSidebarProps) {
   // User state
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [isOwner, setIsOwner] = useState(false);
@@ -92,7 +93,6 @@ export default function MessagingSidebar({ isOpen, onClose }: MessagingSidebarPr
   // ─── WebSocket setup ─────────────────────────────────────
 
   useEffect(() => {
-    if (!isOpen) return;
 
     // Get token via server-side endpoint (httpOnly cookies aren't readable by JS)
     const getTokenAndConnect = async () => {
@@ -148,7 +148,7 @@ export default function MessagingSidebar({ isOpen, onClose }: MessagingSidebarPr
         wsRef.current = null;
       }
     };
-  }, [isOpen]);
+  }, []);
 
   // ─── Scroll to bottom on new messages ────────────────────
 
@@ -175,12 +175,16 @@ export default function MessagingSidebar({ isOpen, onClose }: MessagingSidebarPr
     }
   }, []);
 
-  // Fetch threads when sidebar opens
+  // Fetch threads on mount (so unread badge works even when panel is closed)
   useEffect(() => {
-    if (isOpen) {
-      fetchThreads();
-    }
-  }, [isOpen, fetchThreads]);
+    fetchThreads();
+  }, [fetchThreads]);
+
+  // Report total unread count to parent
+  useEffect(() => {
+    const total = threads.reduce((sum, t) => sum + t.unread_count, 0);
+    onUnreadCountChange?.(total);
+  }, [threads, onUnreadCountChange]);
 
   const searchContacts = useCallback(async (query: string) => {
     if (!query.trim()) {
@@ -523,7 +527,7 @@ export default function MessagingSidebar({ isOpen, onClose }: MessagingSidebarPr
                 </svg>
               </button>
 
-              <img src={getAvatarUrl(getThreadDisplayName(activeThread), getOtherParticipant(activeThread) ? getColorForUser(getOtherParticipant(activeThread)!.user_id) : '0d9488')} 
+              <img src={getAvatarUrl(getThreadDisplayName(activeThread), getOtherParticipant(activeThread) ? getColorForUser(getOtherParticipant(activeThread)!.user_id) : '0d9488')}
                 alt="Avatar" className="w-9 h-9 rounded-xl shadow-sm hidden sm:block" />
 
               <div className="flex-1 min-w-0">
@@ -582,10 +586,9 @@ export default function MessagingSidebar({ isOpen, onClose }: MessagingSidebarPr
                             {msg.sender_name}
                           </span>
                         )}
-                        <div className={`px-4 py-2.5 max-w-[80%] shadow-sm ${
-                            isOwn 
-                              ? 'bg-gradient-to-br from-accent-500 to-accent-600 text-white rounded-2xl rounded-tr-sm' 
-                              : 'bg-white text-navy-900 rounded-2xl rounded-tl-sm border border-slate-100'
+                        <div className={`px-4 py-2.5 max-w-[80%] shadow-sm ${isOwn
+                            ? 'bg-gradient-to-br from-accent-500 to-accent-600 text-white rounded-2xl rounded-tr-sm'
+                            : 'bg-white text-navy-900 rounded-2xl rounded-tl-sm border border-slate-100'
                           }`}>
                           <p className="text-sm leading-relaxed">{msg.message_text}</p>
                         </div>
@@ -604,11 +607,10 @@ export default function MessagingSidebar({ isOpen, onClose }: MessagingSidebarPr
                 placeholder="Type a message..."
                 className="flex-1 px-5 py-3 rounded-2xl border border-slate-300 text-sm text-navy-900 outline-none focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20 bg-slate-50 focus:bg-white transition-all shadow-inner" />
               <button onClick={handleSend} disabled={!messageInput.trim()}
-                className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 shadow-md flex-shrink-0 ${
-                  messageInput.trim() 
-                    ? 'bg-gradient-to-br from-accent-500 to-accent-600 text-white hover:shadow-lg hover:scale-105' 
+                className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 shadow-md flex-shrink-0 ${messageInput.trim()
+                    ? 'bg-gradient-to-br from-accent-500 to-accent-600 text-white hover:shadow-lg hover:scale-105'
                     : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                }`}>
+                  }`}>
                 <svg className="w-5 h-5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                 </svg>

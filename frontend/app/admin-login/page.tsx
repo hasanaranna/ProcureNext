@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { setAdminUser } from '@/lib/auth';
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -40,12 +41,13 @@ export default function AdminLoginPage() {
 
       if (res.ok) {
         const data = await res.json();
-        // Store tokens and user context
-        localStorage.setItem('access_token', data.access_token);
-        localStorage.setItem('refresh_token', data.refresh_token);
-        localStorage.setItem('user', JSON.stringify(data.user));
+        // Store admin display data in sessionStorage only.
+        // Actual auth tokens (admin_access_token / admin_refresh_token) are
+        // now set as HttpOnly cookies by the API proxy — the middleware reads
+        // these to gate /admin-home without ever touching client storage.
+        setAdminUser(data.user ?? {});
 
-        // Use hard redirect to force RootLayout to re-evaluate cookies
+        // Use hard redirect to force middleware to re-evaluate the new cookie
         window.location.href = '/admin-home';
       } else {
         const err = await res.json();

@@ -99,3 +99,43 @@ class TestOrganizationEndpoints:
             current_user_role="Owner"
         )
 
+    @pytest.mark.asyncio
+    @patch("app.tasks.notification_tasks.send_invitation_email_task.delay")
+    async def test_create_or_update_invitation_service_logic(self, mock_celery_task):
+        from app.modules.organizations.service import create_or_update_invitation
+        mock_conn = AsyncMock()
+
+        # 1. Not already a member
+        mock_conn.fetchval.return_value = None
+        # 2. Existing invitation lookup
+        mock_conn.fetchrow.side_effect = [
+            None,  # No existing invitation
+            {
+                "invitation_id": 1,
+                "organization_id": 10,
+                "invited_by": 1,
+                "email": "newbie@test.com",
+                "token": "tok123",
+                "status": "Pending",
+                "created_at": "2026-08-17",
+                "expires_at": "2026-08-24",
+            },  # Insert result
+            {"organization_name": "Test Org", "inviter_name": "Alice"},  # org_info
+        ]
+
+        result = await create_or_update_invitation(
+            mock_conn,
+            organization_id=10,
+            invited_by=1,
+            email="newbie@test.com",
+            token="tok123",
+        )
+
+        assert "invitation" in result
+        assert result["invitation"]["email"] == "newbie@test.com"
+        mock_celery_task.assert_called_once()
+        call_kwargs = mock_celery_task.call_args.kwargs
+        assert call_kwargs["to_email"] == "newbie@test.com"
+        assert call_kwargs["org_name"] == "Test Org"
+        assert "tok123" in call_kwargs["invite_link"]
+

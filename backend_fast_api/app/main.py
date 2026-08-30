@@ -26,22 +26,50 @@
 # RUN: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 # ============================================================
 
+import logging
+from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.db import check_db_connection, create_notifications_table
 from app.modules.organizations.router import router as organizations_router
 from app.modules.auth.router import router as auth_router
 from app.modules.admin.router import router as admin_router
 from app.modules.tenders.router import router as tenders_router
 from app.modules.bids.router import router as bids_router
 from app.modules.messaging.router import router as messaging_router
+from app.modules.payments.router import router as payments_router
+from app.modules.audit.router import router as audit_router
+from app.modules.notifications.router import router as notifications_router
 from app.modules.messaging.websocket import websocket_endpoint
 
+logger = logging.getLogger("app.main")
 
-app = FastAPI(title="ProcureNext FastAPI Backend")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Verify DB connection on startup
+    logger.info("Verifying database connection at application initialization...")
+    is_connected = await check_db_connection()
+    if is_connected:
+        logger.info("Database connection successfully established.")
+    else:
+        logger.warning("Database connection check failed at initialization. Some features may not work properly.")
+
+    # Ensure the notifications table exists (idempotent)
+    await create_notifications_table()
+
+    yield
+    logger.info("ProcureNext backend shutting down.")
+
+
+app = FastAPI(
+    title="ProcureNext FastAPI Backend",
+    lifespan=lifespan
+)
 
 app.add_middleware(
 	CORSMiddleware,
@@ -57,10 +85,18 @@ app.include_router(admin_router)
 app.include_router(tenders_router)
 app.include_router(bids_router)
 app.include_router(messaging_router)
+app.include_router(payments_router)
+app.include_router(audit_router)
+app.include_router(notifications_router)
 
 app.add_api_websocket_route("/ws/messages", websocket_endpoint)
 
 @app.get("/health")
 async def health_check() -> dict:
-	return {"status": "ok"}
+    db_ok = await check_db_connection()
+    return {
+        "status": "ok" if db_ok else "degraded",
+        "database": "connected" if db_ok else "disconnected"
+    }
+
 
