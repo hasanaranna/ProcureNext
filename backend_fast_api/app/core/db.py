@@ -120,3 +120,44 @@ async def create_notifications_table() -> None:
         logger.error(f"[DB] Failed to create notifications table: {exc}")
 
 
+async def create_password_reset_tokens_table() -> None:
+    """
+    Idempotently create the PASSWORD_RESET_TOKENS table and its indexes.
+    """
+    database_url = get_database_url()
+    if not database_url:
+        logger.warning("[DB] Skipping password_reset_tokens table creation: DATABASE_URL not set.")
+        return
+
+    try:
+        connection = await asyncpg.connect(
+            database_url,
+            ssl="require",
+            statement_cache_size=0,
+            timeout=10.0,
+        )
+        try:
+            await connection.execute("""
+                CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                    reset_id    SERIAL PRIMARY KEY,
+                    user_id     INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+                    email       VARCHAR(255) NOT NULL,
+                    token       VARCHAR(255) UNIQUE NOT NULL,
+                    expires_at  TIMESTAMP NOT NULL,
+                    used_at     TIMESTAMP,
+                    created_at  TIMESTAMP NOT NULL DEFAULT NOW()
+                )
+            """)
+            await connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_pwd_reset_token ON password_reset_tokens(token)"
+            )
+            await connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_pwd_reset_user_email ON password_reset_tokens(email)"
+            )
+            logger.info("[DB] PASSWORD_RESET_TOKENS table verified/created.")
+        finally:
+            await connection.close()
+    except Exception as exc:
+        logger.error(f"[DB] Failed to create password_reset_tokens table: {exc}")
+
+
