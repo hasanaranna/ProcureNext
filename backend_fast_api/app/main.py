@@ -34,7 +34,12 @@ load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.db import check_db_connection, create_notifications_table, create_password_reset_tokens_table
+from app.core.db import (
+    check_db_connection,
+    create_notifications_table,
+    create_password_reset_tokens_table,
+    create_tender_search_index,
+)
 from app.core.logging_config import setup_logging
 from app.middleware.audit_middleware import AuditMiddleware
 from app.middleware.request_logging import RequestLoggingMiddleware
@@ -49,6 +54,7 @@ from app.modules.audit.router import router as audit_router
 from app.modules.notifications.router import router as notifications_router
 from app.modules.contracts.router import router as contracts_router
 from app.modules.users.router import router as users_router
+from app.modules.search.router import router as search_router
 from app.modules.messaging.websocket import websocket_endpoint
 
 logger = logging.getLogger("app.main")
@@ -70,6 +76,9 @@ async def lifespan(app: FastAPI):
 
     # Ensure the password_reset_tokens table exists (idempotent)
     await create_password_reset_tokens_table()
+
+    # Ensure the tenders full-text search column/index exists (idempotent)
+    await create_tender_search_index()
 
     yield
     logger.info("ProcureNext backend shutting down.")
@@ -101,6 +110,7 @@ app.include_router(audit_router)
 app.include_router(notifications_router)
 app.include_router(contracts_router)
 app.include_router(users_router)
+app.include_router(search_router)
 
 app.add_api_websocket_route("/ws/messages", websocket_endpoint)
 

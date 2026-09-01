@@ -35,6 +35,32 @@ from app.services.ml_client import parse_and_embed_tender_pdf, vectorize_text
 
 logger = logging.getLogger(__name__)
 
+
+def build_visibility_filter(viewer_org_id: int | None, param_idx: int) -> tuple[str, list]:
+    """
+    Build the SQL fragment that enforces tender visibility rules.
+
+    Public tenders are visible to everyone. Restricted tenders are only visible to
+    vendor organizations that have been invited to that specific tender.
+
+    Args:
+        viewer_org_id: The viewing organization's id, or None for an anonymous/public caller.
+        param_idx: The positional parameter number to bind viewer_org_id to ($1, $2, ...).
+
+    Returns:
+        (sql_fragment, params) - the fragment is a leading-AND clause intended to be
+        appended to a WHERE clause on a query aliasing the tenders table as `t`.
+    """
+    if viewer_org_id is None:
+        return " AND (t.visibility_type = 'Public' OR t.visibility_type IS NULL)", []
+    return (
+        f" AND (t.visibility_type = 'Public' OR t.visibility_type IS NULL"
+        f" OR EXISTS (SELECT 1 FROM tender_invitations ti"
+        f" WHERE ti.tender_id = t.tender_id AND ti.vendor_org_id = ${param_idx}))",
+        [viewer_org_id],
+    )
+
+
 async def resolve_nature_id(connection: asyncpg.Connection, nature_str: str | None, nature_id: int | None) -> int | None:
     if nature_id:
         return nature_id
@@ -651,9 +677,14 @@ async def get_all_published_tenders(
             JOIN organizations o ON t.buyer_id = o.organization_id
             JOIN enlisted_vendors ev ON ev.enlisted_org_id = t.buyer_id AND ev.org_id = $1
             WHERE t.status = 'Published'
-            ORDER BY t.created_at DESC;
         """
-        rows = await connection.fetch(query, vendor_org_id)
+        args = [vendor_org_id]
+        visibility_sql, visibility_args = build_visibility_filter(vendor_org_id, len(args) + 1)
+        query += visibility_sql
+        args.extend(visibility_args)
+
+        query += " ORDER BY t.created_at DESC;"
+        rows = await connection.fetch(query, *args)
         return [dict(row) for row in rows]
 
     query = """
@@ -670,13 +701,17 @@ async def get_all_published_tenders(
         WHERE t.status = 'Published'
     """
     args = []
-    
+
     if vendor_org_id is not None:
         query += " AND t.buyer_id != $1"
         args.append(vendor_org_id)
-        
+
+    visibility_sql, visibility_args = build_visibility_filter(vendor_org_id, len(args) + 1)
+    query += visibility_sql
+    args.extend(visibility_args)
+
     query += " ORDER BY t.created_at DESC;"
-    
+
     rows = await connection.fetch(query, *args)
     return [dict(row) for row in rows]
 
