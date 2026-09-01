@@ -1,16 +1,31 @@
 # ============================================================
 # search/schemas.py - Search Pydantic Schemas
 # ============================================================
-# SCHEMAS TO DEFINE:
-# - TenderSearchQuery: q, category, nature, method, budget_min,
-#   budget_max, location, publish_date_from, publish_date_to,
-#   deadline_from, deadline_to, visibility, org_id, sort_by, order
-# - TenderSearchResult: tender summary + relevance_score
-# - TenderSearchResponse: paginated list of TenderSearchResult,
-#   total_count, applied_filters
-# - VendorSearchQuery: q, skills list, location, min_rating
-# - VendorSearchResult: vendor org summary + match info
-# - VendorSearchResponse: paginated list of VendorSearchResult
-# - OrgSearchQuery: name, type, location
-# - OrgSearchResult: org summary
+# COVERS: FR-03 (Advanced Search with Semantic Matching)
+#
+# Currently implemented: tender search results.
+# Vendor/organization search schemas are not implemented yet -
+# organization search lives in the organizations module today.
 # ============================================================
+
+from datetime import datetime
+
+from pydantic import BaseModel
+
+
+class TenderSearchResult(BaseModel):
+    """
+    A single tender in a search result set.
+
+    Mirrors the shape returned by the tender listing endpoints, plus the
+    relevance score used to order hybrid (keyword + semantic) search results.
+    """
+
+    tender_id: int
+    title: str
+    description: str
+    status: str
+    buyer_org_name: str
+    submission_deadline: datetime | None = None
+    created_at: datetime
+    relevance_score: float = 0.0

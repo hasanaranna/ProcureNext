@@ -165,6 +165,8 @@ export default function HomePage() {
     buyer_org_name: string;
     submission_deadline: string | null;
     created_at: string;
+    // Present on seller-side results, which are ranked by the search endpoint.
+    relevance_score?: number;
   }
 
   const [buyerTenders, setBuyerTenders] = useState<TenderItem[]>([]);
@@ -203,31 +205,25 @@ export default function HomePage() {
   const filteredBuyerTenders = buyerTenders.filter(
     (t) => buyerTenderMatchesFilter(t) && matchesSearch(t),
   );
-  const filteredSellerTenders = sellerTenders.filter(matchesSearch);
+  // Seller results are already filtered and relevance-ranked by the search
+  // endpoint. Re-applying the client-side substring filter here would discard
+  // semantic matches that don't literally contain the typed text.
+  const filteredSellerTenders = sellerTenders;
   const [enlistedOrgs, setEnlistedOrgs] = useState<Array<{ organization_id: number; organization_name: string; organization_type: string }>>([]);
   const [sellerBidCount, setSellerBidCount] = useState(0);
   const [sellerOngoingCount, setSellerOngoingCount] = useState(0);
 
-  // Fetch tenders when mode or activeTab changes
+  // Buyer mode: fetch the organization's own tenders (filtered client-side).
   useEffect(() => {
-    const fetchTenders = async () => {
+    if (mode !== 'buyer') return;
+
+    const fetchBuyerTenders = async () => {
       setTendersLoading(true);
       try {
-        if (mode === 'buyer') {
-          const res = await fetch('/api/tenders/buyer/my-tenders');
-          if (res.ok) {
-            const data = await res.json();
-            setBuyerTenders(data);
-          }
-        } else {
-          const endpoint = activeTab === 'enlisted'
-            ? '/api/tenders/seller/all-tenders?enlisted_only=true'
-            : '/api/tenders/seller/all-tenders';
-          const res = await fetch(endpoint);
-          if (res.ok) {
-            const data = await res.json();
-            setSellerTenders(data);
-          }
+        const res = await fetch('/api/tenders/buyer/my-tenders');
+        if (res.ok) {
+          const data = await res.json();
+          setBuyerTenders(data);
         }
       } catch (err) {
         console.error('Failed to fetch tenders:', err);
@@ -235,8 +231,45 @@ export default function HomePage() {
         setTendersLoading(false);
       }
     };
-    fetchTenders();
-  }, [mode, activeTab]);
+    fetchBuyerTenders();
+  }, [mode]);
+
+  // Seller mode: hybrid keyword + semantic search, ranked server-side.
+  // Debounced so typing doesn't fire a request (and an embedding round-trip)
+  // per keystroke.
+  const searchRequestIdRef = useRef(0);
+
+  useEffect(() => {
+    if (mode !== 'seller') return;
+
+    const fetchSellerTenders = async () => {
+      const requestId = ++searchRequestIdRef.current;
+      setTendersLoading(true);
+      try {
+        const params = new URLSearchParams();
+        if (searchQuery.trim()) params.set('q', searchQuery.trim());
+        if (activeTab === 'enlisted') params.set('enlisted_only', 'true');
+
+        const res = await fetch(`/api/search/tenders?${params.toString()}`);
+        // A slower earlier request must not overwrite newer results.
+        if (requestId !== searchRequestIdRef.current) return;
+
+        if (res.ok) {
+          const data = await res.json();
+          setSellerTenders(data);
+        }
+      } catch (err) {
+        console.error('Failed to search tenders:', err);
+      } finally {
+        if (requestId === searchRequestIdRef.current) {
+          setTendersLoading(false);
+        }
+      }
+    };
+
+    const timer = setTimeout(fetchSellerTenders, 300);
+    return () => clearTimeout(timer);
+  }, [mode, activeTab, searchQuery]);
 
   // Fetch enlisted organizations
   useEffect(() => {
@@ -696,7 +729,7 @@ export default function HomePage() {
               <div className="pt-8 px-4 md:px-8 flex justify-center">
                 <SlidingToggle
                   options={[
-                    { value: 'recommended', label: 'Recommended For You' },
+                    { value: 'recommended', label: 'Available Tenders' },
                     { value: 'enlisted', label: 'From My Enlisted Buyers' },
                   ]}
                   value={activeTab}
@@ -817,6 +850,15 @@ export default function HomePage() {
                             >
                               + Discover & Enlist Buyers
                             </button>
+                          </>
+                        ) : searchQuery.trim() ? (
+                          <>
+                            <p className="text-navy-900 text-lg font-bold">
+                              No tenders match &ldquo;{searchQuery.trim()}&rdquo;
+                            </p>
+                            <p className="text-slate-400 text-sm mt-1 max-w-md mx-auto">
+                              Try different or broader wording.
+                            </p>
                           </>
                         ) : (
                           <p className="text-slate-400 text-lg font-medium">No tenders available at the moment.</p>

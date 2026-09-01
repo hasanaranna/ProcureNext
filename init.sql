@@ -294,6 +294,11 @@ CREATE TABLE tenders (
     submission_deadline TIMESTAMP,
     status              tender_status   DEFAULT 'Draft',
     embedding           VECTOR(384),
+    -- Full-text search vector for hybrid search; title weighted above description.
+    search_vector       tsvector        GENERATED ALWAYS AS (
+                            setweight(to_tsvector('english', title), 'A') ||
+                            setweight(to_tsvector('english', description), 'B')
+                        ) STORED,
     created_at          TIMESTAMP       DEFAULT NOW(),
     updated_at          TIMESTAMP       DEFAULT NOW()
 );
@@ -627,6 +632,7 @@ CREATE INDEX idx_org_verify     ON organizations(verification_status);
 CREATE INDEX idx_tenders_buyer  ON tenders(buyer_id);
 CREATE INDEX idx_tenders_status ON tenders(status);
 CREATE INDEX idx_tenders_deadline ON tenders(submission_deadline);
+CREATE INDEX idx_tenders_search_vector ON tenders USING GIN (search_vector);
 CREATE INDEX idx_bids_tender    ON bids(tender_id);
 CREATE INDEX idx_bids_vendor    ON bids(vendor_org_id);
 CREATE INDEX idx_bids_status    ON bids(status);
