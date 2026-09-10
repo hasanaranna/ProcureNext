@@ -21,6 +21,7 @@ class ParticipantInfo(BaseModel):
     user_id: int
     full_name: str
     is_admin: bool = False
+    is_permanent: bool = False
 
 
 class ThreadListItem(BaseModel):

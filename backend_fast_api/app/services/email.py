@@ -788,3 +788,166 @@ def send_bid_rejected_email(
         html_body=build_bid_rejected_html(vendor_name, tender_title, buyer_org_name),
         text_body=build_bid_rejected_text(vendor_name, tender_title, buyer_org_name),
     )
+
+
+# ──────────────────────────────────────────────────────────────
+# InterCompany Channel Created – Owner Notification
+# ──────────────────────────────────────────────────────────────
+
+def build_intercompany_created_html(
+    user_name: str,
+    tender_title: str,
+    other_org_name: str,
+) -> str:
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inter-Company Channel Created</title></head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f1f5f9;padding:40px 16px;">
+<tr><td align="center">
+<table role="presentation" width="100%" style="max-width:580px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 25px -5px rgba(0,0,0,0.08);border:1px solid #e2e8f0;" cellspacing="0" cellpadding="0">
+  <tr><td style="background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);padding:36px 32px;text-align:center;">
+    <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:800;">Procure<span style="color:#38bdf8;">Next</span></h1>
+    <p style="margin:6px 0 0 0;color:#94a3b8;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;">Collaboration</p>
+  </td></tr>
+  <tr><td style="padding:36px 32px;">
+    <div style="text-align:center;margin-bottom:24px;">
+      <span style="display:inline-block;width:56px;height:56px;border-radius:50%;background:#0284c7;line-height:56px;font-size:28px;text-align:center;">🌐</span>
+    </div>
+    <h2 style="margin:0 0 16px 0;color:#0f172a;font-size:20px;font-weight:700;text-align:center;">Inter-Company Channel Created</h2>
+    <p style="margin:0 0 18px 0;font-size:15px;line-height:1.6;color:#475569;">Hello <strong>{user_name}</strong>,</p>
+    <p style="margin:0 0 24px 0;font-size:15px;line-height:1.6;color:#475569;">
+      A collaboration channel has been created for the tender <strong>"{tender_title}"</strong>
+      between your organisation and <strong>{other_org_name}</strong>.
+    </p>
+    <p style="margin:0 0 24px 0;font-size:15px;line-height:1.6;color:#475569;">
+      You can now communicate directly through ProcureNext Messaging. You may also add members
+      from your own organisation to this channel.
+    </p>
+    <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 auto 28px auto;">
+      <tr><td align="center" style="border-radius:12px;background:linear-gradient(135deg,#0284c7 0%,#0369a1 100%);">
+        <a href="https://procurenext.app/messages" target="_blank" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:12px;">Open Channel &rarr;</a>
+      </td></tr>
+    </table>
+  </td></tr>
+  <tr><td style="background-color:#f8fafc;padding:24px 32px;text-align:center;border-top:1px solid #e2e8f0;">
+    <p style="margin:0;font-size:11px;color:#94a3b8;">&copy; 2026 ProcureNext. All rights reserved.</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>"""
+
+
+def build_intercompany_created_text(
+    user_name: str,
+    tender_title: str,
+    other_org_name: str,
+) -> str:
+    return f"""ProcureNext - Inter-Company Channel Created
+
+Hello {user_name},
+
+A collaboration channel has been created for the tender "{tender_title}"
+between your organisation and {other_org_name}.
+
+You can now communicate directly through ProcureNext Messaging.
+You may also add members from your own organisation to this channel.
+
+Open the channel at: https://procurenext.app/messages
+
+-- ProcureNext Team
+"""
+
+
+def send_intercompany_created_email(
+    to_email: str,
+    user_name: str,
+    tender_title: str,
+    other_org_name: str,
+) -> bool:
+    subject = f"A new project channel has been created — {tender_title}"
+    return send_smtp_email(
+        to_email=to_email,
+        subject=subject,
+        html_body=build_intercompany_created_html(user_name, tender_title, other_org_name),
+        text_body=build_intercompany_created_text(user_name, tender_title, other_org_name),
+    )
+
+
+# ──────────────────────────────────────────────────────────────
+# InterCompany Channel – Member Added Notification
+# ──────────────────────────────────────────────────────────────
+
+def build_intercompany_member_added_html(
+    user_name: str,
+    tender_title: str,
+    owner_name: str,
+) -> str:
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Added to Inter-Company Channel</title></head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f1f5f9;padding:40px 16px;">
+<tr><td align="center">
+<table role="presentation" width="100%" style="max-width:580px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 25px -5px rgba(0,0,0,0.08);border:1px solid #e2e8f0;" cellspacing="0" cellpadding="0">
+  <tr><td style="background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);padding:36px 32px;text-align:center;">
+    <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:800;">Procure<span style="color:#38bdf8;">Next</span></h1>
+    <p style="margin:6px 0 0 0;color:#94a3b8;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;">Collaboration</p>
+  </td></tr>
+  <tr><td style="padding:36px 32px;">
+    <div style="text-align:center;margin-bottom:24px;">
+      <span style="display:inline-block;width:56px;height:56px;border-radius:50%;background:#0284c7;line-height:56px;font-size:28px;text-align:center;">🌐</span>
+    </div>
+    <h2 style="margin:0 0 16px 0;color:#0f172a;font-size:20px;font-weight:700;text-align:center;">You've Been Added to a Project Channel</h2>
+    <p style="margin:0 0 18px 0;font-size:15px;line-height:1.6;color:#475569;">Hello <strong>{user_name}</strong>,</p>
+    <p style="margin:0 0 24px 0;font-size:15px;line-height:1.6;color:#475569;">
+      <strong>{owner_name}</strong> has added you to the inter-company collaboration channel for
+      the tender <strong>"{tender_title}"</strong> on ProcureNext.
+    </p>
+    <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 auto 28px auto;">
+      <tr><td align="center" style="border-radius:12px;background:linear-gradient(135deg,#0284c7 0%,#0369a1 100%);">
+        <a href="https://procurenext.app/messages" target="_blank" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:12px;">Open Channel &rarr;</a>
+      </td></tr>
+    </table>
+  </td></tr>
+  <tr><td style="background-color:#f8fafc;padding:24px 32px;text-align:center;border-top:1px solid #e2e8f0;">
+    <p style="margin:0;font-size:11px;color:#94a3b8;">&copy; 2026 ProcureNext. All rights reserved.</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>"""
+
+
+def build_intercompany_member_added_text(
+    user_name: str,
+    tender_title: str,
+    owner_name: str,
+) -> str:
+    return f"""ProcureNext - Added to Inter-Company Channel
+
+Hello {user_name},
+
+{owner_name} has added you to the inter-company collaboration channel
+for the tender "{tender_title}" on ProcureNext.
+
+Open the channel at: https://procurenext.app/messages
+
+-- ProcureNext Team
+"""
+
+
+def send_intercompany_member_added_email(
+    to_email: str,
+    user_name: str,
+    tender_title: str,
+    owner_name: str,
+) -> bool:
+    subject = f"You've been added to a project channel — {tender_title}"
+    return send_smtp_email(
+        to_email=to_email,
+        subject=subject,
+        html_body=build_intercompany_member_added_html(user_name, tender_title, owner_name),
+        text_body=build_intercompany_member_added_text(user_name, tender_title, owner_name),
+    )

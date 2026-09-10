@@ -414,6 +414,7 @@ CREATE TABLE public.thread_participants (
   user_id integer NOT NULL,
   organization_id integer NOT NULL,
   is_admin boolean DEFAULT false,
+  is_permanent boolean NOT NULL DEFAULT false,
   joined_at timestamp without time zone DEFAULT now(),
   last_read_at timestamp without time zone,
   CONSTRAINT thread_participants_pkey PRIMARY KEY (id),

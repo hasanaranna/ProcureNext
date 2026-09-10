@@ -175,7 +175,7 @@ async def list_user_threads(
         # Get participants for this thread
         participants_rows = await connection.fetch(
             """
-            SELECT u.user_id, u.full_name, tp.is_admin
+            SELECT u.user_id, u.full_name, tp.is_admin, tp.is_permanent
             FROM thread_participants tp
             JOIN users u ON tp.user_id = u.user_id
             WHERE tp.thread_id = $1
@@ -187,6 +187,7 @@ async def list_user_threads(
                 user_id=p["user_id"],
                 full_name=p["full_name"] or "Unknown",
                 is_admin=p["is_admin"],
+                is_permanent=p["is_permanent"],
             )
             for p in participants_rows
         ]
@@ -517,6 +518,71 @@ async def create_group_thread(
     return ThreadCreatedResponse(thread_id=thread_id, is_new=True)
 
 
+async def create_intercompany_thread(
+    connection: asyncpg.Connection,
+    tender_id: int,
+    group_name: str,
+    buyer_owner_user_id: int,
+    buyer_org_id: int,
+    vendor_owner_user_id: int,
+    vendor_org_id: int,
+) -> int:
+    """
+    Create an InterCompany group thread when a bid is awarded.
+    Called internally by bids/service.py — NOT exposed as an API endpoint.
+    Both owners are added as is_admin=TRUE, is_permanent=TRUE.
+    Returns the new thread_id.
+    """
+    # Idempotency guard: don't create a duplicate thread for the same tender
+    existing = await connection.fetchval(
+        """
+        SELECT thread_id FROM message_threads
+        WHERE tender_id = $1 AND thread_type = 'InterCompany'
+        LIMIT 1
+        """,
+        tender_id,
+    )
+    if existing:
+        return existing
+
+    async with connection.transaction():
+        thread = await connection.fetchrow(
+            """
+            INSERT INTO message_threads (thread_type, group_name, tender_id, created_by)
+            VALUES ('InterCompany', $1, $2, $3)
+            RETURNING thread_id
+            """,
+            group_name,
+            tender_id,
+            buyer_owner_user_id,
+        )
+        thread_id = thread["thread_id"]
+
+        # Add buyer owner — permanent admin
+        await connection.execute(
+            """
+            INSERT INTO thread_participants (thread_id, user_id, organization_id, is_admin, is_permanent)
+            VALUES ($1, $2, $3, TRUE, TRUE)
+            """,
+            thread_id,
+            buyer_owner_user_id,
+            buyer_org_id,
+        )
+
+        # Add vendor owner — permanent admin
+        await connection.execute(
+            """
+            INSERT INTO thread_participants (thread_id, user_id, organization_id, is_admin, is_permanent)
+            VALUES ($1, $2, $3, TRUE, TRUE)
+            """,
+            thread_id,
+            vendor_owner_user_id,
+            vendor_org_id,
+        )
+
+    return thread_id
+
+
 async def rename_group(
     connection: asyncpg.Connection,
     thread_id: int,
@@ -525,6 +591,7 @@ async def rename_group(
 ) -> dict:
     """
     Rename a group thread. Only the group admin can rename.
+    Blocked for InterCompany threads (name is locked to the tender name).
     """
     new_name = new_name.strip()
     if not new_name:
@@ -532,13 +599,18 @@ async def rename_group(
 
     # Verify thread is a group
     thread = await connection.fetchrow(
-        "SELECT group_name FROM message_threads WHERE thread_id = $1",
+        "SELECT group_name, thread_type FROM message_threads WHERE thread_id = $1",
         thread_id,
     )
     if not thread:
         raise HTTPException(status_code=404, detail="Thread not found.")
     if thread["group_name"] is None:
         raise HTTPException(status_code=400, detail="This is not a group thread.")
+    if str(thread["thread_type"]) == "InterCompany":
+        raise HTTPException(
+            status_code=400,
+            detail="Inter-company thread names are locked to the tender name and cannot be changed.",
+        )
 
     # Verify requester is group admin
     participant = await connection.fetchrow(
@@ -566,23 +638,27 @@ async def add_group_members(
     new_user_ids: list[int],
 ) -> dict:
     """
-    Add new members to a group thread. Admin only.
-    New members must belong to the requester's own organization (always intra-org).
+    Add new members to a group thread.
+    - IntraCompany: any admin can add members from their own org.
+    - InterCompany: only permanent admins (owners) can add members from their own org.
+    New members must always belong to the requester's own organization (intra-org only).
     """
     if not new_user_ids:
         raise HTTPException(status_code=400, detail="No user IDs provided.")
 
-    # Verify thread is a group
+    # Verify thread is a group and get its type
     thread = await connection.fetchrow(
-        "SELECT group_name FROM message_threads WHERE thread_id = $1",
+        "SELECT group_name, thread_type FROM message_threads WHERE thread_id = $1",
         thread_id,
     )
     if not thread or thread["group_name"] is None:
         raise HTTPException(status_code=404, detail="Group thread not found.")
 
-    # Verify requester is admin
+    is_intercompany = str(thread["thread_type"]) == "InterCompany"
+
+    # Verify requester is a participant
     participant = await connection.fetchrow(
-        "SELECT is_admin, organization_id FROM thread_participants WHERE thread_id = $1 AND user_id = $2",
+        "SELECT is_admin, is_permanent, organization_id FROM thread_participants WHERE thread_id = $1 AND user_id = $2",
         thread_id,
         requester_user_id,
     )
@@ -590,6 +666,9 @@ async def add_group_members(
         raise HTTPException(status_code=403, detail="You are not a participant in this group.")
     if not participant["is_admin"]:
         raise HTTPException(status_code=403, detail="Only the group admin can add members.")
+    # For InterCompany threads, only the permanent owners may add members
+    if is_intercompany and not participant["is_permanent"]:
+        raise HTTPException(status_code=403, detail="Only the company owners can add members to an inter-company channel.")
 
     requester_org_id = participant["organization_id"]
 
@@ -609,7 +688,7 @@ async def add_group_members(
                 detail=f"User {uid} is not a member of your organization.",
             )
 
-    added = 0
+    added_user_infos = []
     for uid in new_user_ids:
         already_exists = await connection.fetchval(
             "SELECT 1 FROM thread_participants WHERE thread_id = $1 AND user_id = $2",
@@ -619,16 +698,59 @@ async def add_group_members(
         if not already_exists:
             await connection.execute(
                 """
-                INSERT INTO thread_participants (thread_id, user_id, organization_id, is_admin)
-                VALUES ($1, $2, $3, FALSE)
+                INSERT INTO thread_participants (thread_id, user_id, organization_id, is_admin, is_permanent)
+                VALUES ($1, $2, $3, FALSE, FALSE)
                 """,
                 thread_id,
                 uid,
                 requester_org_id,
             )
-            added += 1
+            # Gather user info for notifications (InterCompany only)
+            if is_intercompany:
+                user_info = await connection.fetchrow(
+                    "SELECT full_name, email FROM users WHERE user_id = $1",
+                    uid,
+                )
+                if user_info:
+                    added_user_infos.append(dict(user_info))
 
-    return {"added": added}
+    # Fire InterCompany member-added notifications
+    if is_intercompany and added_user_infos:
+        try:
+            thread_name = thread["group_name"] or "Inter-Company Channel"
+            requester_info = await connection.fetchrow(
+                "SELECT full_name FROM users WHERE user_id = $1",
+                requester_user_id,
+            )
+            owner_name = requester_info["full_name"] if requester_info else "Your company owner"
+            from app.tasks.notification_tasks import send_intercompany_member_added_email_task
+            from app.modules.notifications.service import create_notification
+            for info in added_user_infos:
+                # In-app notification
+                user_row = await connection.fetchrow(
+                    "SELECT user_id FROM users WHERE email = $1",
+                    info["email"],
+                )
+                if user_row:
+                    await create_notification(
+                        connection,
+                        user_id=user_row["user_id"],
+                        title="Added to Inter-Company Channel",
+                        message=f"{owner_name} has added you to the inter-company channel \"{thread_name}\".",
+                        notification_type="System",
+                        action_url="/messages",
+                    )
+                # Email
+                send_intercompany_member_added_email_task.delay(
+                    to_email=info["email"],
+                    user_name=info["full_name"] or "Team Member",
+                    tender_title=thread_name,
+                    owner_name=owner_name,
+                )
+        except Exception as notify_exc:
+            print(f"[NOTIFY WARNING] InterCompany member-added notification failed: {notify_exc}", flush=True)
+
+    return {"added": len(added_user_infos) if is_intercompany else sum(1 for _ in new_user_ids)}
 
 
 async def remove_group_member(
@@ -639,7 +761,9 @@ async def remove_group_member(
 ) -> dict:
     """
     Remove a member from a group thread. Admin only.
-    Admin cannot remove themselves — use leave_group / transfer_admin for that.
+    - Cannot remove self.
+    - Cannot remove permanent members (company owners in InterCompany threads).
+    - For InterCompany threads, only permanent admins can remove members.
     """
     if requester_user_id == target_user_id:
         raise HTTPException(
@@ -647,31 +771,37 @@ async def remove_group_member(
             detail="Admins cannot remove themselves. Use 'Leave Group' after transferring admin.",
         )
 
-    # Verify thread is a group
+    # Verify thread is a group and get its type
     thread = await connection.fetchrow(
-        "SELECT group_name FROM message_threads WHERE thread_id = $1",
+        "SELECT group_name, thread_type FROM message_threads WHERE thread_id = $1",
         thread_id,
     )
     if not thread or thread["group_name"] is None:
         raise HTTPException(status_code=404, detail="Group thread not found.")
 
+    is_intercompany = str(thread["thread_type"]) == "InterCompany"
+
     # Verify requester is admin
     requester = await connection.fetchrow(
-        "SELECT is_admin FROM thread_participants WHERE thread_id = $1 AND user_id = $2",
+        "SELECT is_admin, is_permanent FROM thread_participants WHERE thread_id = $1 AND user_id = $2",
         thread_id,
         requester_user_id,
     )
     if not requester or not requester["is_admin"]:
         raise HTTPException(status_code=403, detail="Only the group admin can remove members.")
+    if is_intercompany and not requester["is_permanent"]:
+        raise HTTPException(status_code=403, detail="Only the company owners can remove members from an inter-company channel.")
 
     # Verify target is in the group
     target = await connection.fetchrow(
-        "SELECT id FROM thread_participants WHERE thread_id = $1 AND user_id = $2",
+        "SELECT id, is_permanent FROM thread_participants WHERE thread_id = $1 AND user_id = $2",
         thread_id,
         target_user_id,
     )
     if not target:
         raise HTTPException(status_code=404, detail="Target user is not in this group.")
+    if target["is_permanent"]:
+        raise HTTPException(status_code=403, detail="Company owners cannot be removed from an inter-company channel.")
 
     async with connection.transaction():
         await connection.execute(
@@ -693,17 +823,23 @@ async def transfer_admin(
     """
     Transfer group admin role to another participant.
     Required before the current admin can leave.
+    Blocked for InterCompany threads (ownership is permanent and non-transferable).
     """
     if current_admin_user_id == new_admin_user_id:
         raise HTTPException(status_code=400, detail="You are already the admin.")
 
     # Verify thread is a group
     thread = await connection.fetchrow(
-        "SELECT group_name FROM message_threads WHERE thread_id = $1",
+        "SELECT group_name, thread_type FROM message_threads WHERE thread_id = $1",
         thread_id,
     )
     if not thread or thread["group_name"] is None:
         raise HTTPException(status_code=404, detail="Group thread not found.")
+    if str(thread["thread_type"]) == "InterCompany":
+        raise HTTPException(
+            status_code=400,
+            detail="Admin roles cannot be transferred in an inter-company channel.",
+        )
 
     # Verify requester is current admin
     requester = await connection.fetchrow(
@@ -724,13 +860,11 @@ async def transfer_admin(
         raise HTTPException(status_code=404, detail="Target user is not in this group.")
 
     async with connection.transaction():
-        # Demote current admin
         await connection.execute(
             "UPDATE thread_participants SET is_admin = FALSE WHERE thread_id = $1 AND user_id = $2",
             thread_id,
             current_admin_user_id,
         )
-        # Promote new admin
         await connection.execute(
             "UPDATE thread_participants SET is_admin = TRUE WHERE thread_id = $1 AND user_id = $2",
             thread_id,
@@ -747,7 +881,8 @@ async def leave_group(
 ) -> dict:
     """
     Leave a group thread.
-    - Admin cannot leave without transferring admin first (if others remain).
+    - IntraCompany admin cannot leave without transferring admin first (if others remain).
+    - InterCompany permanent members (owners) cannot leave at all.
     - If the leaving user is the last participant, the thread is deleted.
     """
     # Verify thread is a group
@@ -760,12 +895,19 @@ async def leave_group(
 
     # Verify user is a participant
     participant = await connection.fetchrow(
-        "SELECT is_admin FROM thread_participants WHERE thread_id = $1 AND user_id = $2",
+        "SELECT is_admin, is_permanent FROM thread_participants WHERE thread_id = $1 AND user_id = $2",
         thread_id,
         user_id,
     )
     if not participant:
         raise HTTPException(status_code=403, detail="You are not a participant in this group.")
+
+    # Permanent members (company owners in InterCompany threads) cannot leave
+    if participant["is_permanent"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Company owners cannot leave an inter-company channel.",
+        )
 
     # If user is admin, check how many other members remain
     if participant["is_admin"]:

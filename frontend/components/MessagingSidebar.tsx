@@ -9,6 +9,7 @@ interface Participant {
   user_id: number;
   full_name: string;
   is_admin: boolean;
+  is_permanent: boolean;
 }
 
 interface Thread {
@@ -108,12 +109,27 @@ export default function MessagingSidebar({ isOpen, onClose, onUnreadCountChange 
   const [transferTargetId, setTransferTargetId] = useState<number | null>(null);
   const [isTransferring, setIsTransferring] = useState(false);
 
+  // ─── Group name popover state (for long InterCompany names) ─
+  const [showGroupNamePopover, setShowGroupNamePopover] = useState(false);
+
   // ─── Helpers ─────────────────────────────────────────────
 
   const isGroupThread = (thread: Thread) => thread.group_name !== null;
 
+  const isInterCompanyThread = (thread: Thread) => thread.thread_type === 'InterCompany';
+
+  const isSelfPermanent = (thread: Thread) =>
+    thread.participants.find((p) => p.user_id === currentUserId)?.is_permanent === true;
+
   const isGroupAdmin = (thread: Thread) =>
     thread.participants.find((p) => p.user_id === currentUserId)?.is_admin === true;
+
+  /** Truncate a string in the middle: "Very Long Name Here" → "Very L…re" */
+  const truncateMiddle = (str: string, maxLen = 32): string => {
+    if (str.length <= maxLen) return str;
+    const half = Math.floor((maxLen - 1) / 2);
+    return str.slice(0, half) + '…' + str.slice(str.length - half);
+  };
 
   // ─── Load user data ──────────────────────────────────────
 
@@ -803,6 +819,7 @@ export default function MessagingSidebar({ isOpen, onClose, onUnreadCountChange 
                   {threads.map((thread) => {
                     const displayName = getThreadDisplayName(thread);
                     const isGroup = isGroupThread(thread);
+                    const isInterCo = isInterCompanyThread(thread);
                     const other = getOtherParticipant(thread);
                     const avatarColor = other ? getColorForUser(other.user_id) : '0d9488';
 
@@ -811,8 +828,13 @@ export default function MessagingSidebar({ isOpen, onClose, onUnreadCountChange 
                         className="flex items-center gap-4 px-5 py-4 cursor-pointer transition-all duration-200 hover:bg-slate-50 group">
                         {/* Avatar */}
                         <div className="relative flex-shrink-0">
-                          {isGroup ? (
-                            /* Group icon */
+                          {isInterCo ? (
+                            /* InterCompany globe icon */
+                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
+                              <span className="text-xl" role="img" aria-label="Inter-company">🌐</span>
+                            </div>
+                          ) : isGroup ? (
+                            /* IntraCompany group icon */
                             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
                               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -829,18 +851,21 @@ export default function MessagingSidebar({ isOpen, onClose, onUnreadCountChange 
 
                         {/* Info */}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between gap-2">
                             <h3 className={`text-sm truncate ${thread.unread_count > 0 ? 'font-black text-navy-900' : 'font-bold text-slate-700'}`}>
                               {displayName}
                             </h3>
-                            <span className="text-xs text-slate-400 flex-shrink-0 ml-2 font-medium">
-                              {formatTime(thread.last_message_time)}
-                            </span>
+                            <div className="flex items-center gap-1.5 flex-shrink-0 ml-1">
+                              {isInterCo && (
+                                <span className="text-[9px] font-bold text-sky-600 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded-full uppercase tracking-wide">Inter-Co</span>
+                              )}
+                              <span className="text-xs text-slate-400 font-medium">{formatTime(thread.last_message_time)}</span>
+                            </div>
                           </div>
                           <div className="flex items-center justify-between mt-0.5">
                             <p className={`text-xs truncate ${thread.unread_count > 0 ? 'font-semibold text-navy-800' : 'text-slate-500'}`}>
                               {isGroup && (
-                                <span className="text-indigo-500 font-bold mr-1">
+                                <span className={`font-bold mr-1 ${isInterCo ? 'text-sky-500' : 'text-indigo-500'}`}>
                                   {thread.participants.length} members ·
                                 </span>
                               )}
@@ -1076,8 +1101,8 @@ export default function MessagingSidebar({ isOpen, onClose, onUnreadCountChange 
                   </div>
                 </div>
 
-                {/* Transfer admin sub-panel */}
-                {showTransferAdmin && (
+                {/* Transfer admin sub-panel — IntraCompany only */}
+                {showTransferAdmin && !isInterCompanyThread(activeThread) && (
                   <div className="px-4 py-3 bg-amber-50 border-b border-amber-200">
                     <p className="text-xs font-bold text-amber-700 mb-2">Select new admin before leaving:</p>
                     <div className="flex flex-col gap-1">
@@ -1116,6 +1141,10 @@ export default function MessagingSidebar({ isOpen, onClose, onUnreadCountChange 
                   {activeThread.participants.map((p) => {
                     const isSelf = p.user_id === currentUserId;
                     const amAdmin = isGroupAdmin(activeThread);
+                    const isInterCo = isInterCompanyThread(activeThread);
+                    const amPermanent = isSelfPermanent(activeThread);
+                    // Can remove: admin + not self + target is not permanent
+                    const canRemove = amAdmin && !isSelf && !(isInterCo && p.is_permanent) && (!isInterCo || amPermanent);
                     return (
                       <div key={p.user_id} className="flex items-center gap-3 px-4 py-3">
                         <img src={getAvatarUrl(p.full_name, getColorForUser(p.user_id))} alt={p.full_name} className="w-10 h-10 rounded-xl shadow-sm" />
@@ -1124,12 +1153,18 @@ export default function MessagingSidebar({ isOpen, onClose, onUnreadCountChange 
                             {p.full_name}
                             {isSelf && <span className="text-slate-400 font-normal"> (you)</span>}
                           </p>
-                          {p.is_admin && (
-                            <span className="text-[10px] font-black text-amber-600 uppercase tracking-wide">Admin</span>
-                          )}
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {p.is_permanent ? (
+                              <span className="text-[10px] font-black text-sky-600 uppercase tracking-wide flex items-center gap-0.5">
+                                🔒 Owner
+                              </span>
+                            ) : p.is_admin ? (
+                              <span className="text-[10px] font-black text-amber-600 uppercase tracking-wide">Admin</span>
+                            ) : null}
+                          </div>
                         </div>
-                        {/* Admin can remove non-self members */}
-                        {amAdmin && !isSelf && (
+                        {/* Remove button — allowed only where canRemove */}
+                        {canRemove && (
                           <button
                             onClick={() => handleRemoveMember(p.user_id)}
                             className="text-xs font-bold text-red-500 hover:text-red-700 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors"
@@ -1142,8 +1177,8 @@ export default function MessagingSidebar({ isOpen, onClose, onUnreadCountChange 
                   })}
                 </div>
 
-                {/* Admin transfer button at bottom */}
-                {isGroupAdmin(activeThread) && !showTransferAdmin && (
+                {/* Transfer Admin button — IntraCompany admins only */}
+                {isGroupAdmin(activeThread) && !isInterCompanyThread(activeThread) && !showTransferAdmin && (
                   <div className="p-4 border-t border-slate-200 bg-white">
                     <button
                       onClick={() => setShowTransferAdmin(true)}
@@ -1204,20 +1239,26 @@ export default function MessagingSidebar({ isOpen, onClose, onUnreadCountChange 
               </button>
 
               {isGroupThread(activeThread) ? (
-                /* Group avatar */
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-sm hidden sm:flex flex-shrink-0">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </div>
+                /* Group avatar — globe for InterCompany, indigo group for IntraCompany */
+                isInterCompanyThread(activeThread) ? (
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center shadow-sm hidden sm:flex flex-shrink-0">
+                    <span className="text-base" role="img" aria-label="Inter-company">🌐</span>
+                  </div>
+                ) : (
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-sm hidden sm:flex flex-shrink-0">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </div>
+                )
               ) : (
                 <img src={getAvatarUrl(getThreadDisplayName(activeThread), getOtherParticipant(activeThread) ? getColorForUser(getOtherParticipant(activeThread)!.user_id) : '0d9488')}
                   alt="Avatar" className="w-9 h-9 rounded-xl shadow-sm hidden sm:block" />
               )}
 
               <div className="flex-1 min-w-0">
-                {/* Rename inline for group admin */}
-                {isGroupThread(activeThread) && isRenaming ? (
+                {/* Rename inline — only for IntraCompany admins */}
+                {isGroupThread(activeThread) && !isInterCompanyThread(activeThread) && isRenaming ? (
                   <input
                     type="text"
                     value={renameInput}
@@ -1228,25 +1269,49 @@ export default function MessagingSidebar({ isOpen, onClose, onUnreadCountChange 
                     className="text-sm font-bold text-navy-900 border-b-2 border-indigo-500 outline-none bg-transparent w-full"
                   />
                 ) : (
-                  <h2 className="text-sm font-bold text-navy-900 truncate flex items-center gap-1.5">
-                    {getThreadDisplayName(activeThread)}
-                    {isGroupThread(activeThread) && isGroupAdmin(activeThread) && (
-                      <button
-                        onClick={() => { setRenameInput(activeThread.group_name || ''); setIsRenaming(true); }}
-                        className="text-slate-400 hover:text-indigo-500 transition-colors flex-shrink-0"
-                        title="Rename group"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                        </svg>
-                      </button>
+                  <div className="relative">
+                    <h2 className="text-sm font-bold text-navy-900 truncate flex items-center gap-1.5">
+                      {/* For InterCompany with long names: show truncated with popover */}
+                      {isGroupThread(activeThread) && isInterCompanyThread(activeThread) && activeThread.group_name && activeThread.group_name.length > 32 ? (
+                        <button
+                          onClick={() => setShowGroupNamePopover((v) => !v)}
+                          className="truncate text-left hover:text-sky-600 transition-colors"
+                          title="Click to see full name"
+                        >
+                          {truncateMiddle(activeThread.group_name, 32)}
+                        </button>
+                      ) : (
+                        getThreadDisplayName(activeThread)
+                      )}
+                      {/* Rename pencil — IntraCompany admin only */}
+                      {isGroupThread(activeThread) && !isInterCompanyThread(activeThread) && isGroupAdmin(activeThread) && (
+                        <button
+                          onClick={() => { setRenameInput(activeThread.group_name || ''); setIsRenaming(true); }}
+                          className="text-slate-400 hover:text-indigo-500 transition-colors flex-shrink-0"
+                          title="Rename group"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                        </button>
+                      )}
+                    </h2>
+                    {/* Full name popover (InterCompany only) */}
+                    {showGroupNamePopover && isInterCompanyThread(activeThread) && (
+                      <div className="absolute top-full left-0 mt-1 z-50 bg-slate-900 text-white text-xs rounded-xl px-3 py-2 shadow-xl max-w-[260px] break-words">
+                        {activeThread.group_name}
+                        <button
+                          onClick={() => setShowGroupNamePopover(false)}
+                          className="ml-2 text-slate-400 hover:text-white"
+                        >✕</button>
+                      </div>
                     )}
-                  </h2>
+                  </div>
                 )}
                 {isGroupThread(activeThread) ? (
                   <button
                     onClick={() => setShowMembersOverlay(true)}
-                    className="text-xs text-indigo-500 font-semibold hover:text-indigo-700 transition-colors truncate text-left"
+                    className={`text-xs font-semibold hover:opacity-80 transition-colors truncate text-left ${isInterCompanyThread(activeThread) ? 'text-sky-500 hover:text-sky-700' : 'text-indigo-500 hover:text-indigo-700'}`}
                   >
                     {activeThread.participants.length} members
                   </button>
@@ -1258,19 +1323,24 @@ export default function MessagingSidebar({ isOpen, onClose, onUnreadCountChange 
               </div>
 
               <div className="flex items-center gap-1.5 flex-shrink-0">
-                {/* ＋ icon: DM → create group; Group (admin) → add member */}
+                {/* ＋ icon: DM → create group; Group → add member (InterCompany: permanent admin only) */}
                 {isGroupThread(activeThread) ? (
-                  isGroupAdmin(activeThread) && (
-                    <button
-                      onClick={() => { setShowAddMembers(true); setSelectedAddMembers([]); setAddMemberQuery(''); setAddMemberResults([]); }}
-                      className="w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 text-indigo-500 hover:bg-indigo-50 hover:text-indigo-700"
-                      title="Add member"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                      </svg>
-                    </button>
-                  )
+                  (() => {
+                    const canAdd = isInterCompanyThread(activeThread)
+                      ? isSelfPermanent(activeThread)   // InterCompany: owner only
+                      : isGroupAdmin(activeThread);      // IntraCompany: any admin
+                    return canAdd ? (
+                      <button
+                        onClick={() => { setShowAddMembers(true); setSelectedAddMembers([]); setAddMemberQuery(''); setAddMemberResults([]); }}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 ${isInterCompanyThread(activeThread) ? 'text-sky-500 hover:bg-sky-50 hover:text-sky-700' : 'text-indigo-500 hover:bg-indigo-50 hover:text-indigo-700'}`}
+                        title="Add member"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                        </svg>
+                      </button>
+                    ) : null;
+                  })()
                 ) : (
                   <button
                     onClick={() => { setShowGroupCreate(true); setGroupNameInput(''); setSelectedGroupMembers([]); setGroupSearchQuery(''); setGroupSearchResults([]); }}
@@ -1283,8 +1353,8 @@ export default function MessagingSidebar({ isOpen, onClose, onUnreadCountChange 
                   </button>
                 )}
 
-                {/* Leave button (group chats only) */}
-                {isGroupThread(activeThread) && (
+                {/* Leave button: group only, hidden for permanent members */}
+                {isGroupThread(activeThread) && !isSelfPermanent(activeThread) && (
                   <button
                     onClick={() => setShowLeaveConfirm(true)}
                     className="w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 text-red-400 hover:bg-red-50 hover:text-red-600"

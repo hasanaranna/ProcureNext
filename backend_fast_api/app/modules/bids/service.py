@@ -10,7 +10,9 @@ from app.tasks.notification_tasks import (
     send_bid_received_email_task,
     send_bid_accepted_email_task,
     send_bid_rejected_email_task,
+    send_intercompany_created_email_task,
 )
+from app.modules.messaging.service import create_intercompany_thread
 
 
 async def submit_bid_with_documents(
@@ -304,6 +306,84 @@ async def accept_bid_for_tender(
             RETURNING *
         """
         await connection.execute(insert_award_query, bid_id, user_id, tender_id)
+
+        # ── 6. Create InterCompany group chat for the two organisation owners ──
+        try:
+            parties = await connection.fetchrow(
+                """
+                SELECT
+                    t.title            AS tender_title,
+                    t.buyer_id         AS buyer_org_id,
+                    b.vendor_org_id,
+                    buyer_oe.user_id   AS buyer_owner_user_id,
+                    buyer_u.email      AS buyer_owner_email,
+                    buyer_u.full_name  AS buyer_owner_name,
+                    vendor_oe.user_id  AS vendor_owner_user_id,
+                    vendor_u.email     AS vendor_owner_email,
+                    vendor_u.full_name AS vendor_owner_name,
+                    buyer_org.organization_name AS buyer_org_name,
+                    vendor_org.organization_name AS vendor_org_name
+                FROM bids b
+                JOIN tenders t ON b.tender_id = t.tender_id
+                JOIN organizations buyer_org  ON t.buyer_id         = buyer_org.organization_id
+                JOIN organizations vendor_org ON b.vendor_org_id    = vendor_org.organization_id
+                JOIN organization_employees buyer_oe
+                    ON buyer_oe.organization_id = t.buyer_id       AND buyer_oe.role_in_org = 'Owner'
+                JOIN users buyer_u  ON buyer_oe.user_id  = buyer_u.user_id
+                JOIN organization_employees vendor_oe
+                    ON vendor_oe.organization_id = b.vendor_org_id AND vendor_oe.role_in_org = 'Owner'
+                JOIN users vendor_u ON vendor_oe.user_id = vendor_u.user_id
+                WHERE b.bid_id = $1
+                """,
+                bid_id,
+            )
+            if parties:
+                thread_id = await create_intercompany_thread(
+                    connection,
+                    tender_id=tender_id,
+                    group_name=parties["tender_title"],
+                    buyer_owner_user_id=parties["buyer_owner_user_id"],
+                    buyer_org_id=parties["buyer_org_id"],
+                    vendor_owner_user_id=parties["vendor_owner_user_id"],
+                    vendor_org_id=parties["vendor_org_id"],
+                )
+
+                # In-app notifications for both owners
+                chat_url = "/messages"
+                msg = (
+                    f'A collaboration channel has been created for "{parties["tender_title"]}" '
+                    f'between {parties["buyer_org_name"]} and {parties["vendor_org_name"]}.'
+                )
+                await create_notification(
+                    connection,
+                    user_id=parties["buyer_owner_user_id"],
+                    title="Inter-Company Channel Created",
+                    message=msg,
+                    notification_type="System",
+                    action_url=chat_url,
+                )
+                await create_notification(
+                    connection,
+                    user_id=parties["vendor_owner_user_id"],
+                    title="Inter-Company Channel Created",
+                    message=msg,
+                    notification_type="System",
+                    action_url=chat_url,
+                )
+
+                # Email notifications for both owners (via Celery)
+                for owner_email, owner_name, other_org_name in [
+                    (parties["buyer_owner_email"],  parties["buyer_owner_name"],  parties["vendor_org_name"]),
+                    (parties["vendor_owner_email"], parties["vendor_owner_name"], parties["buyer_org_name"]),
+                ]:
+                    send_intercompany_created_email_task.delay(
+                        to_email=owner_email,
+                        user_name=owner_name or "Owner",
+                        tender_title=parties["tender_title"],
+                        other_org_name=other_org_name,
+                    )
+        except Exception as chat_exc:
+            print(f"[CHAT WARNING] Failed to create InterCompany thread for bid {bid_id}: {chat_exc}", flush=True)
 
         # Notify the winning vendor about bid acceptance
         try:

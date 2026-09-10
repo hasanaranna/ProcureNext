@@ -655,6 +655,7 @@ CREATE TABLE thread_participants (
     user_id         INT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     organization_id INT NOT NULL REFERENCES organizations(organization_id),
     is_admin        BOOLEAN DEFAULT FALSE,
+    is_permanent    BOOLEAN NOT NULL DEFAULT FALSE,
     joined_at       TIMESTAMP DEFAULT NOW(),
     last_read_at    TIMESTAMP,
     UNIQUE(thread_id, user_id)

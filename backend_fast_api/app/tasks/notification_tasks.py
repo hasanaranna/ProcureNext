@@ -13,6 +13,8 @@ from app.services.email import (
     send_bid_accepted_email,
     send_bid_rejected_email,
     send_password_reset_email,
+    send_intercompany_created_email,
+    send_intercompany_member_added_email,
 )
 
 logger = logging.getLogger("app.tasks.notifications")
@@ -266,6 +268,66 @@ def send_bid_rejected_email_task(
         )
     except Exception as exc:
         logger.error(f"Error sending bid rejected email to {to_email}: {exc}", exc_info=True)
+        try:
+            raise self.retry(exc=exc)
+        except Exception:
+            return False
+
+
+@celery_app.task(
+    name="send_intercompany_created_email_task",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+)
+def send_intercompany_created_email_task(
+    self,
+    to_email: str,
+    user_name: str,
+    tender_title: str,
+    other_org_name: str,
+) -> bool:
+    """Notify both company owners that an inter-company channel was created for their tender."""
+    try:
+        print(f"[CELERY TASK] Sending intercompany-created email to {to_email}...", flush=True)
+        return send_intercompany_created_email(
+            to_email=to_email,
+            user_name=user_name,
+            tender_title=tender_title,
+            other_org_name=other_org_name,
+        )
+    except Exception as exc:
+        logger.error(f"Error sending intercompany-created email to {to_email}: {exc}", exc_info=True)
+        try:
+            raise self.retry(exc=exc)
+        except Exception:
+            return False
+
+
+@celery_app.task(
+    name="send_intercompany_member_added_email_task",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+)
+def send_intercompany_member_added_email_task(
+    self,
+    to_email: str,
+    user_name: str,
+    tender_title: str,
+    owner_name: str,
+) -> bool:
+    """Notify a member that they were added to an inter-company channel by their owner."""
+    try:
+        print(f"[CELERY TASK] Sending intercompany-member-added email to {to_email}...", flush=True)
+        return send_intercompany_member_added_email(
+            to_email=to_email,
+            user_name=user_name,
+            tender_title=tender_title,
+            owner_name=owner_name,
+        )
+    except Exception as exc:
+        logger.error(f"Error sending intercompany-member-added email to {to_email}: {exc}", exc_info=True)
         try:
             raise self.retry(exc=exc)
         except Exception:
