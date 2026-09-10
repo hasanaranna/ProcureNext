@@ -161,3 +161,44 @@ async def create_password_reset_tokens_table() -> None:
         logger.error(f"[DB] Failed to create password_reset_tokens table: {exc}")
 
 
+async def create_tender_search_index() -> None:
+    """
+    Idempotently add the full-text search column and index used by hybrid tender search.
+
+    Adds a generated tsvector column over the tender title (weight A) and description
+    (weight B), plus a GIN index on it. Both statements are naturally idempotent, so this
+    is safe to run on every startup. Purely additive - no existing data is modified.
+    """
+    database_url = get_database_url()
+    if not database_url:
+        logger.warning("[DB] Skipping tender search index creation: DATABASE_URL not set.")
+        return
+
+    try:
+        connection = await asyncpg.connect(
+            database_url,
+            ssl="require",
+            statement_cache_size=0,
+            timeout=10.0,
+        )
+        try:
+            # Two-argument to_tsvector() is required here: it is IMMUTABLE, which a
+            # GENERATED ALWAYS AS ... STORED expression demands.
+            await connection.execute("""
+                ALTER TABLE tenders ADD COLUMN IF NOT EXISTS search_vector tsvector
+                GENERATED ALWAYS AS (
+                    setweight(to_tsvector('english', title), 'A') ||
+                    setweight(to_tsvector('english', description), 'B')
+                ) STORED
+            """)
+            await connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_tenders_search_vector "
+                "ON tenders USING GIN (search_vector)"
+            )
+            logger.info("[DB] TENDERS search_vector column and GIN index verified/created.")
+        finally:
+            await connection.close()
+    except Exception as exc:
+        logger.error(f"[DB] Failed to create tender search index: {exc}")
+
+

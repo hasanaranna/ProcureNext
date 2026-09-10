@@ -1,0 +1,27 @@
+name: Deploy to EC2
+
+on:
+  workflow_run:
+    workflows: ["CI / Test Pipeline"]
+    types:
+      - completed
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 20m
+          script: |
+            cd ~/ProcureNext
+            git pull origin main
+            docker compose build --parallel 1
+            docker compose up -d
