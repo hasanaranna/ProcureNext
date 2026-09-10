@@ -20,6 +20,7 @@ class ContactSearchResult(BaseModel):
 class ParticipantInfo(BaseModel):
     user_id: int
     full_name: str
+    is_admin: bool = False
 
 
 class ThreadListItem(BaseModel):
@@ -39,6 +40,28 @@ class IntraCompanyDMCreate(BaseModel):
 class ThreadCreatedResponse(BaseModel):
     thread_id: int
     is_new: bool
+
+
+# ---------- Group Chat ----------
+
+class GroupCreateRequest(BaseModel):
+    """Create a new group thread. participant_user_ids are the other members (not the creator)."""
+    participant_user_ids: list[int]
+    group_name: str
+
+
+class GroupRenameRequest(BaseModel):
+    group_name: str
+
+
+class GroupAddMembersRequest(BaseModel):
+    """Add one or more members to a group. Only intra-org users are permitted."""
+    user_ids: list[int]
+
+
+class TransferAdminRequest(BaseModel):
+    """Transfer group admin role to another participant before the current admin leaves."""
+    new_admin_user_id: int
 
 
 # ---------- Messages ----------

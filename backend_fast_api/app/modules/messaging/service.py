@@ -175,7 +175,7 @@ async def list_user_threads(
         # Get participants for this thread
         participants_rows = await connection.fetch(
             """
-            SELECT u.user_id, u.full_name
+            SELECT u.user_id, u.full_name, tp.is_admin
             FROM thread_participants tp
             JOIN users u ON tp.user_id = u.user_id
             WHERE tp.thread_id = $1
@@ -186,6 +186,7 @@ async def list_user_threads(
             ParticipantInfo(
                 user_id=p["user_id"],
                 full_name=p["full_name"] or "Unknown",
+                is_admin=p["is_admin"],
             )
             for p in participants_rows
         ]
@@ -402,3 +403,394 @@ async def get_thread_participant_ids(
         thread_id,
     )
     return [row["user_id"] for row in rows]
+
+
+# ============================================================
+# Group Chat Functions
+# ============================================================
+
+async def _delete_thread_if_empty(
+    connection: asyncpg.Connection,
+    thread_id: int,
+) -> None:
+    """
+    Delete a thread and all its messages if no participants remain.
+    Performs explicit ordered deletion because the FKs do not have ON DELETE CASCADE.
+    Order: messages → thread_participants → message_threads
+    """
+    count = await connection.fetchval(
+        "SELECT COUNT(*) FROM thread_participants WHERE thread_id = $1",
+        thread_id,
+    )
+    if count == 0:
+        await connection.execute(
+            "DELETE FROM messages WHERE thread_id = $1", thread_id
+        )
+        await connection.execute(
+            "DELETE FROM thread_participants WHERE thread_id = $1", thread_id
+        )
+        await connection.execute(
+            "DELETE FROM message_threads WHERE thread_id = $1", thread_id
+        )
+
+
+async def create_group_thread(
+    connection: asyncpg.Connection,
+    creator_user_id: int,
+    creator_org_id: int,
+    participant_user_ids: list[int],
+    group_name: str,
+) -> ThreadCreatedResponse:
+    """
+    Create a new IntraCompany group thread.
+    - creator is automatically added as admin (is_admin=TRUE).
+    - all participant_user_ids must belong to the same org as the creator.
+    - participant_user_ids must not include the creator (de-duplicated automatically).
+    - Minimum 1 other participant required.
+    """
+    group_name = group_name.strip()
+    if not group_name:
+        raise HTTPException(status_code=400, detail="Group name cannot be empty.")
+
+    # Deduplicate and exclude creator from the participant list
+    other_ids = list({uid for uid in participant_user_ids if uid != creator_user_id})
+    if not other_ids:
+        raise HTTPException(status_code=400, detail="A group must have at least one other participant.")
+
+    # Validate every participant belongs to the creator's organization
+    for uid in other_ids:
+        row = await connection.fetchrow(
+            """
+            SELECT organization_id FROM organization_employees
+            WHERE user_id = $1 AND organization_id = $2
+            """,
+            uid,
+            creator_org_id,
+        )
+        if not row:
+            raise HTTPException(
+                status_code=403,
+                detail=f"User {uid} is not a member of your organization.",
+            )
+
+    async with connection.transaction():
+        thread = await connection.fetchrow(
+            """
+            INSERT INTO message_threads (thread_type, group_name, created_by)
+            VALUES ('IntraCompany', $1, $2)
+            RETURNING thread_id
+            """,
+            group_name,
+            creator_user_id,
+        )
+        thread_id = thread["thread_id"]
+
+        # Add creator as admin
+        await connection.execute(
+            """
+            INSERT INTO thread_participants (thread_id, user_id, organization_id, is_admin)
+            VALUES ($1, $2, $3, TRUE)
+            """,
+            thread_id,
+            creator_user_id,
+            creator_org_id,
+        )
+
+        # Add other participants (non-admin)
+        for uid in other_ids:
+            already_exists = await connection.fetchval(
+                "SELECT 1 FROM thread_participants WHERE thread_id = $1 AND user_id = $2",
+                thread_id,
+                uid,
+            )
+            if not already_exists:
+                await connection.execute(
+                    """
+                    INSERT INTO thread_participants (thread_id, user_id, organization_id, is_admin)
+                    VALUES ($1, $2, $3, FALSE)
+                    """,
+                    thread_id,
+                    uid,
+                    creator_org_id,
+                )
+
+    return ThreadCreatedResponse(thread_id=thread_id, is_new=True)
+
+
+async def rename_group(
+    connection: asyncpg.Connection,
+    thread_id: int,
+    requester_user_id: int,
+    new_name: str,
+) -> dict:
+    """
+    Rename a group thread. Only the group admin can rename.
+    """
+    new_name = new_name.strip()
+    if not new_name:
+        raise HTTPException(status_code=400, detail="Group name cannot be empty.")
+
+    # Verify thread is a group
+    thread = await connection.fetchrow(
+        "SELECT group_name FROM message_threads WHERE thread_id = $1",
+        thread_id,
+    )
+    if not thread:
+        raise HTTPException(status_code=404, detail="Thread not found.")
+    if thread["group_name"] is None:
+        raise HTTPException(status_code=400, detail="This is not a group thread.")
+
+    # Verify requester is group admin
+    participant = await connection.fetchrow(
+        "SELECT is_admin FROM thread_participants WHERE thread_id = $1 AND user_id = $2",
+        thread_id,
+        requester_user_id,
+    )
+    if not participant:
+        raise HTTPException(status_code=403, detail="You are not a participant in this group.")
+    if not participant["is_admin"]:
+        raise HTTPException(status_code=403, detail="Only the group admin can rename the group.")
+
+    await connection.execute(
+        "UPDATE message_threads SET group_name = $1 WHERE thread_id = $2",
+        new_name,
+        thread_id,
+    )
+    return {"group_name": new_name}
+
+
+async def add_group_members(
+    connection: asyncpg.Connection,
+    thread_id: int,
+    requester_user_id: int,
+    new_user_ids: list[int],
+) -> dict:
+    """
+    Add new members to a group thread. Admin only.
+    New members must belong to the requester's own organization (always intra-org).
+    """
+    if not new_user_ids:
+        raise HTTPException(status_code=400, detail="No user IDs provided.")
+
+    # Verify thread is a group
+    thread = await connection.fetchrow(
+        "SELECT group_name FROM message_threads WHERE thread_id = $1",
+        thread_id,
+    )
+    if not thread or thread["group_name"] is None:
+        raise HTTPException(status_code=404, detail="Group thread not found.")
+
+    # Verify requester is admin
+    participant = await connection.fetchrow(
+        "SELECT is_admin, organization_id FROM thread_participants WHERE thread_id = $1 AND user_id = $2",
+        thread_id,
+        requester_user_id,
+    )
+    if not participant:
+        raise HTTPException(status_code=403, detail="You are not a participant in this group.")
+    if not participant["is_admin"]:
+        raise HTTPException(status_code=403, detail="Only the group admin can add members.")
+
+    requester_org_id = participant["organization_id"]
+
+    # Validate all new users are in the requester's org (always intra-org)
+    for uid in new_user_ids:
+        row = await connection.fetchrow(
+            """
+            SELECT organization_id FROM organization_employees
+            WHERE user_id = $1 AND organization_id = $2
+            """,
+            uid,
+            requester_org_id,
+        )
+        if not row:
+            raise HTTPException(
+                status_code=403,
+                detail=f"User {uid} is not a member of your organization.",
+            )
+
+    added = 0
+    for uid in new_user_ids:
+        already_exists = await connection.fetchval(
+            "SELECT 1 FROM thread_participants WHERE thread_id = $1 AND user_id = $2",
+            thread_id,
+            uid,
+        )
+        if not already_exists:
+            await connection.execute(
+                """
+                INSERT INTO thread_participants (thread_id, user_id, organization_id, is_admin)
+                VALUES ($1, $2, $3, FALSE)
+                """,
+                thread_id,
+                uid,
+                requester_org_id,
+            )
+            added += 1
+
+    return {"added": added}
+
+
+async def remove_group_member(
+    connection: asyncpg.Connection,
+    thread_id: int,
+    requester_user_id: int,
+    target_user_id: int,
+) -> dict:
+    """
+    Remove a member from a group thread. Admin only.
+    Admin cannot remove themselves — use leave_group / transfer_admin for that.
+    """
+    if requester_user_id == target_user_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Admins cannot remove themselves. Use 'Leave Group' after transferring admin.",
+        )
+
+    # Verify thread is a group
+    thread = await connection.fetchrow(
+        "SELECT group_name FROM message_threads WHERE thread_id = $1",
+        thread_id,
+    )
+    if not thread or thread["group_name"] is None:
+        raise HTTPException(status_code=404, detail="Group thread not found.")
+
+    # Verify requester is admin
+    requester = await connection.fetchrow(
+        "SELECT is_admin FROM thread_participants WHERE thread_id = $1 AND user_id = $2",
+        thread_id,
+        requester_user_id,
+    )
+    if not requester or not requester["is_admin"]:
+        raise HTTPException(status_code=403, detail="Only the group admin can remove members.")
+
+    # Verify target is in the group
+    target = await connection.fetchrow(
+        "SELECT id FROM thread_participants WHERE thread_id = $1 AND user_id = $2",
+        thread_id,
+        target_user_id,
+    )
+    if not target:
+        raise HTTPException(status_code=404, detail="Target user is not in this group.")
+
+    async with connection.transaction():
+        await connection.execute(
+            "DELETE FROM thread_participants WHERE thread_id = $1 AND user_id = $2",
+            thread_id,
+            target_user_id,
+        )
+        await _delete_thread_if_empty(connection, thread_id)
+
+    return {"removed": True}
+
+
+async def transfer_admin(
+    connection: asyncpg.Connection,
+    thread_id: int,
+    current_admin_user_id: int,
+    new_admin_user_id: int,
+) -> dict:
+    """
+    Transfer group admin role to another participant.
+    Required before the current admin can leave.
+    """
+    if current_admin_user_id == new_admin_user_id:
+        raise HTTPException(status_code=400, detail="You are already the admin.")
+
+    # Verify thread is a group
+    thread = await connection.fetchrow(
+        "SELECT group_name FROM message_threads WHERE thread_id = $1",
+        thread_id,
+    )
+    if not thread or thread["group_name"] is None:
+        raise HTTPException(status_code=404, detail="Group thread not found.")
+
+    # Verify requester is current admin
+    requester = await connection.fetchrow(
+        "SELECT is_admin FROM thread_participants WHERE thread_id = $1 AND user_id = $2",
+        thread_id,
+        current_admin_user_id,
+    )
+    if not requester or not requester["is_admin"]:
+        raise HTTPException(status_code=403, detail="Only the current admin can transfer admin rights.")
+
+    # Verify new admin is a participant
+    new_admin = await connection.fetchrow(
+        "SELECT id FROM thread_participants WHERE thread_id = $1 AND user_id = $2",
+        thread_id,
+        new_admin_user_id,
+    )
+    if not new_admin:
+        raise HTTPException(status_code=404, detail="Target user is not in this group.")
+
+    async with connection.transaction():
+        # Demote current admin
+        await connection.execute(
+            "UPDATE thread_participants SET is_admin = FALSE WHERE thread_id = $1 AND user_id = $2",
+            thread_id,
+            current_admin_user_id,
+        )
+        # Promote new admin
+        await connection.execute(
+            "UPDATE thread_participants SET is_admin = TRUE WHERE thread_id = $1 AND user_id = $2",
+            thread_id,
+            new_admin_user_id,
+        )
+
+    return {"transferred_to": new_admin_user_id}
+
+
+async def leave_group(
+    connection: asyncpg.Connection,
+    thread_id: int,
+    user_id: int,
+) -> dict:
+    """
+    Leave a group thread.
+    - Admin cannot leave without transferring admin first (if others remain).
+    - If the leaving user is the last participant, the thread is deleted.
+    """
+    # Verify thread is a group
+    thread = await connection.fetchrow(
+        "SELECT group_name FROM message_threads WHERE thread_id = $1",
+        thread_id,
+    )
+    if not thread or thread["group_name"] is None:
+        raise HTTPException(status_code=404, detail="Group thread not found.")
+
+    # Verify user is a participant
+    participant = await connection.fetchrow(
+        "SELECT is_admin FROM thread_participants WHERE thread_id = $1 AND user_id = $2",
+        thread_id,
+        user_id,
+    )
+    if not participant:
+        raise HTTPException(status_code=403, detail="You are not a participant in this group.")
+
+    # If user is admin, check how many other members remain
+    if participant["is_admin"]:
+        other_count = await connection.fetchval(
+            "SELECT COUNT(*) FROM thread_participants WHERE thread_id = $1 AND user_id != $2",
+            thread_id,
+            user_id,
+        )
+        if other_count > 0:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "You are the group admin. Please transfer admin rights to another member "
+                    "before leaving the group."
+                ),
+            )
+        # Admin is the last person — allow deletion
+    
+    async with connection.transaction():
+        await connection.execute(
+            "DELETE FROM thread_participants WHERE thread_id = $1 AND user_id = $2",
+            thread_id,
+            user_id,
+        )
+        await _delete_thread_if_empty(connection, thread_id)
+
+    return {"left": True}
+
