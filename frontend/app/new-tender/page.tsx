@@ -595,7 +595,7 @@ export default function NewTenderPage() {
     router.push("/home");
   };
 
-  const inputClass = "w-full px-4 py-3 border border-slate-300 rounded-xl bg-white text-navy-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-all duration-200";
+  const inputClass = "w-full px-4 py-2.5 border border-subtle rounded bg-surface text-content-primary placeholder-content-muted focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent transition text-sm";
 
   const publishedTitle =
     (createdTenderResult?.title as string | undefined) || formData.title;
@@ -613,23 +613,22 @@ export default function NewTenderPage() {
     (createdTenderResult?.category as string | undefined) || formData.category;
 
   return (
-    <main className="w-full min-h-screen py-12 px-4 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800 relative overflow-x-hidden">
-      <div className="absolute top-1/3 right-1/4 w-72 h-72 bg-accent-500/5 rounded-full blur-3xl" />
-      
-      <div className="relative z-10 max-w-3xl mx-auto w-full animate-fade-in">
+    <main className="w-full min-h-screen py-12 px-4 bg-app">
+
+      <div className="max-w-3xl mx-auto w-full animate-fade-in">
         {/* Back button */}
-        <button type="button" onClick={handleCancel} className="mb-6 flex items-center gap-2 text-slate-400 hover:text-white transition-colors duration-200 cursor-pointer">
+        <button type="button" onClick={handleCancel} className="mb-6 flex items-center gap-2 text-content-muted hover:text-content-primary transition-colors duration-200 cursor-pointer">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
           <span className="font-medium text-sm">Back to Dashboard</span>
         </button>
 
-        <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+        <div className="bg-surface rounded border border-subtle overflow-hidden">
           {/* Header */}
-          <div className="bg-gradient-to-r from-navy-900 to-navy-800 px-8 py-6 flex items-center justify-between">
+          <div className="bg-brand-navy px-8 py-6 flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-black text-white">Create New Tender</h1>
+              <h1 className="text-2xl font-semibold text-white">Create New Tender</h1>
               <p className="text-slate-300 text-sm mt-1">Import a PDF notice to pre-fill the form, or enter tender details manually</p>
             </div>
 
@@ -637,11 +636,11 @@ export default function NewTenderPage() {
             <button
               type="button"
               onClick={() => setShowManageTokens(true)}
-              className="bg-white/10 hover:bg-white/20 border border-white/15 px-3.5 py-1.5 rounded-xl text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+              className="bg-white/10 hover:bg-white/20 border border-white/15 px-3.5 py-1.5 rounded text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
               title="Manage Organization Tokens"
             >
               <span className="text-slate-300">Tokens:</span>
-              <span className="text-amber-300 text-sm font-black">{loadingTokens ? '...' : tokenBalance.toLocaleString()}</span>
+              <span className="text-amber-300 text-sm font-semibold tabular-nums">{loadingTokens ? '...' : tokenBalance.toLocaleString()}</span>
               <svg className="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
@@ -650,7 +649,7 @@ export default function NewTenderPage() {
 
           {/* Form Error Alert */}
           {formError && (
-            <div className="m-8 mb-0 p-4 bg-red-50 border-2 border-red-200 rounded-xl flex items-start gap-3 animate-fade-in text-red-800 text-sm">
+            <div className="m-8 mb-0 p-4 bg-red-50 border border-red-200 rounded flex items-start gap-3 animate-fade-in text-red-800 text-sm">
               <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
@@ -661,7 +660,7 @@ export default function NewTenderPage() {
           )}
 
           {localFormRestoredMessage && (
-            <div className="m-8 mb-0 p-4 bg-sky-50 border-2 border-sky-200 rounded-xl flex items-start gap-3 animate-fade-in text-sky-900 text-sm">
+            <div className="m-8 mb-0 p-4 bg-sky-50 border border-sky-200 rounded flex items-start gap-3 animate-fade-in text-sky-900 text-sm">
               <svg className="w-5 h-5 text-sky-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
@@ -674,7 +673,7 @@ export default function NewTenderPage() {
 
           {/* PDF AI Success Notice */}
           {pdfSuccessMessage && (
-            <div className="m-8 mb-0 p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-3 animate-fade-in text-emerald-900 text-sm">
+            <div className="m-8 mb-0 p-4 bg-emerald-50 border border-emerald-200 rounded flex items-start gap-3 animate-fade-in text-emerald-900 text-sm">
               <div className="p-1.5 bg-emerald-600 text-white rounded-lg flex-shrink-0">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -688,29 +687,29 @@ export default function NewTenderPage() {
           )}
 
           {pdfJobMessage && (
-            <div className="m-8 mb-0 p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-start gap-3 animate-fade-in text-slate-800 text-sm">
-              <svg className="animate-spin h-5 w-5 text-accent-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24">
+            <div className="m-8 mb-0 p-4 bg-slate-50 border border-slate-200 rounded flex items-start gap-3 animate-fade-in text-slate-800 text-sm">
+              <svg className="animate-spin h-5 w-5 text-brand-blue flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
               <div>
-                <p className="font-semibold text-navy-900">Processing PDF</p>
+                <p className="font-semibold text-content-primary">Processing PDF</p>
                 <p className="text-xs text-slate-600 mt-0.5">{pdfJobMessage}</p>
               </div>
             </div>
           )}
 
           <div className="px-8 pt-8">
-            <div className="p-6 bg-slate-50 border border-slate-200 rounded-2xl">
+            <div className="p-6 bg-app border border-subtle rounded">
               <div className="flex items-start justify-between gap-4 mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-navy-800 text-white flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded bg-brand-navy text-white flex items-center justify-center flex-shrink-0">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-navy-900">Import from PDF notice</h3>
+                    <h3 className="text-base font-bold text-content-primary">Import from PDF notice</h3>
                     <p className="text-xs text-slate-600 mt-0.5">
                       Upload an official tender notice PDF to extract fields into the form, or publish directly without manual entry.
                     </p>
@@ -719,10 +718,10 @@ export default function NewTenderPage() {
               </div>
 
               <div className="flex flex-col sm:flex-row items-center gap-3">
-                <label className={`flex-1 w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed rounded-xl cursor-pointer transition ${
+                <label className={`flex-1 w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed rounded cursor-pointer transition ${
                   isExtractingPdf || isPublishingPdf
                     ? "bg-slate-100 border-slate-300 text-slate-400 cursor-not-allowed"
-                    : "bg-white border-slate-300 hover:border-accent-500 text-navy-900 hover:bg-white shadow-sm"
+                    : "bg-white border-slate-300 hover:border-brand-blue text-content-primary hover:bg-white shadow-sm"
                 }`}>
                   <input
                     type="file"
@@ -733,7 +732,7 @@ export default function NewTenderPage() {
                   />
                   {isExtractingPdf ? (
                     <>
-                      <svg className="animate-spin h-4 w-4 text-accent-600" fill="none" viewBox="0 0 24 24">
+                      <svg className="animate-spin h-4 w-4 text-brand-blue" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                       </svg>
@@ -741,7 +740,7 @@ export default function NewTenderPage() {
                     </>
                   ) : (
                     <>
-                      <svg className="w-4 h-4 text-accent-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-brand-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                       </svg>
                       <span className="text-xs font-semibold">Fill form from PDF</span>
@@ -749,10 +748,10 @@ export default function NewTenderPage() {
                   )}
                 </label>
 
-                <label className={`w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl text-xs font-semibold transition flex-shrink-0 ${
+                <label className={`w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-3 rounded text-xs font-semibold transition flex-shrink-0 ${
                   isPublishingPdf
                     ? "bg-slate-400 text-white cursor-not-allowed"
-                    : "bg-navy-900 hover:bg-navy-800 text-white cursor-pointer"
+                    : "bg-brand-navy hover:bg-slate-900 text-white cursor-pointer"
                 }`}>
                   <input
                     type="file"
@@ -788,13 +787,13 @@ export default function NewTenderPage() {
 
           <form onSubmit={handleSubmit} className="p-8 space-y-8">
             {/* ── Token Cost & Balance Banner ───────── */}
-            <div className={`p-4 rounded-2xl border transition-all duration-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+            <div className={`p-4 rounded border transition-all duration-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
               tokenBalance < tenderPublishCost
                 ? 'bg-rose-50 border-rose-200 text-rose-900'
-                : 'bg-amber-50/70 border-amber-200/80 text-navy-900'
+                : 'bg-amber-50/70 border-amber-200/80 text-content-primary'
             }`}>
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                <div className={`w-10 h-10 rounded flex items-center justify-center flex-shrink-0 ${
                   tokenBalance < tenderPublishCost ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'
                 }`}>
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -802,11 +801,11 @@ export default function NewTenderPage() {
                   </svg>
                 </div>
                 <div>
-                  <p className="text-[11px] uppercase font-bold text-slate-500">Publishing Fee</p>
-                  <p className="text-sm font-black text-navy-900">
-                    Cost: <span className="text-amber-600 font-black">{tenderPublishCost} Tokens</span>
+                  <p className="text-content-secondary text-xs font-medium uppercase">Publishing Fee</p>
+                  <p className="text-sm font-semibold text-content-primary">
+                    Cost: <span className="text-amber-600 font-semibold tabular-nums">{tenderPublishCost} Tokens</span>
                     <span className="mx-2 text-slate-300">|</span>
-                    Available: <span className={`font-black ${tokenBalance < tenderPublishCost ? 'text-rose-600' : 'text-emerald-600'}`}>{tokenBalance} Tokens</span>
+                    Available: <span className={`font-semibold tabular-nums ${tokenBalance < tenderPublishCost ? 'text-rose-600' : 'text-emerald-600'}`}>{tokenBalance} Tokens</span>
                   </p>
                   {tokenBalance < tenderPublishCost && (
                     <p className="text-xs text-rose-600 font-medium mt-0.5">
@@ -819,7 +818,7 @@ export default function NewTenderPage() {
               <button
                 type="button"
                 onClick={() => setShowManageTokens(true)}
-                className="px-4 py-2 bg-navy-900 hover:bg-navy-800 text-white text-xs font-bold rounded-xl transition shadow flex items-center gap-1.5 flex-shrink-0 cursor-pointer"
+                className="px-4 py-2 bg-brand-navy hover:bg-slate-900 text-white text-xs font-bold rounded transition shadow flex items-center gap-1.5 flex-shrink-0 cursor-pointer"
               >
                 <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -829,7 +828,7 @@ export default function NewTenderPage() {
             </div>
 
             {tokenError && (
-              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold rounded-xl flex items-center justify-between">
+              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold rounded flex items-center justify-between">
                 <span>{tokenError}</span>
                 <button
                   type="button"
@@ -844,18 +843,18 @@ export default function NewTenderPage() {
             {/* ── Section 1: Tender Details ───────────── */}
             <div className="space-y-5">
               <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
-                <span className="w-7 h-7 rounded-lg bg-navy-900 text-white flex items-center justify-center text-xs font-bold">1</span>
-                <h3 className="text-sm font-bold text-navy-900 uppercase tracking-wide">Tender Details & Classification</h3>
+                <span className="w-7 h-7 rounded bg-brand-navy text-white flex items-center justify-center text-xs font-bold">1</span>
+                <h3 className="text-sm font-medium text-content-primary uppercase tracking-wide">Tender Details & Classification</h3>
               </div>
 
               <div>
-                <label htmlFor="title" className="block text-sm font-semibold text-navy-900 mb-1.5">Tender Title <span className="text-red-500">*</span></label>
+                <label htmlFor="title" className="block text-sm font-medium text-content-primary mb-1.5">Tender Title <span className="text-red-500">*</span></label>
                 <input type="text" id="title" name="title" value={formData.title} onChange={handleChange} placeholder="Enter tender title" required className={inputClass} />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label htmlFor="procurementNature" className="block text-sm font-semibold text-navy-900 mb-1.5">Procurement Nature <span className="text-red-500">*</span></label>
+                  <label htmlFor="procurementNature" className="block text-sm font-medium text-content-primary mb-1.5">Procurement Nature <span className="text-red-500">*</span></label>
                   <select id="procurementNature" name="procurementNature" value={formData.procurementNature} onChange={handleChange} required className={`${inputClass} appearance-none`}>
                     <option value="Goods">Goods</option>
                     <option value="Works">Works</option>
@@ -865,7 +864,7 @@ export default function NewTenderPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="procurementMethod" className="block text-sm font-semibold text-navy-900 mb-1.5">Procurement Method <span className="text-red-500">*</span></label>
+                  <label htmlFor="procurementMethod" className="block text-sm font-medium text-content-primary mb-1.5">Procurement Method <span className="text-red-500">*</span></label>
                   <select id="procurementMethod" name="procurementMethod" value={formData.procurementMethod} onChange={handleChange} required className={`${inputClass} appearance-none`}>
                     <option value="OTM">Open Tendering Method (OTM)</option>
                     <option value="RFQ">Request for Quotation (RFQ)</option>
@@ -876,21 +875,21 @@ export default function NewTenderPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="category" className="block text-sm font-semibold text-navy-900 mb-1.5">Category <span className="text-red-500">*</span></label>
+                  <label htmlFor="category" className="block text-sm font-medium text-content-primary mb-1.5">Category <span className="text-red-500">*</span></label>
                   <input type="text" id="category" name="category" value={formData.category} onChange={handleChange} placeholder="e.g. Stone & Construction Materials" required className={inputClass} />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="budget" className="block text-sm font-semibold text-navy-900 mb-1.5">Budget Ceiling / Estimated Value (BDT)</label>
+                  <label htmlFor="budget" className="block text-sm font-medium text-content-primary mb-1.5">Budget Ceiling / Estimated Value (BDT)</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">৳</span>
                     <input type="number" id="budget" name="budget" value={formData.budget} onChange={handleChange} placeholder="e.g. 3900000" min="0" className={`${inputClass} pl-10`} />
                   </div>
                 </div>
                 <div>
-                  <label htmlFor="bidBond" className="block text-sm font-semibold text-navy-900 mb-1.5">Bid-Bond Security Amount (BDT)</label>
+                  <label htmlFor="bidBond" className="block text-sm font-medium text-content-primary mb-1.5">Bid-Bond Security Amount (BDT)</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">৳</span>
                     <input type="number" id="bidBond" name="bidBond" value={bidBondAmount} onChange={(e) => setBidBondAmount(e.target.value)} placeholder="e.g. 75000" min="0" className={`${inputClass} pl-10`} />
@@ -900,15 +899,15 @@ export default function NewTenderPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-navy-900 mb-1.5">Tender Visibility <span className="text-red-500">*</span></label>
+                  <label className="block text-sm font-medium text-content-primary mb-1.5">Tender Visibility <span className="text-red-500">*</span></label>
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       type="button"
                       onClick={() => setVisibilityType("Public")}
-                      className={`p-3 rounded-xl border text-left font-semibold text-xs transition-all ${
+                      className={`p-3 rounded border text-left font-semibold text-xs transition-all ${
                         visibilityType === "Public"
-                          ? "bg-navy-900 text-white border-navy-900 shadow-md"
-                          : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                          ? "bg-brand-navy text-white border-brand-navy shadow-md"
+                          : "bg-surface text-slate-600 border-subtle hover:bg-slate-50"
                       }`}
                     >
                       🌍 Public Tender
@@ -917,10 +916,10 @@ export default function NewTenderPage() {
                     <button
                       type="button"
                       onClick={() => setVisibilityType("Exclusive")}
-                      className={`p-3 rounded-xl border text-left font-semibold text-xs transition-all ${
+                      className={`p-3 rounded border text-left font-semibold text-xs transition-all ${
                         visibilityType === "Exclusive"
-                          ? "bg-navy-900 text-white border-navy-900 shadow-md"
-                          : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                          ? "bg-brand-navy text-white border-brand-navy shadow-md"
+                          : "bg-surface text-slate-600 border-subtle hover:bg-slate-50"
                       }`}
                     >
                       🔒 Enlisted Only
@@ -930,21 +929,21 @@ export default function NewTenderPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="deadline" className="block text-sm font-semibold text-navy-900 mb-1.5">Submission Deadline <span className="text-red-500">*</span></label>
+                  <label htmlFor="deadline" className="block text-sm font-medium text-content-primary mb-1.5">Submission Deadline <span className="text-red-500">*</span></label>
                   <input type="date" id="deadline" name="deadline" value={formData.deadline} onChange={handleChange} required className={inputClass} />
                 </div>
               </div>
 
               {/* ── Packaging Mode & Lot Items Builder (FR-08) ───────────── */}
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4">
+              <div className="bg-app border border-subtle rounded p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200">
                   <div>
-                    <h4 className="text-sm font-bold text-navy-900">Tender Packaging & Lot Items</h4>
+                    <h4 className="text-sm font-bold text-content-primary">Tender Packaging & Lot Items</h4>
                     <p className="text-xs text-slate-500 mt-0.5">
                       Choose whether this is a single item or packaged tender containing multiple items/lots (e.g. Cement and Rod).
                     </p>
                   </div>
-                  <div className="inline-flex rounded-xl bg-white border border-slate-200 p-1 shadow-sm flex-shrink-0">
+                  <div className="inline-flex rounded bg-white border border-slate-200 p-1 shadow-sm flex-shrink-0">
                     <button
                       type="button"
                       onClick={() => {
@@ -955,8 +954,8 @@ export default function NewTenderPage() {
                       }}
                       className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
                         packageType === "SingleItem"
-                          ? "bg-navy-900 text-white shadow"
-                          : "text-slate-600 hover:text-navy-900"
+                          ? "bg-brand-navy text-white shadow"
+                          : "text-slate-600 hover:text-content-primary"
                       }`}
                     >
                       Single Item
@@ -971,8 +970,8 @@ export default function NewTenderPage() {
                       }}
                       className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
                         packageType === "PackagedLots"
-                          ? "bg-navy-900 text-white shadow"
-                          : "text-slate-600 hover:text-navy-900"
+                          ? "bg-brand-navy text-white shadow"
+                          : "text-slate-600 hover:text-content-primary"
                       }`}
                     >
                       📦 Packaged Lots
@@ -982,9 +981,9 @@ export default function NewTenderPage() {
 
                 <div className="space-y-3">
                   {tenderItems.map((item, idx) => (
-                    <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                    <div key={idx} className="bg-surface p-4 rounded border border-subtle shadow-sm space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="px-2.5 py-0.5 bg-navy-100 text-navy-900 font-black text-xs rounded-md">
+                        <span className="px-2.5 py-0.5 bg-app text-content-primary font-semibold text-xs rounded border border-subtle tabular-nums">
                           {item.lot_number || `LOT-${idx + 1}`}
                         </span>
                         {packageType === "PackagedLots" && tenderItems.length > 1 && (
@@ -1000,57 +999,57 @@ export default function NewTenderPage() {
 
                       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                         <div className="sm:col-span-2">
-                          <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Item / Lot Name <span className="text-red-500">*</span></label>
+                          <label className="block text-content-secondary text-xs font-medium uppercase mb-1">Item / Lot Name <span className="text-red-500">*</span></label>
                           <input
                             type="text"
                             value={item.item_name}
                             onChange={(e) => handleUpdateLotItem(idx, "item_name", e.target.value)}
                             placeholder={idx === 0 ? "e.g. Portland Composite Cement" : "e.g. 60-Grade Deformed Rebar"}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                            className="w-full px-3 py-2 border border-subtle rounded text-sm"
                           />
                         </div>
                         <div>
-                          <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Quantity</label>
+                          <label className="block text-content-secondary text-xs font-medium uppercase mb-1">Quantity</label>
                           <input
                             type="number"
                             min="1"
                             value={item.quantity}
                             onChange={(e) => handleUpdateLotItem(idx, "quantity", e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                            className="w-full px-3 py-2 border border-subtle rounded text-sm"
                           />
                         </div>
                         <div>
-                          <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Unit of Measure</label>
+                          <label className="block text-content-secondary text-xs font-medium uppercase mb-1">Unit of Measure</label>
                           <input
                             type="text"
                             value={item.unit_of_measure}
                             onChange={(e) => handleUpdateLotItem(idx, "unit_of_measure", e.target.value)}
                             placeholder="e.g. Bags, Tons, Units"
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                            className="w-full px-3 py-2 border border-subtle rounded text-sm"
                           />
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Estimated Unit Price (BDT, Optional)</label>
+                          <label className="block text-content-secondary text-xs font-medium uppercase mb-1">Estimated Unit Price (BDT, Optional)</label>
                           <input
                             type="number"
                             min="0"
                             value={item.estimated_unit_price}
                             onChange={(e) => handleUpdateLotItem(idx, "estimated_unit_price", e.target.value)}
                             placeholder="e.g. 550"
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                            className="w-full px-3 py-2 border border-subtle rounded text-sm"
                           />
                         </div>
                         <div>
-                          <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Specifications (Optional)</label>
+                          <label className="block text-content-secondary text-xs font-medium uppercase mb-1">Specifications (Optional)</label>
                           <input
                             type="text"
                             value={item.specifications}
                             onChange={(e) => handleUpdateLotItem(idx, "specifications", e.target.value)}
                             placeholder="e.g. BSTI BDS EN 197-1 certified"
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                            className="w-full px-3 py-2 border border-subtle rounded text-sm"
                           />
                         </div>
                       </div>
@@ -1061,7 +1060,7 @@ export default function NewTenderPage() {
                     <button
                       type="button"
                       onClick={handleAddLotItem}
-                      className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-navy-900 font-bold text-xs rounded-xl transition border border-dashed border-slate-300 flex items-center justify-center gap-1.5"
+                      className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-content-primary font-bold text-xs rounded transition border border-dashed border-slate-300 flex items-center justify-center gap-1.5"
                     >
                       + Add Another Lot / Item (e.g. Cement + Rod)
                     </button>
@@ -1070,13 +1069,13 @@ export default function NewTenderPage() {
               </div>
 
               <div>
-                <label htmlFor="eligibilityOfTenderer" className="block text-sm font-semibold text-navy-900 mb-1.5">Eligibility of Tenderer</label>
+                <label htmlFor="eligibilityOfTenderer" className="block text-sm font-medium text-content-primary mb-1.5">Eligibility of Tenderer</label>
                 <textarea id="eligibilityOfTenderer" name="eligibilityOfTenderer" value={formData.eligibilityOfTenderer} onChange={handleChange} placeholder="Enter specific financial and experience criteria required from vendors..." rows={3}
                   className={`${inputClass} resize-none`} />
               </div>
 
               <div>
-                <label htmlFor="description" className="block text-sm font-semibold text-navy-900 mb-1.5">Detailed Description & Scope of Work <span className="text-red-500">*</span></label>
+                <label htmlFor="description" className="block text-sm font-medium text-content-primary mb-1.5">Detailed Description & Scope of Work <span className="text-red-500">*</span></label>
                 <textarea id="description" name="description" value={formData.description} onChange={handleChange} placeholder="Enter detailed tender requirements, scope of work, and terms..." required rows={4}
                   className={`${inputClass} resize-none`} />
               </div>
@@ -1085,21 +1084,21 @@ export default function NewTenderPage() {
             {/* ── Section 2: Key Dates ───────────────── */}
             <div className="space-y-5">
               <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
-                <span className="w-7 h-7 rounded-lg bg-navy-900 text-white flex items-center justify-center text-xs font-bold">2</span>
-                <h3 className="text-sm font-bold text-navy-900 uppercase tracking-wide">Key Timeline Dates</h3>
+                <span className="w-7 h-7 rounded bg-brand-navy text-white flex items-center justify-center text-xs font-bold">2</span>
+                <h3 className="text-sm font-medium text-content-primary uppercase tracking-wide">Key Timeline Dates</h3>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label htmlFor="tenderPublicDate" className="block text-sm font-semibold text-navy-900 mb-1.5">Publication Date <span className="text-red-500">*</span></label>
+                  <label htmlFor="tenderPublicDate" className="block text-sm font-medium text-content-primary mb-1.5">Publication Date <span className="text-red-500">*</span></label>
                   <input type="date" id="tenderPublicDate" name="tenderPublicDate" value={formData.tenderPublicDate} onChange={handleChange} required className={inputClass} />
                 </div>
                 <div>
-                  <label htmlFor="preBidMeeting" className="block text-sm font-semibold text-navy-900 mb-1.5">Pre-Bid Meeting Date</label>
+                  <label htmlFor="preBidMeeting" className="block text-sm font-medium text-content-primary mb-1.5">Pre-Bid Meeting Date</label>
                   <input type="date" id="preBidMeeting" name="preBidMeeting" value={formData.preBidMeeting} onChange={handleChange} className={inputClass} />
                 </div>
                 <div>
-                  <label htmlFor="tenderOpeningDate" className="block text-sm font-semibold text-navy-900 mb-1.5">Opening Date <span className="text-red-500">*</span></label>
+                  <label htmlFor="tenderOpeningDate" className="block text-sm font-medium text-content-primary mb-1.5">Opening Date <span className="text-red-500">*</span></label>
                   <input type="date" id="tenderOpeningDate" name="tenderOpeningDate" value={formData.tenderOpeningDate} onChange={handleChange} required className={inputClass} />
                 </div>
               </div>
@@ -1108,12 +1107,12 @@ export default function NewTenderPage() {
             {/* ── Section 3: Documents ────────────────── */}
             <div className="space-y-5">
               <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
-                <span className="w-7 h-7 rounded-lg bg-navy-900 text-white flex items-center justify-center text-xs font-bold">3</span>
-                <h3 className="text-sm font-bold text-navy-900 uppercase tracking-wide">Tender Specification Documents</h3>
+                <span className="w-7 h-7 rounded bg-brand-navy text-white flex items-center justify-center text-xs font-bold">3</span>
+                <h3 className="text-sm font-medium text-content-primary uppercase tracking-wide">Tender Specification Documents</h3>
               </div>
 
-              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
-                <label htmlFor="fileCount" className="block text-sm font-semibold text-navy-900 mb-1.5">
+              <div className="bg-app p-5 rounded border border-subtle">
+                <label htmlFor="fileCount" className="block text-sm font-medium text-content-primary mb-1.5">
                   Specification Files to Attach
                 </label>
                 <input type="number" id="fileCount" name="fileCount" value={fileCount} onChange={handleFileCountChange} placeholder="e.g. 1" min="0" className={`${inputClass} mb-4`} />
@@ -1127,12 +1126,12 @@ export default function NewTenderPage() {
                       return (
                         <div
                           key={index}
-                          className={`p-4 rounded-xl border-2 transition-all duration-300 ${
-                            isComplete ? 'bg-white border-emerald-300 shadow-sm' : 'bg-white border-slate-300'
+                          className={`p-4 rounded border transition-all duration-300 ${
+                            isComplete ? 'bg-surface border-emerald-300 shadow-sm' : 'bg-surface border-subtle'
                           }`}
                         >
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-bold text-navy-900">Document #{index + 1}</span>
+                            <span className="text-xs font-bold text-content-primary">Document #{index + 1}</span>
                             <button
                               type="button"
                               onClick={() => removeFileSlot(index)}
@@ -1147,7 +1146,7 @@ export default function NewTenderPage() {
                               <label className="block text-xs font-medium text-slate-500 mb-1">Document Title <span className="text-red-500">*</span></label>
                               <input type="text" value={cf.name} onChange={(e) => updateCustomFile(index, 'name', e.target.value)}
                                 placeholder="e.g. Tender Notice Specification" required
-                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-navy-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500 transition text-xs" />
+                                className="w-full px-3 py-2 bg-app border border-subtle rounded text-content-primary placeholder-content-muted focus:outline-none focus:ring-2 focus:ring-brand-blue transition text-xs" />
                             </div>
 
                             <div>
@@ -1157,7 +1156,7 @@ export default function NewTenderPage() {
                                   <span className="text-xs text-emerald-800 font-medium truncate max-w-[150px]">
                                     {cf.file.name} ({formatFileSize(cf.file.size)})
                                   </span>
-                                  <label className="cursor-pointer text-[10px] bg-white border border-slate-200 hover:bg-slate-50 text-navy-900 px-2 py-1 rounded font-bold transition">
+                                  <label className="cursor-pointer text-[10px] bg-white border border-slate-200 hover:bg-slate-50 text-content-primary px-2 py-1 rounded font-bold transition">
                                     Change
                                     <input type="file" className="hidden" onChange={(e) => {
                                       if (e.target.files && e.target.files[0]) {
@@ -1172,7 +1171,7 @@ export default function NewTenderPage() {
                                       updateCustomFile(index, 'file', e.target.files[0]);
                                     }
                                   }} required
-                                  className="w-full px-3 py-1 text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-accent-50 file:text-accent-700 hover:file:bg-accent-100 transition" />
+                                  className="w-full px-3 py-1 text-xs text-content-secondary file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-app file:text-content-primary hover:file:bg-slate-200 transition" />
                               )}
                             </div>
                           </div>
@@ -1186,13 +1185,13 @@ export default function NewTenderPage() {
               {/* Documents Required from Seller */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-semibold text-navy-900">Mandatory Documents Required from Vendors</label>
+                  <label className="block text-sm font-medium text-content-primary">Mandatory Documents Required from Vendors</label>
                   {sellerDocs.length > 0 && (
                     <button type="button" onClick={() => setShowAccessConfig(!showAccessConfig)}
-                      className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all duration-200 cursor-pointer ${
+                      className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded border transition-all duration-200 cursor-pointer ${
                         showAccessConfig
-                          ? 'bg-accent-50 text-accent-700 border-accent-200'
-                          : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+                          ? 'bg-app text-content-primary border-subtle'
+                          : 'bg-app text-content-muted border-subtle hover:bg-slate-100'
                       }`}>
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -1205,13 +1204,13 @@ export default function NewTenderPage() {
                 {sellerDocs.length > 0 && (
                   <ul className="mb-3 space-y-2">
                     {sellerDocs.map((doc, index) => (
-                      <li key={index} className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+                      <li key={index} className="bg-app rounded border border-subtle overflow-hidden">
                         <div className="flex items-center justify-between px-4 py-2.5">
                           <div className="flex items-center gap-2.5">
-                            <svg className="w-4 h-4 text-accent-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 text-brand-blue flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
-                            <span className="text-sm text-navy-900 font-medium">{doc.name}</span>
+                            <span className="text-sm text-content-primary font-medium">{doc.name}</span>
                           </div>
                           <button type="button" onClick={() => removeSellerDoc(index)}
                             className="text-slate-400 hover:text-red-500 transition flex-shrink-0 ml-3 cursor-pointer" aria-label="Remove">
@@ -1233,7 +1232,7 @@ export default function NewTenderPage() {
                                     checked={role === "Owner" || doc.allowed_roles.includes(role)}
                                     disabled={role === "Owner"}
                                     onChange={() => toggleRole(index, role)}
-                                    className="w-3.5 h-3.5 rounded border-slate-300 text-accent-600 focus:ring-accent-500 focus:ring-offset-0 disabled:opacity-60"
+                                    className="w-3.5 h-3.5 rounded border-slate-300 text-brand-blue focus:ring-brand-blue focus:ring-offset-0 disabled:opacity-60"
                                   />
                                   <span className="text-slate-600 font-medium">{ROLE_LABELS[role]}</span>
                                 </label>
@@ -1250,9 +1249,9 @@ export default function NewTenderPage() {
                   <input type="text" value={newSellerDoc} onChange={(e) => setNewSellerDoc(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSellerDoc(); } }}
                     placeholder="e.g. Trade License, Tax Certificate, VAT Registration"
-                    className="flex-1 px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-navy-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500 transition text-sm" />
+                    className="flex-1 px-4 py-2.5 bg-surface border border-subtle rounded text-content-primary placeholder-content-muted focus:outline-none focus:ring-2 focus:ring-brand-blue transition text-sm" />
                   <button type="button" onClick={addSellerDoc}
-                    className="px-4 py-2.5 bg-navy-900 hover:bg-navy-800 text-white text-sm font-semibold rounded-xl transition flex items-center gap-1.5 flex-shrink-0 cursor-pointer">
+                    className="px-4 py-2.5 bg-brand-navy hover:bg-slate-900 text-white text-sm font-medium rounded transition flex items-center gap-1.5 flex-shrink-0 cursor-pointer">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
                     </svg>
@@ -1265,19 +1264,19 @@ export default function NewTenderPage() {
             {/* Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
               <button type="button" onClick={handleCancel}
-                className="flex-1 px-6 py-3.5 bg-slate-100 text-navy-900 font-semibold rounded-xl hover:bg-slate-200 transition border border-slate-200 text-sm cursor-pointer">
+                className="flex-1 px-6 py-3.5 bg-app text-content-primary font-semibold rounded hover:bg-slate-200 transition border border-subtle text-sm cursor-pointer">
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleSaveDraft}
                 disabled={isSubmitting || isSavingDraft || isExtractingPdf || isPublishingPdf}
-                className="flex-1 px-6 py-3.5 bg-white text-navy-900 font-semibold rounded-xl hover:bg-slate-50 transition border border-slate-300 text-sm cursor-pointer disabled:opacity-50"
+                className="flex-1 px-6 py-3.5 bg-app text-content-primary font-semibold rounded hover:bg-slate-50 transition border border-subtle text-sm cursor-pointer disabled:opacity-50"
               >
                 {isSavingDraft ? "Saving Draft..." : "Save as Draft"}
               </button>
               <button type="submit" disabled={isSubmitting || isSavingDraft || isExtractingPdf || isPublishingPdf}
-                className="flex-1 px-6 py-3.5 bg-gradient-to-r from-navy-900 to-navy-800 text-white font-bold rounded-xl hover:from-navy-800 hover:to-navy-700 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 text-sm cursor-pointer disabled:opacity-50">
+                className="flex-1 px-6 py-3.5 bg-brand-navy text-white font-bold rounded hover:bg-slate-900 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 text-sm cursor-pointer disabled:opacity-50">
                 {isSubmitting ? (
                   <>
                     <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
@@ -1303,7 +1302,7 @@ export default function NewTenderPage() {
             <div className="text-center pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
               <p className="flex items-center gap-1">
                 Organization Balance:{" "}
-                <span className="font-bold text-navy-900 flex items-center gap-1 text-sm">
+                <span className="font-bold text-content-primary flex items-center gap-1 text-sm tabular-nums">
                   {tokenBalance.toLocaleString()}
                   <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1342,33 +1341,34 @@ export default function NewTenderPage() {
         maxWidth="max-w-lg"
       >
         <div className="p-8 text-center">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-lg ring-8 ring-emerald-50/50">
+          <div className="w-16 h-16 mx-auto mb-4 rounded bg-status-approved-bg text-status-approved-text flex items-center justify-center">
             <svg className="w-9 h-9" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
             </svg>
           </div>
 
-          <h2 className="text-2xl font-black text-navy-900 mb-1">Tender Published!</h2>
-          <p className="text-slate-600 text-sm mb-6">
+          <h2 className="text-xl font-bold text-content-primary mb-1">Tender Published!</h2>
+          <p className="text-content-secondary text-sm mb-6">
             Your tender has been published and is now open for vendors to submit proposals.
           </p>
 
-          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 mb-6 text-left space-y-3">
-            <div className="flex justify-between items-center pb-2.5 border-b border-slate-200">
-              <span className="text-xs text-slate-500 font-semibold uppercase">Title</span>
-              <span className="text-xs font-bold text-navy-900 truncate max-w-[240px]">{publishedTitle}</span>
+          <div className="bg-app border border-subtle rounded p-5 mb-6 text-left space-y-3">
+            <div className="flex justify-between items-center pb-2.5 border-b border-subtle">
+              <span className="text-xs text-content-muted font-semibold uppercase">Title</span>
+              <span className="text-xs font-bold text-content-primary truncate max-w-[240px]">{publishedTitle}</span>
             </div>
-            <div className="flex justify-between items-center pb-2.5 border-b border-slate-200">
-              <span className="text-xs text-slate-500 font-semibold uppercase">Nature / Method</span>
-              <span className="text-xs font-bold text-navy-900">{publishedNature} ({publishedMethod})</span>
+            <div className="flex justify-between items-center pb-2.5 border-b border-subtle">
+              <span className="text-xs text-content-muted font-semibold uppercase">Nature / Method</span>
+              <span className="text-xs font-bold text-content-primary">{publishedNature} ({publishedMethod})</span>
             </div>
-            <div className="flex justify-between items-center pb-2.5 border-b border-slate-200">
-              <span className="text-xs text-slate-500 font-semibold uppercase">Budget Ceiling</span>
-              <span className="text-base font-black text-navy-900">৳ {parseFloat(publishedBudget || '0').toLocaleString()}</span>
+            <div className="flex justify-between items-center pb-2.5 border-b border-subtle">
+              <span className="text-xs text-content-muted font-semibold uppercase">Budget Ceiling</span>
+              <span className="text-base font-bold text-content-primary tabular-nums">৳ {parseFloat(publishedBudget || '0').toLocaleString()}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-xs text-slate-500 font-semibold uppercase">Category</span>
-              <span className="px-2.5 py-0.5 bg-accent-50 text-accent-700 text-xs font-bold rounded-full border border-accent-200 capitalize">
+              <span className="text-xs text-content-muted font-semibold uppercase">Category</span>
+              <span className="badge-status badge-draft capitalize">
+                <span className="badge-dot" />
                 {publishedCategory || 'General'}
               </span>
             </div>
@@ -1378,7 +1378,7 @@ export default function NewTenderPage() {
             {createdTenderResult?.tender_id ? (
               <button
                 onClick={() => router.push(`/view-my-tender/${createdTenderResult.tender_id}`)}
-                className="w-full py-3.5 bg-gradient-to-r from-navy-900 to-navy-800 text-white font-bold rounded-xl hover:from-navy-800 hover:to-navy-700 transition shadow-lg text-sm flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3.5 bg-brand-navy text-white font-bold rounded hover:bg-slate-900 transition shadow-lg text-sm flex items-center justify-center gap-2 cursor-pointer"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -1390,7 +1390,7 @@ export default function NewTenderPage() {
 
             <button
               onClick={() => router.push("/home")}
-              className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-navy-900 font-bold rounded-xl transition border border-slate-200 text-sm cursor-pointer"
+              className="w-full py-3 bg-app hover:bg-slate-200 text-content-primary font-bold rounded transition border border-subtle text-sm cursor-pointer"
             >
               Return to Dashboard
             </button>

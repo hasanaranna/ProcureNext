@@ -125,11 +125,11 @@ export default function EditTenderPage() {
   };
 
   const inputClass =
-    "w-full px-4 py-3 border border-slate-300 rounded-xl bg-white text-navy-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent";
+    "w-full px-4 py-3 border border-subtle rounded bg-white text-content-primary placeholder-content-muted focus:outline-none focus:ring-2 focus:ring-brand-blue/40 focus:border-brand-blue";
 
   if (loading) {
     return (
-      <main className="w-full min-h-screen flex items-center justify-center bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800 text-white">
+      <main className="w-full min-h-screen flex items-center justify-center bg-app text-content-muted">
         Loading tender...
       </main>
     );
@@ -137,11 +137,11 @@ export default function EditTenderPage() {
 
   if (error && !formData.title) {
     return (
-      <main className="w-full min-h-screen flex flex-col items-center justify-center gap-4 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800 px-4">
-        <p className="text-red-300">{error}</p>
+      <main className="w-full min-h-screen flex flex-col items-center justify-center gap-4 bg-app px-4">
+        <p className="text-status-rejected-text">{error}</p>
         <button
           onClick={() => router.push(`/view-my-tender/${tenderId}`)}
-          className="px-5 py-2.5 bg-white text-navy-900 rounded-xl font-semibold"
+          className="bg-brand-navy text-white hover:bg-slate-900 text-sm font-medium h-9 px-3.5 rounded"
         >
           Back to Tender
         </button>
@@ -150,34 +150,34 @@ export default function EditTenderPage() {
   }
 
   return (
-    <main className="w-full min-h-screen py-10 px-4 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
+    <main className="w-full min-h-screen py-10 px-4 bg-app">
       <div className="max-w-3xl mx-auto">
         <button
           onClick={() => router.push(`/view-my-tender/${tenderId}`)}
-          className="mb-6 text-slate-400 hover:text-white text-sm"
+          className="mb-6 text-content-muted hover:text-content-primary text-sm"
         >
           ← Back to Tender
         </button>
 
-        <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-8">
+        <div className="bg-surface rounded border border-subtle p-6">
           <div className="mb-6">
-            <h1 className="text-2xl font-black text-navy-900">Edit Tender</h1>
-            <p className="text-sm text-slate-500 mt-1">Status: {status}</p>
+            <h1 className="text-xl font-semibold text-content-primary">Edit Tender</h1>
+            <p className="text-sm text-content-secondary mt-1">Status: {status}</p>
           </div>
 
           {error && (
-            <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
+            <div className="mb-4 p-3 rounded bg-status-rejected-bg border border-subtle text-status-rejected-text text-sm">
               {error}
             </div>
           )}
 
           <form onSubmit={handleSave} className="space-y-5">
             <div>
-              <label className="block text-sm font-semibold text-navy-900 mb-1">Title</label>
+              <label className="block text-sm font-medium text-content-primary mb-1">Title</label>
               <input name="title" value={formData.title} onChange={handleChange} required className={inputClass} />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-navy-900 mb-1">Description</label>
+              <label className="block text-sm font-medium text-content-primary mb-1">Description</label>
               <textarea
                 name="description"
                 value={formData.description}
@@ -189,17 +189,17 @@ export default function EditTenderPage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-navy-900 mb-1">Budget (max)</label>
+                <label className="block text-sm font-medium text-content-primary mb-1">Budget (max)</label>
                 <input name="budget" value={formData.budget} onChange={handleChange} className={inputClass} />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-navy-900 mb-1">Submission deadline</label>
+                <label className="block text-sm font-medium text-content-primary mb-1">Submission deadline</label>
                 <input type="date" name="deadline" value={formData.deadline} onChange={handleChange} className={inputClass} />
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-navy-900 mb-1">Procurement nature</label>
+                <label className="block text-sm font-medium text-content-primary mb-1">Procurement nature</label>
                 <select name="procurementNature" value={formData.procurementNature} onChange={handleChange} className={inputClass}>
                   <option value="Goods">Goods</option>
                   <option value="Works">Works</option>
@@ -207,7 +207,7 @@ export default function EditTenderPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-navy-900 mb-1">Procurement method</label>
+                <label className="block text-sm font-medium text-content-primary mb-1">Procurement method</label>
                 <input name="procurementMethod" value={formData.procurementMethod} onChange={handleChange} className={inputClass} />
               </div>
             </div>
@@ -215,14 +215,14 @@ export default function EditTenderPage() {
               <button
                 type="button"
                 onClick={() => router.push(`/view-my-tender/${tenderId}`)}
-                className="flex-1 px-5 py-3 rounded-xl border border-slate-300 text-navy-900 font-semibold"
+                className="flex-1 rounded border border-subtle text-content-primary bg-app hover:bg-subtle text-sm font-medium h-9 px-3.5"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="flex-1 px-5 py-3 rounded-xl bg-navy-900 text-white font-bold disabled:opacity-50"
+                className="flex-1 bg-brand-navy text-white hover:bg-slate-900 text-sm font-medium h-9 px-3.5 rounded disabled:opacity-50"
               >
                 {saving ? "Saving..." : "Save Changes"}
               </button>

@@ -93,7 +93,7 @@ export default function RoleAssignmentSection() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-full py-16">
-        <svg className="animate-spin h-8 w-8 text-accent-500" fill="none" viewBox="0 0 24 24">
+        <svg className="animate-spin h-8 w-8 text-brand-blue" fill="none" viewBox="0 0 24 24">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
@@ -104,8 +104,8 @@ export default function RoleAssignmentSection() {
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto p-6 md:p-8">
-        <h3 className="text-lg font-bold text-navy-900 mb-1">Role Assignment</h3>
-        <p className="text-slate-500 text-sm mb-6">
+        <h3 className="text-sm font-semibold text-content-primary mb-1">Role Assignment</h3>
+        <p className="text-content-secondary text-xs font-medium mb-6">
           Assign roles to your organization members to manage their access and permissions.
         </p>
 
@@ -129,23 +129,23 @@ export default function RoleAssignmentSection() {
 
               return (
                 <div key={member.org_user_id}
-                  className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-5 py-4 rounded-xl border border-slate-200 bg-white hover:shadow-md transition-all duration-200 gap-3">
+                  className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 py-3 rounded border border-subtle bg-surface hover:bg-app transition-all duration-200 gap-3">
                   <div className="flex items-center gap-3">
                     <img src={avatarUrl} alt={member.full_name || member.email}
-                      className="w-10 h-10 rounded-xl flex-shrink-0 shadow-sm" />
+                      className="w-8 h-8 rounded flex-shrink-0" />
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-bold text-navy-900">
+                        <p className="text-sm font-medium text-content-primary">
                           {member.full_name || 'Unnamed User'}
                         </p>
                         {isPrimaryOwner && (
-                          <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                            You
+                          <span className="badge-status badge-pending">
+                            <span className="badge-dot" />You
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-slate-400 mt-0.5">{member.email}</p>
-                      <p className="text-xs text-slate-400">
+                      <p className="text-content-secondary text-xs font-medium mt-0.5">{member.email}</p>
+                      <p className="text-content-secondary text-xs font-medium">
                         Joined {new Date(member.joined_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </p>
                     </div>
@@ -161,21 +161,21 @@ export default function RoleAssignmentSection() {
 
                     {/* Loading indicator */}
                     {updatingId === member.org_user_id && (
-                      <svg className="animate-spin w-5 h-5 text-accent-500" fill="none" viewBox="0 0 24 24">
+                      <svg className="animate-spin w-5 h-5 text-brand-blue" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                       </svg>
                     )}
 
                     {isPrimaryOwner ? (
-                      <span className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-500 bg-slate-100 border border-slate-200">
+                      <span className="px-3 py-1.5 rounded text-sm font-medium text-content-secondary bg-app border border-subtle">
                         {roleLabels[member.role_in_org] || member.role_in_org}
                       </span>
                     ) : (
                       <select value={member.role_in_org}
                         onChange={(e) => handleRoleChange(member.org_user_id, e.target.value)}
                         disabled={updatingId === member.org_user_id}
-                        className="px-4 py-2 rounded-xl border border-slate-300 text-sm font-medium text-navy-900 outline-none cursor-pointer focus:ring-2 focus:ring-accent-500 focus:border-transparent transition disabled:opacity-50 bg-white">
+                        className="px-3 py-1.5 rounded border border-subtle text-sm font-medium text-content-primary outline-none cursor-pointer focus:ring-2 focus:ring-brand-blue focus:border-transparent transition disabled:opacity-50 bg-surface">
                         {roles.map((role) => (
                           <option key={role} value={role}>
                             {roleLabels[role] || role}
