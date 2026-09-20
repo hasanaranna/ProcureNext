@@ -92,6 +92,8 @@ services:
       - ./frontend/proxy.ts:/app/proxy.ts:z
       - ./frontend/tsconfig.json:/app/tsconfig.json:z
       - ./frontend/next.config.ts:/app/next.config.ts:z
+      - ./frontend/postcss.config.js:/app/postcss.config.js:z
+      - ./frontend/tailwind.config.js:/app/tailwind.config.js:z
     environment:
       - WATCHPACK_POLLING=true # Makes hot reload work reliably
       - BACKEND_API_URL=http://backend:8000

@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -6,29 +5,26 @@
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
   /* ── Core Surfaces & App Layout ─────────────────── */
-  --color-app: #F1F5F9;              /* Main background — slate-100 for less empty white */
-  --color-surface: #FFFFFF;          /* Cards, modals, drawers */
-  --color-subtle: #E2E8F0;           /* Razor-thin 1px borders */
+  --color-app: #F1F5F9;
+  --color-surface: #FFFFFF;
+  --color-subtle: #E2E8F0;
 
   /* ── Formal Corporate Typography ───────────────── */
-  --color-content-primary: #0F172A;   /* Slate-900: High-contrast primary text */
-  --color-content-secondary: #475569; /* Slate-600: Column headers & metadata */
-  --color-content-muted: #94A3B8;     /* Slate-400: Inactive states & placeholders */
+  --color-content-primary: #0F172A;
+  --color-content-secondary: #475569;
+  --color-content-muted: #94A3B8;
 
   /* ── Brand & Action Colors ─────────────────────── */
-  --color-brand-navy: #1E293B;       /* Primary buttons & authoritative CTAs */
-  --color-brand-blue: #2563EB;       /* Focus rings, links, interactive states */
+  --color-brand-navy: #1E293B;
+  --color-brand-blue: #2563EB;
 
   /* ── WCAG AAA Procurement Status Colors ─────────── */
   --color-status-approved-bg: #ECFDF5;
   --color-status-approved-text: #047857;
-
   --color-status-pending-bg: #FFFBEB;
   --color-status-pending-text: #B45309;
-
   --color-status-rejected-bg: #FEF2F2;
   --color-status-rejected-text: #B91C1C;
-
   --color-status-draft-bg: #F1F5F9;
   --color-status-draft-text: #475569;
 
@@ -45,6 +41,26 @@
     from { opacity: 0; }
     to { opacity: 1; }
   }
+}
+
+/* Fallback so brand tokens exist even if a stale CSS chunk skips @theme utilities */
+:root {
+  --color-app: #F1F5F9;
+  --color-surface: #FFFFFF;
+  --color-subtle: #E2E8F0;
+  --color-content-primary: #0F172A;
+  --color-content-secondary: #475569;
+  --color-content-muted: #94A3B8;
+  --color-brand-navy: #1E293B;
+  --color-brand-blue: #2563EB;
+  --color-status-approved-bg: #ECFDF5;
+  --color-status-approved-text: #047857;
+  --color-status-pending-bg: #FFFBEB;
+  --color-status-pending-text: #B45309;
+  --color-status-rejected-bg: #FEF2F2;
+  --color-status-rejected-text: #B91C1C;
+  --color-status-draft-bg: #F1F5F9;
+  --color-status-draft-text: #475569;
 }
 
 /* ── Base Styles ─────────────────────────────────── */
