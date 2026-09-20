@@ -336,8 +336,8 @@ export default function MessagingSidebar({ isOpen, onClose, onUnreadCountChange 
         thread_type: 'IntraCompany',
         group_name: null,
         participants: [
-          { user_id: currentUserId || 0, full_name: 'You', is_admin: false },
-          { user_id: otherUserId || 0, full_name: displayName || 'User', is_admin: false },
+          { user_id: currentUserId || 0, full_name: 'You', is_admin: false, is_permanent: false },
+          { user_id: otherUserId || 0, full_name: displayName || 'User', is_admin: false, is_permanent: false },
         ],
         last_message_preview: null,
         last_message_time: null,

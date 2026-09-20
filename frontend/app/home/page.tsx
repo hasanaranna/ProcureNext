@@ -333,9 +333,20 @@ export default function HomePage() {
   };
 
   // Sidebar nav items
-  const navItems: Array<{ label: string; href?: string; onClick?: () => void; icon: React.ReactNode }> = [
+  type NavItem = { label: string; href?: string; onClick?: () => void; icon: React.ReactNode };
+  const orgManagementItem: NavItem = {
+    label: 'Org Management',
+    onClick: () => setShowOrgManagement(true),
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+      </svg>
+    ),
+  };
+  const navItems: NavItem[] = [
     { label: 'Find Organizations', href: '/organizations', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>) },
     { label: 'Ongoing Tenders', href: '/ongoing-tenders', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>) },
+    ...(isOwner ? [orgManagementItem] : []),
     { label: 'Manage Tokens', onClick: () => setShowManageTokens(true), icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) },
     { label: 'Update Credentials', href: '#', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) },
     { label: 'Change Password', href: '/change-password', icon: (<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>) },
@@ -389,46 +400,66 @@ export default function HomePage() {
     }
   };
 
+  const publishedCount = buyerTenders.filter(t => t.status === 'Published').length;
+  const draftCount = buyerTenders.filter(t => t.status === 'Draft').length;
+  const awardedCount = buyerTenders.filter(t => t.status === 'Awarded' || t.status === 'Accepted').length;
+  const enlistedVendors = enlistedOrgs.filter(o => o.organization_type === 'Vendor');
+  const enlistedBuyers = enlistedOrgs.filter(o => o.organization_type === 'Buyer');
+
   const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
-    <div className="flex flex-col h-full">
-      {/* Toggle / Close */}
-      <div className="p-4 flex items-center justify-between">
-        {(sidebarOpen || isMobile) && <h2 className="text-lg font-bold text-content-primary">Menu</h2>}
+    <div className="flex flex-col h-full bg-surface">
+      <div className={`h-[52px] flex-shrink-0 flex items-center border-b border-subtle ${(sidebarOpen || isMobile) ? 'px-3.5 justify-between' : 'px-2 justify-center'}`}>
+        {(sidebarOpen || isMobile) && (
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 rounded bg-brand-navy text-white flex items-center justify-center flex-shrink-0">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <span className="font-bold text-[13px] text-content-primary tracking-tight truncate">ProcureNext</span>
+          </div>
+        )}
         <button
           onClick={() => isMobile ? setMobileSidebarOpen(false) : setSidebarOpen(!sidebarOpen)}
-          className="p-2 rounded bg-app hover:bg-subtle/60 text-content-secondary transition-all"
+          className="h-7 w-7 flex items-center justify-center rounded text-content-muted hover:text-content-primary hover:bg-app transition-colors"
           title={sidebarOpen ? 'Collapse' : 'Expand'}
         >
-          <svg className={`w-5 h-5 transition-transform ${!isMobile && sidebarOpen ? '' : 'rotate-180'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className={`w-4 h-4 transition-transform ${!isMobile && sidebarOpen ? '' : 'rotate-180'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
       </div>
 
-      {/* User Profile */}
-      <div className="px-3 py-4 border-b border-subtle">
-        <div className={`flex ${(sidebarOpen || isMobile) ? 'flex-col items-center text-center gap-2' : 'justify-center'}`}>
-          <div className={`${(sidebarOpen || isMobile) ? 'w-12 h-12 mb-1' : 'w-9 h-9'} flex-shrink-0 rounded overflow-hidden bg-brand-navy`}>
+      <div className={`px-3.5 py-3 border-b border-subtle ${(sidebarOpen || isMobile) ? '' : 'flex justify-center'}`}>
+        <div className={`flex ${(sidebarOpen || isMobile) ? 'items-center gap-2.5' : ''}`}>
+          <div className="w-8 h-8 flex-shrink-0 rounded-full overflow-hidden bg-brand-navy ring-1 ring-subtle">
             <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
           </div>
           {(sidebarOpen || isMobile) && (
-            <>
-              <h3 className="font-semibold text-content-primary text-sm leading-tight">{user.name}</h3>
-              <p className="text-content-muted text-xs break-words">{user.email}</p>
-              <p className="text-content-secondary text-xs font-medium">{user.orgName}</p>
-              {isOwner ? (
-                <span className="badge-status badge-approved"><span className="badge-dot" />Owner</span>
-              ) : user.role ? (
-                <span className="badge-status badge-draft"><span className="badge-dot" />{user.role.replace(/([a-z])([A-Z])/g, '$1 $2')}</span>
-              ) : null}
-            </>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold text-content-primary text-xs leading-tight truncate">{user.name}</h3>
+              <p className="text-content-muted text-[11px] truncate">{user.orgName}</p>
+            </div>
           )}
         </div>
+        {(sidebarOpen || isMobile) && (isOwner || user.role) && (
+          <div className="mt-2">
+            {isOwner ? (
+              <span className="badge-status badge-approved"><span className="badge-dot" />Owner</span>
+            ) : (
+              <span className="badge-status badge-draft"><span className="badge-dot" />{user.role.replace(/([a-z])([A-Z])/g, '$1 $2')}</span>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Nav Links */}
-      <nav className="flex-1 px-3 py-4">
-        <ul className="space-y-1">
+      <nav className="flex-1 px-2.5 py-3 overflow-y-auto">
+        {(sidebarOpen || isMobile) && (
+          <p className="px-2 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-content-muted">
+            Workspace
+          </p>
+        )}
+        <ul className="space-y-0.5">
           {navItems.map((item, i) => (
             <li key={i}>
               <button
@@ -438,23 +469,24 @@ export default function HomePage() {
                   } else if (item.href && item.href !== '#') {
                     router.push(item.href);
                   }
+                  if (isMobile) setMobileSidebarOpen(false);
                 }}
-                className="w-full flex items-center gap-3 p-3 rounded text-content-secondary hover:text-content-primary hover:bg-app transition-all duration-200 text-left cursor-pointer"
+                className={`w-full flex items-center ${(sidebarOpen || isMobile) ? 'gap-2.5 px-2.5' : 'justify-center px-0'} h-9 rounded text-content-secondary hover:text-content-primary hover:bg-app transition-colors text-left cursor-pointer`}
+                title={item.label}
               >
-                {item.icon}
-                {(sidebarOpen || isMobile) && <span className="text-sm font-medium">{item.label}</span>}
+                <span className="flex-shrink-0 text-content-muted [&>svg]:w-4 [&>svg]:h-4">{item.icon}</span>
+                {(sidebarOpen || isMobile) && <span className="text-xs font-medium truncate">{item.label}</span>}
               </button>
             </li>
           ))}
         </ul>
       </nav>
 
-      {/* Logout */}
-      <div className="p-3 border-t border-subtle mt-auto">
+      <div className="p-2.5 border-t border-subtle mt-auto">
         <button
           onClick={handleLogout}
           title="Log out"
-          className={`w-full flex items-center ${(sidebarOpen || isMobile) ? 'gap-3 justify-start' : 'justify-center'} px-3 h-9 rounded text-content-secondary hover:text-content-primary hover:bg-app border border-transparent hover:border-subtle transition-colors text-sm font-medium`}
+          className={`w-full flex items-center ${(sidebarOpen || isMobile) ? 'gap-2.5 justify-start px-2.5' : 'justify-center px-0'} h-9 rounded text-content-secondary hover:text-content-primary hover:bg-app transition-colors text-xs font-medium`}
         >
           <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -469,46 +501,51 @@ export default function HomePage() {
     <>
       <div className="flex h-screen bg-app">
         {/* ── Desktop Sidebar ──────────────────────── */}
-        <div className={`hidden md:flex bg-surface border-r border-subtle ${sidebarOpen ? 'w-64' : 'w-20'} transition-all duration-300 flex-col overflow-y-auto flex-shrink-0`}>
+        <div className={`hidden md:flex bg-surface border-r border-subtle ${sidebarOpen ? 'w-56' : 'w-[68px]'} transition-all duration-300 flex-col overflow-hidden flex-shrink-0`}>
           <SidebarContent />
         </div>
 
         {/* ── Mobile Sidebar Overlay ───────────────── */}
         {mobileSidebarOpen && (
           <div className="md:hidden fixed inset-0 z-50">
-            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setMobileSidebarOpen(false)} />
-            <div className="absolute left-0 top-0 bottom-0 w-72 bg-surface border-r border-subtle shadow-lg animate-slide-up" style={{ animationName: 'none', transform: 'none' }}>
+            <div className="absolute inset-0 bg-black/30" onClick={() => setMobileSidebarOpen(false)} />
+            <div className="absolute left-0 top-0 bottom-0 w-64 bg-surface border-r border-subtle shadow-lg">
               <SidebarContent isMobile />
             </div>
           </div>
         )}
 
         {/* ── Main Content ─────────────────────────── */}
-        <div className="flex-1 overflow-auto flex flex-col min-w-0">
-          {/* Upper Section */}
-          <div className="bg-surface border-b border-subtle flex flex-col justify-center flex-shrink-0 relative">
-            <div className="p-4 md:p-6 pb-4 flex flex-col md:flex-row gap-4 items-start md:items-center">
-              {/* Mobile hamburger */}
-              <button onClick={() => setMobileSidebarOpen(true)} className="md:hidden p-2 rounded bg-app text-content-secondary">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="flex-1 overflow-hidden flex flex-col min-w-0">
+          {/* Top chrome: title + search + actions */}
+          <header className="flex-shrink-0 bg-surface border-b border-subtle">
+            <div className="h-[52px] px-4 md:px-5 flex items-center gap-3">
+              <button onClick={() => setMobileSidebarOpen(true)} className="md:hidden h-8 w-8 flex items-center justify-center rounded text-content-secondary hover:bg-app">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
 
-              {/* Title */}
-              <div className="flex-1">
-                <h1 className="text-2xl md:text-3xl font-semibold text-content-primary mb-0.5">
+              <div className="min-w-0 hidden sm:block">
+                <h1 className="text-sm font-semibold text-content-primary leading-tight truncate">
                   {mode === 'buyer' ? 'Buyer Dashboard' : 'Seller Dashboard'}
                 </h1>
-                <p className="text-content-secondary text-sm">
-                  {mode === 'buyer'
-                    ? 'Welcome back! Manage your procurement activities here.'
-                    : 'Welcome back! Manage your vendor activities here.'}
-                </p>
               </div>
 
-              {/* Right Controls */}
-              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+              <div className="relative flex-1 max-w-sm min-w-0 mx-auto sm:mx-0 sm:ml-4">
+                <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-content-muted pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Search tenders..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full h-8 pl-8 pr-3 rounded border border-subtle bg-app text-content-primary placeholder-content-muted focus:outline-none focus:ring-2 focus:ring-brand-blue focus:bg-surface transition text-xs"
+                />
+              </div>
+
+              <div className="ml-auto flex items-center gap-1 flex-shrink-0">
                 <SlidingToggle
                   options={[
                     { value: 'buyer', label: 'Buyer' },
@@ -518,391 +555,256 @@ export default function HomePage() {
                   onChange={(v) => handleModeSwitch(v as 'buyer' | 'seller')}
                 />
 
-                {/* Notification Bell */}
+                <div className="w-px h-5 bg-subtle mx-1 hidden sm:block" />
+
+                <button
+                  onClick={() => setShowManageTokens(true)}
+                  className="h-8 px-2 rounded flex items-center gap-1.5 text-content-secondary hover:text-content-primary hover:bg-app transition-colors cursor-pointer"
+                  title="Manage Organization Tokens"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-xs font-semibold tabular-nums text-content-primary">
+                    {tokenBalance !== null ? tokenBalance.toLocaleString() : '—'}
+                  </span>
+                </button>
+
                 <button
                   onClick={() => setShowNotifications(true)}
-                  className="relative p-2.5 rounded bg-app hover:bg-subtle/60 border border-subtle text-content-secondary transition-all duration-200"
+                  className="relative h-8 w-8 flex items-center justify-center rounded text-content-secondary hover:text-content-primary hover:bg-app transition-colors"
                   title="Notifications"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                   </svg>
                   {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center tabular-nums">
-                      {unreadCount}
-                    </span>
+                    <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-rose-500 ring-2 ring-white" />
                   )}
                 </button>
 
-                {/* Search */}
-                <div className="flex-1 md:flex-initial" style={{ minWidth: '180px' }}>
-                  <input
-                    type="text"
-                    placeholder="Search tenders..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full px-4 py-2 rounded border border-subtle bg-app text-content-primary placeholder-content-muted focus:outline-none focus:ring-2 focus:ring-brand-blue focus:bg-surface transition text-sm"
-                  />
-                </div>
-
-                {/* Token capsule */}
                 <button
-                  onClick={() => setShowManageTokens(true)}
-                  className="rounded px-4 py-2 flex items-center gap-2 whitespace-nowrap bg-app hover:bg-subtle/40 border border-subtle transition-all duration-200 cursor-pointer group"
-                  title="Manage Organization Tokens (Shared Pool)"
+                  onClick={() => setRightSidebarOpen(true)}
+                  className="relative h-8 w-8 flex items-center justify-center rounded text-content-secondary hover:text-content-primary hover:bg-app transition-colors"
+                  title="Messages"
                 >
-                  <span className="text-content-secondary text-sm font-medium">Tokens:</span>
-                  <span className="text-content-primary text-lg font-semibold tabular-nums group-hover:text-brand-blue transition min-w-[28px] text-center inline-flex items-center justify-center">
-                    {tokenBalance !== null ? (
-                      tokenBalance.toLocaleString()
-                    ) : (
-                      <span className="inline-block w-8 h-4 bg-subtle rounded animate-pulse"></span>
-                    )}
-                  </span>
-                  <svg className="w-5 h-5 text-status-pending-text transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>
+                  {totalUnreadMessages > 0 && (
+                    <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-rose-500 ring-2 ring-white" />
+                  )}
                 </button>
-
-                {isOwner && (
-                  <button onClick={() => setShowOrgManagement(true)}
-                    className="rounded px-4 py-2 flex items-center gap-2 whitespace-nowrap font-medium text-sm transition-all duration-200 bg-surface text-content-primary border border-subtle hover:bg-app">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                    </svg>
-                    <span className="hidden sm:inline">Org Management</span>
-                  </button>
-                )}
               </div>
             </div>
 
-            {/* Stats - Collapsible */}
-            <div className="overflow-hidden transition-all duration-300 ease-in-out"
-              style={{ maxHeight: upperCollapsed ? '0px' : '500px', opacity: upperCollapsed ? 0 : (modeFadeIn ? 1 : 0) }}>
-              <div className="px-4 md:px-6 pb-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
+            {/* Page actions row */}
+            <div className="px-4 md:px-5 py-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-subtle">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-[11px] font-medium text-content-secondary bg-app border border-subtle px-2 py-0.5 rounded tabular-nums">
+                  {mode === 'buyer'
+                    ? `${filteredBuyerTenders.length} tenders · ${publishedCount} live`
+                    : `${filteredSellerTenders.length} open · ${sellerBidCount} bids`}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setUpperCollapsed(!upperCollapsed)}
+                  className="text-[11px] font-medium text-content-muted hover:text-content-primary transition-colors"
+                >
+                  {upperCollapsed ? 'Show metrics' : 'Hide metrics'}
+                </button>
+              </div>
+              {mode === 'buyer' ? (
+                <button type="button" onClick={() => router.push('/new-tender')}
+                  className="h-8 px-3 bg-brand-navy hover:bg-slate-900 text-white rounded text-xs font-medium flex items-center gap-1.5 transition-colors">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                  </svg>
+                  New Tender
+                </button>
+              ) : (
+                <button type="button" onClick={() => router.push('/view-my-bids')}
+                  className="h-8 px-3 bg-brand-navy hover:bg-slate-900 text-white rounded text-xs font-medium transition-colors">
+                  View My Bids
+                </button>
+              )}
+            </div>
+          </header>
+
+          <div className="flex-1 overflow-y-auto">
+            {/* KPI ribbon — cards on app canvas */}
+            <div
+              className="overflow-hidden transition-all duration-300 ease-in-out"
+              style={{ maxHeight: upperCollapsed ? '0px' : '220px', opacity: upperCollapsed ? 0 : (modeFadeIn ? 1 : 0) }}
+            >
+              <section className="px-4 md:px-5 pt-4 pb-1">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   {mode === 'buyer' ? (
                     <>
-                      <div className="bg-surface rounded border border-subtle p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-content-secondary text-xs font-medium">Total Published Tenders</p>
-                            <p className="text-2xl font-semibold text-content-primary mt-1 tabular-nums">{buyerTenders.filter(t => t.status === 'Published').length}</p>
-                          </div>
-                          <div className="w-10 h-10 bg-brand-navy rounded flex items-center justify-center text-white flex-shrink-0">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                            </svg>
-                          </div>
-                        </div>
+                      <div className="bg-surface border border-subtle rounded p-3 shadow-subtle-card">
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-content-muted">Published</p>
+                        <p className="text-xl font-bold text-content-primary tabular-nums mt-1">{publishedCount}</p>
+                        <p className="text-[11px] text-content-secondary mt-1">Open for bids</p>
                       </div>
-                      <div
-                        onClick={() => router.push('/ongoing-tenders')}
-                        className="bg-surface hover:bg-app rounded p-4 border border-subtle cursor-pointer transition group"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="flex items-center gap-1">
-                              <p className="text-content-secondary text-xs font-medium group-hover:text-brand-blue transition-colors">Accepted / Ongoing Tenders</p>
-                              <span className="text-xs text-content-muted">→</span>
-                            </div>
-                            <p className="text-2xl font-semibold text-content-primary mt-1 tabular-nums">{buyerTenders.filter(t => t.status === 'Awarded').length}</p>
-                          </div>
-                          <div className="w-10 h-10 bg-status-approved-bg rounded flex items-center justify-center text-status-approved-text flex-shrink-0">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                          </div>
-                        </div>
+                      <div className="bg-surface border border-subtle rounded p-3 shadow-subtle-card">
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-content-muted">Drafts</p>
+                        <p className="text-xl font-bold text-content-primary tabular-nums mt-1">{draftCount}</p>
+                        <p className="text-[11px] text-content-secondary mt-1">Not yet published</p>
                       </div>
-                      <div className="bg-surface rounded border border-subtle p-4 sm:col-span-2">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="text-content-secondary text-xs font-medium">
-                            Enlisted Vendors ({enlistedOrgs.filter(o => o.organization_type === 'Vendor').length})
-                          </p>
-                          <button
-                            onClick={() => router.push('/organizations')}
-                            className="text-xs text-brand-blue hover:text-blue-700 font-bold transition flex items-center gap-1"
-                          >
-                            + Find Vendors →
-                          </button>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {enlistedOrgs.filter(o => o.organization_type === 'Vendor').length === 0 ? (
-                            <span className="text-xs text-content-muted italic">No vendors enlisted yet. Explore the directory to enlist trusted suppliers.</span>
-                          ) : (
-                            enlistedOrgs.filter(o => o.organization_type === 'Vendor').map(v => (
-                              <button
-                                key={v.organization_id}
-                                onClick={() => router.push(`/organizations/${v.organization_id}`)}
-                                className="px-3 py-1 rounded text-xs text-content-primary bg-app hover:bg-subtle/60 border border-subtle font-medium transition cursor-pointer"
-                              >
-                                <span>{v.organization_name}</span>
-                              </button>
-                            ))
-                          )}
-                        </div>
-                      </div>
+                      <button type="button" onClick={() => router.push('/ongoing-tenders')}
+                        className="bg-surface border border-subtle rounded p-3 shadow-subtle-card text-left hover:border-content-muted transition cursor-pointer">
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-content-muted">Awarded</p>
+                        <p className="text-xl font-bold text-content-primary tabular-nums mt-1">{awardedCount}</p>
+                        <p className="text-[11px] text-brand-blue mt-1 font-medium">View ongoing →</p>
+                      </button>
+                      <button type="button" onClick={() => router.push('/organizations')}
+                        className="bg-surface border border-subtle rounded p-3 shadow-subtle-card text-left hover:border-content-muted transition cursor-pointer">
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-content-muted">Vendors</p>
+                        <p className="text-xl font-bold text-content-primary tabular-nums mt-1">{enlistedVendors.length}</p>
+                        <p className="text-[11px] text-brand-blue mt-1 font-medium">Find vendors →</p>
+                      </button>
                     </>
                   ) : (
                     <>
-                      <div className="bg-surface rounded border border-subtle p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-content-secondary text-xs font-medium">Tenders Bid On</p>
-                            <p className="text-2xl font-semibold text-content-primary mt-1 tabular-nums">{sellerBidCount}</p>
-                          </div>
-                          <div className="w-10 h-10 bg-brand-navy rounded flex items-center justify-center text-white flex-shrink-0">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                            </svg>
-                          </div>
-                        </div>
+                      <div className="bg-surface border border-subtle rounded p-3 shadow-subtle-card">
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-content-muted">Bids placed</p>
+                        <p className="text-xl font-bold text-content-primary tabular-nums mt-1">{sellerBidCount}</p>
+                        <p className="text-[11px] text-content-secondary mt-1">All tenders</p>
                       </div>
-                      <div
-                        onClick={() => router.push('/ongoing-tenders')}
-                        className="bg-surface hover:bg-app rounded p-4 border border-subtle cursor-pointer transition group"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="flex items-center gap-1">
-                              <p className="text-content-secondary text-xs font-medium group-hover:text-brand-blue transition-colors">Accepted Bids / Ongoing</p>
-                              <span className="text-xs text-content-muted">→</span>
-                            </div>
-                            <p className="text-2xl font-semibold text-content-primary mt-1 tabular-nums">{sellerOngoingCount}</p>
-                          </div>
-                          <div className="w-10 h-10 bg-status-approved-bg rounded flex items-center justify-center text-status-approved-text flex-shrink-0">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                          </div>
-                        </div>
+                      <button type="button" onClick={() => router.push('/ongoing-tenders')}
+                        className="bg-surface border border-subtle rounded p-3 shadow-subtle-card text-left hover:border-content-muted transition cursor-pointer">
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-content-muted">Accepted</p>
+                        <p className="text-xl font-bold text-content-primary tabular-nums mt-1">{sellerOngoingCount}</p>
+                        <p className="text-[11px] text-brand-blue mt-1 font-medium">View ongoing →</p>
+                      </button>
+                      <div className="bg-surface border border-subtle rounded p-3 shadow-subtle-card">
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-content-muted">Open now</p>
+                        <p className="text-xl font-bold text-content-primary tabular-nums mt-1">{filteredSellerTenders.length}</p>
+                        <p className="text-[11px] text-content-secondary mt-1">Matching filters</p>
                       </div>
-                      <div className="bg-surface rounded border border-subtle p-4 sm:col-span-2">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="text-content-secondary text-xs font-medium">
-                            Enlisted Buyers ({enlistedOrgs.filter(o => o.organization_type === 'Buyer').length})
-                          </p>
-                          <button
-                            onClick={() => router.push('/organizations')}
-                            className="text-xs text-brand-blue hover:text-blue-700 font-bold transition flex items-center gap-1"
-                          >
-                            + Find Buyers →
-                          </button>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {enlistedOrgs.filter(o => o.organization_type === 'Buyer').length === 0 ? (
-                            <span className="text-xs text-content-muted italic">No buyers enlisted yet. Explore the directory to find verified buyers.</span>
-                          ) : (
-                            enlistedOrgs.filter(o => o.organization_type === 'Buyer').map(b => (
-                              <button
-                                key={b.organization_id}
-                                onClick={() => router.push(`/organizations/${b.organization_id}`)}
-                                className="px-3 py-1 rounded text-xs text-content-primary bg-app hover:bg-subtle/60 border border-subtle font-medium transition cursor-pointer"
-                              >
-                                <span>{b.organization_name}</span>
-                              </button>
-                            ))
-                          )}
-                        </div>
-                      </div>
+                      <button type="button" onClick={() => router.push('/organizations')}
+                        className="bg-surface border border-subtle rounded p-3 shadow-subtle-card text-left hover:border-content-muted transition cursor-pointer">
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-content-muted">Buyers</p>
+                        <p className="text-xl font-bold text-content-primary tabular-nums mt-1">{enlistedBuyers.length}</p>
+                        <p className="text-[11px] text-brand-blue mt-1 font-medium">Find buyers →</p>
+                      </button>
                     </>
                   )}
                 </div>
-              </div>
+              </section>
             </div>
-          </div>
 
-          {/* Collapse chevron */}
-          <div className="flex justify-center flex-shrink-0" style={{ marginTop: '-14px', marginBottom: '-14px', position: 'relative', zIndex: 10 }}>
-            <button onClick={() => setUpperCollapsed(!upperCollapsed)}
-              className="w-7 h-7 rounded-full shadow-sm flex items-center justify-center bg-surface border border-subtle text-content-secondary hover:bg-app transition-all duration-200"
-              title={upperCollapsed ? 'Expand details' : 'Collapse details'}>
-              <svg className={`w-4 h-4 transition-transform duration-300 ${upperCollapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Lower Section */}
-          <div className="flex-1 bg-app overflow-y-auto">
-            {mode === 'seller' && (
-              <div className="pt-8 px-4 md:px-8 flex justify-center">
-                <SlidingToggle
-                  options={[
-                    { value: 'recommended', label: 'Available Tenders' },
-                    { value: 'enlisted', label: 'From My Enlisted Buyers' },
-                  ]}
-                  value={activeTab}
-                  onChange={(v) => handleTabSwitch(v as 'recommended' | 'enlisted')}
-                />
+            {/* List — no nested outer box; cards sit on canvas */}
+            <div className="px-4 md:px-5 py-4 transition-opacity duration-200" style={{ opacity: tabFadeIn ? 1 : 0 }}>
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <h2 className="text-sm font-semibold text-content-primary">
+                    {mode === 'buyer' ? 'Your Tenders' : (activeTab === 'enlisted' ? 'From Enlisted Buyers' : 'Available Tenders')}
+                  </h2>
+                  {mode === 'seller' && (
+                    <SlidingToggle
+                      options={[
+                        { value: 'recommended', label: 'All open' },
+                        { value: 'enlisted', label: 'Enlisted' },
+                      ]}
+                      value={activeTab}
+                      onChange={(v) => handleTabSwitch(v as 'recommended' | 'enlisted')}
+                    />
+                  )}
+                </div>
+                {mode === 'buyer' && (
+                  <select id="filter-dropdown"
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value as any)}
+                    className="h-8 bg-surface text-content-primary font-medium text-xs outline-none cursor-pointer rounded px-2.5 border border-subtle">
+                    <option value="all">All statuses</option>
+                    <option value="draft">Draft</option>
+                    <option value="published">Published</option>
+                    <option value="accepted">Accepted / Awarded</option>
+                    <option value="closed">Closed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                )}
               </div>
-            )}
 
-            <div className="transition-opacity duration-200 p-4 md:p-8 pt-6" style={{ opacity: tabFadeIn ? 1 : 0 }}>
               {mode === 'buyer' ? (
-                <>
-                  <div className="rounded p-4 md:p-8">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-                      <h2 className="text-2xl font-semibold text-content-primary">Your Tenders</h2>
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <div className="bg-surface border border-subtle rounded px-4 py-2 flex items-center gap-2">
-                          <label htmlFor="filter-dropdown" className="text-content-secondary font-medium text-sm">Filter:</label>
-                          <select id="filter-dropdown"
-                            value={filterStatus}
-                            onChange={(e) => setFilterStatus(e.target.value as any)}
-                            className="bg-surface text-content-primary font-medium text-sm outline-none cursor-pointer rounded px-2 py-1 border border-subtle">
-                            <option value="all">Show All</option>
-                            <option value="draft">Draft</option>
-                            <option value="published">Published</option>
-                            <option value="accepted">Accepted / Awarded</option>
-                            <option value="closed">Closed</option>
-                            <option value="cancelled">Cancelled</option>
-                          </select>
-                        </div>
-                        <button onClick={() => router.push('/organizations')}
-                          className="bg-surface text-content-primary border border-subtle text-sm font-medium h-9 px-3.5 rounded hover:bg-app transition-all">
-                          Find Organizations
-                        </button>
-                        <button onClick={() => router.push('/ongoing-tenders')}
-                          className="bg-surface text-content-primary border border-subtle text-sm font-medium h-9 px-3.5 rounded hover:bg-app transition-all">
-                          Ongoing Tenders
-                        </button>
-                        <button type="button" onClick={() => router.push('/new-tender')}
-                          className="bg-brand-navy text-white hover:bg-slate-900 text-sm font-medium h-9 px-3.5 rounded transition-all">
-                          + Create Tender
-                        </button>
-                      </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {tendersLoading ? (
+                    <div className="col-span-full flex justify-center py-12">
+                      <svg className="animate-spin h-7 w-7 text-brand-blue" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
                     </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                      {tendersLoading ? (
-                        <div className="col-span-full flex justify-center py-12">
-                          <svg className="animate-spin h-8 w-8 text-brand-blue" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                          </svg>
-                        </div>
-                      ) : filteredBuyerTenders.length === 0 ? (
-                        <div className="col-span-full text-center py-16">
-                          <svg className="w-12 h-12 text-content-muted mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                          </svg>
-                          <p className="text-content-muted text-lg font-medium">No tenders found matching your filter.</p>
-                        </div>
+                  ) : filteredBuyerTenders.length === 0 ? (
+                    <div className="col-span-full text-center py-14 bg-surface border border-subtle rounded">
+                      <p className="text-content-muted text-sm font-medium">No tenders found matching your filter.</p>
+                    </div>
+                  ) : (
+                    filteredBuyerTenders.map((tender) => (
+                      <TenderCard
+                        key={tender.tender_id}
+                        title={tender.title}
+                        subtitle={tender.description}
+                        vendor={tender.buyer_org_name}
+                        status={tender.status}
+                        deadline={tender.submission_deadline}
+                        onClick={() => router.push(`/view-my-tender/${tender.tender_id}`)}
+                      />
+                    ))
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {tendersLoading ? (
+                    <div className="col-span-full flex justify-center py-12">
+                      <svg className="animate-spin h-7 w-7 text-brand-blue" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                    </div>
+                  ) : filteredSellerTenders.length === 0 ? (
+                    <div className="col-span-full text-center py-14 px-4 bg-surface border border-subtle rounded">
+                      {activeTab === 'enlisted' ? (
+                        <>
+                          <p className="text-content-primary text-sm font-semibold">No tenders from your enlisted buyers</p>
+                          <p className="text-content-muted text-xs mt-1 max-w-md mx-auto mb-3">
+                            Enlist trusted buyer organizations to see their active and exclusive tenders here.
+                          </p>
+                          <button
+                            onClick={() => router.push('/organizations')}
+                            className="bg-brand-navy text-white hover:bg-slate-900 text-xs font-medium h-8 px-3 rounded transition"
+                          >
+                            + Discover & Enlist Buyers
+                          </button>
+                        </>
+                      ) : searchQuery.trim() ? (
+                        <>
+                          <p className="text-content-primary text-sm font-semibold">
+                            No tenders match &ldquo;{searchQuery.trim()}&rdquo;
+                          </p>
+                          <p className="text-content-muted text-xs mt-1">Try different or broader wording.</p>
+                        </>
                       ) : (
-                        filteredBuyerTenders
-                          .map((tender) => (
-                            <TenderCard
-                              key={tender.tender_id}
-                              title={tender.title}
-                              subtitle={tender.description}
-                              vendor={tender.buyer_org_name}
-                              status={tender.status}
-                              deadline={tender.submission_deadline}
-                              onClick={() => router.push(`/view-my-tender/${tender.tender_id}`)}
-                            />
-                          ))
+                        <p className="text-content-muted text-sm font-medium">No tenders available at the moment.</p>
                       )}
                     </div>
-                  </div>
-                </>
-              ) : (
-                <div className="rounded p-4 md:p-8">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-                    <h2 className="text-2xl font-semibold text-content-primary">Available Tenders</h2>
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <button onClick={() => router.push('/organizations')}
-                        className="bg-surface text-content-primary border border-subtle text-sm font-medium h-9 px-3.5 rounded hover:bg-app transition-all">
-                        Find Organizations
-                      </button>
-                      <button onClick={() => router.push('/ongoing-tenders')}
-                        className="bg-surface text-content-primary border border-subtle text-sm font-medium h-9 px-3.5 rounded hover:bg-app transition-all">
-                        Ongoing Tenders
-                      </button>
-                      <button onClick={() => router.push('/view-my-bids')}
-                        className="bg-brand-navy text-white hover:bg-slate-900 text-sm font-medium h-9 px-3.5 rounded transition-all">
-                        View My Bids
-                      </button>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    {tendersLoading ? (
-                      <div className="col-span-full flex justify-center py-12">
-                        <svg className="animate-spin h-8 w-8 text-brand-blue" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                      </div>
-                    ) : filteredSellerTenders.length === 0 ? (
-                      <div className="col-span-full text-center py-16 bg-surface rounded border border-subtle">
-                        <svg className="w-12 h-12 text-content-muted mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                        </svg>
-                        {activeTab === 'enlisted' ? (
-                          <>
-                            <p className="text-content-primary text-lg font-bold">No tenders from your enlisted buyers</p>
-                            <p className="text-content-muted text-sm mt-1 max-w-md mx-auto mb-4">
-                              Enlist trusted buyer organizations from the directory to see their active and exclusive tenders here.
-                            </p>
-                            <button
-                              onClick={() => router.push('/organizations')}
-                              className="bg-brand-navy text-white hover:bg-slate-900 text-sm font-medium h-9 px-3.5 rounded transition"
-                            >
-                              + Discover & Enlist Buyers
-                            </button>
-                          </>
-                        ) : searchQuery.trim() ? (
-                          <>
-                            <p className="text-content-primary text-lg font-bold">
-                              No tenders match &ldquo;{searchQuery.trim()}&rdquo;
-                            </p>
-                            <p className="text-content-muted text-sm mt-1 max-w-md mx-auto">
-                              Try different or broader wording.
-                            </p>
-                          </>
-                        ) : (
-                          <p className="text-content-muted text-lg font-medium">No tenders available at the moment.</p>
-                        )}
-                      </div>
-                    ) : (
-                      filteredSellerTenders.map((tender) => (
-                        <TenderCard
-                          key={tender.tender_id}
-                          title={tender.title}
-                          subtitle={tender.description}
-                          vendor={tender.buyer_org_name}
-                          onClick={() => router.push(`/bid-for-tender?id=${tender.tender_id}`)}
-                        />
-                      ))
-                    )}
-                  </div>
+                  ) : (
+                    filteredSellerTenders.map((tender) => (
+                      <TenderCard
+                        key={tender.tender_id}
+                        title={tender.title}
+                        subtitle={tender.description}
+                        vendor={tender.buyer_org_name}
+                        onClick={() => router.push(`/bid-for-tender?id=${tender.tender_id}`)}
+                      />
+                    ))
+                  )}
                 </div>
               )}
             </div>
           </div>
         </div>
-
-        {/* Right Sidebar Toggle */}
-        <button onClick={() => setRightSidebarOpen(true)}
-          className="hidden md:flex fixed right-0 top-1/2 -translate-y-1/2 z-40 rounded-l shadow-sm items-center justify-center transition-all duration-300 bg-surface border border-subtle text-content-secondary hover:bg-app"
-          style={{
-            width: '44px',
-            height: '110px',
-            opacity: rightSidebarOpen ? 0 : 1,
-            pointerEvents: rightSidebarOpen ? 'none' : 'auto',
-          }}
-          title="Open sidebar"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          {totalUnreadMessages > 0 && (
-            <span className="absolute -top-1.5 -left-1.5 min-w-[20px] h-[20px] px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center tabular-nums">
-              {totalUnreadMessages > 99 ? '99+' : totalUnreadMessages}
-            </span>
-          )}
-        </button>
 
         <MessagingSidebar isOpen={rightSidebarOpen} onClose={() => setRightSidebarOpen(false)} onUnreadCountChange={setTotalUnreadMessages} />
       </div>

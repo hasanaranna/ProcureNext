@@ -182,7 +182,7 @@ export default function AdminHomePage() {
     package_name: '',
     token_amount: '500',
     price_bdt: '400',
-    badge: 'Save 20%',
+    badge: '',
     is_active: true,
   });
   const [pkgSaving, setPkgSaving] = useState(false);
@@ -215,7 +215,7 @@ export default function AdminHomePage() {
       package_name: '',
       token_amount: '500',
       price_bdt: '400',
-      badge: 'Save 20%',
+      badge: '',
       is_active: true,
     });
     setPkgError(null);
@@ -692,7 +692,7 @@ export default function AdminHomePage() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>
-              + Create New Package
+              Create New Package
             </button>
           </div>
 
@@ -730,26 +730,25 @@ export default function AdminHomePage() {
                         : 'border-subtle bg-app opacity-75'
                     }`}
                   >
-                    {/* Header with badge */}
+                    {/* Header with status + optional marketing badge */}
                     <div className="flex items-start justify-between gap-2 mb-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-semibold text-content-primary text-sm">{pkg.package_name}</h4>
-                          <span
-                            onClick={() => handleTogglePackageStatus(pkg)}
-                            className={`cursor-pointer badge-status ${
-                              pkg.is_active ? 'badge-approved' : 'badge-draft'
-                            }`}
-                            title="Click to toggle active status"
-                          >
-                            <span className="badge-dot" />
-                            {pkg.is_active ? 'Active' : 'Disabled'}
-                          </span>
-                        </div>
+                      <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                        <h4 className="font-semibold text-content-primary text-sm">{pkg.package_name}</h4>
+                        <span
+                          onClick={() => handleTogglePackageStatus(pkg)}
+                          className={`cursor-pointer badge-status ${
+                            pkg.is_active ? 'badge-approved' : 'badge-draft'
+                          }`}
+                          title="Click to toggle active status"
+                        >
+                          <span className="badge-dot" />
+                          {pkg.is_active ? 'Active' : 'Disabled'}
+                        </span>
                       </div>
 
-                      {pkg.badge && (
-                        <span className="badge-status badge-pending">
+                      {pkg.badge && !/^save\s*\d/i.test(pkg.badge.trim()) && (
+                        <span className="badge-status badge-pending flex-shrink-0">
+                          <span className="badge-dot" />
                           {pkg.badge}
                         </span>
                       )}
@@ -891,15 +890,18 @@ export default function AdminHomePage() {
 
               <div>
                 <label className="block text-content-secondary text-xs font-medium uppercase mb-1.5">
-                  Badge / Tag (Optional)
+                  Marketing Badge (Optional)
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Save 20%, Popular, Best Value, Limited Offer"
+                  placeholder="e.g. Popular, Best Value, Limited Offer"
                   value={pkgForm.badge}
                   onChange={(e) => setPkgForm({ ...pkgForm, badge: e.target.value })}
                   className="w-full px-3.5 py-2.5 rounded border border-subtle text-sm font-medium text-content-primary focus:ring-2 focus:ring-brand-blue focus:border-transparent"
                 />
+                <p className="mt-1 text-[11px] text-content-muted">
+                  Savings % is calculated automatically below — use this for labels like “Popular”, not “Save 20%”.
+                </p>
               </div>
 
               <div className="flex items-center gap-2 pt-1">

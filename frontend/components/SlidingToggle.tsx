@@ -25,14 +25,14 @@ export default function SlidingToggle<T extends string>({
   options,
   value,
   onChange,
-  background = 'var(--color-brand-navy)',
+  background = 'var(--color-app)',
   boxShadow = 'none',
   pillColor = 'var(--color-surface)',
   activeTextColor = 'var(--color-content-primary)',
-  inactiveTextColor = 'var(--color-content-muted)',
-  paddingX = 'px-3.5',
+  inactiveTextColor = 'var(--color-content-secondary)',
+  paddingX = 'px-3',
   paddingY = 'py-1',
-  fontSize = 'text-sm',
+  fontSize = 'text-xs',
 }: SlidingToggleProps<T>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const btn0Ref = useRef<HTMLButtonElement>(null);

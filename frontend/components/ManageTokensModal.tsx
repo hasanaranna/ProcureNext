@@ -458,16 +458,12 @@ export default function ManageTokensModal({
                                   : 'border-subtle bg-surface hover:border-content-muted'
                               }`}
                             >
-                              {/* Custom Badge or Savings badge */}
-                              {pkg.badge ? (
+                              {/* Marketing badge only (savings shown below with price) */}
+                              {pkg.badge && !/^save\s*\d/i.test(pkg.badge.trim()) && (
                                 <span className="absolute -top-2.5 right-3 badge-status badge-approved">
                                   <span className="badge-dot" />{pkg.badge}
                                 </span>
-                              ) : pkg.savings_percentage > 0 ? (
-                                <span className="absolute -top-2.5 right-3 badge-status badge-approved">
-                                  <span className="badge-dot" />Save {pkg.savings_percentage}%
-                                </span>
-                              ) : null}
+                              )}
 
                               <div>
                                 <div className="flex items-center justify-between">

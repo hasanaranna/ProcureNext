@@ -103,11 +103,11 @@ export default function InvitationSection() {
   const pendingInvitations = invitations.filter((inv) => inv.status === 'Pending');
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       {/* Sub-tabs */}
       <div className="flex flex-shrink-0 border-b border-subtle">
         <button onClick={() => setActiveTab('invite')}
-          className={`flex-1 py-3 text-sm font-medium transition-all duration-200 border-b-2 ${
+          className={`flex-1 py-2.5 text-sm font-medium transition-all duration-200 border-b-2 ${
             activeTab === 'invite'
               ? 'border-brand-navy text-content-primary'
               : 'border-transparent text-content-muted hover:text-content-secondary'
@@ -115,7 +115,7 @@ export default function InvitationSection() {
           Invite
         </button>
         <button onClick={() => setActiveTab('sent')}
-          className={`flex-1 py-3 text-sm font-medium transition-all duration-200 border-b-2 ${
+          className={`flex-1 py-2.5 text-sm font-medium transition-all duration-200 border-b-2 ${
             activeTab === 'sent'
               ? 'border-brand-navy text-content-primary'
               : 'border-transparent text-content-muted hover:text-content-secondary'
@@ -130,16 +130,16 @@ export default function InvitationSection() {
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto p-6 md:p-8">
+      <div className="p-5">
         {activeTab === 'invite' ? (
-          <div className="max-w-lg mx-auto">
+          <div>
             <h3 className="text-sm font-semibold text-content-primary mb-1">Send an Invitation</h3>
-            <p className="text-content-secondary text-xs font-medium mb-6">
+            <p className="text-content-secondary text-xs font-medium mb-4">
               Enter the email address of the employee you&apos;d like to invite to your organization.
               An invitation link will be generated for you to share.
             </p>
 
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-3">
               <div>
                 <label htmlFor="invite-email" className="block text-xs font-medium text-content-secondary mb-1.5">
                   Email Address <span className="text-status-rejected-text">*</span>
@@ -207,19 +207,19 @@ export default function InvitationSection() {
         ) : (
           <div>
             <h3 className="text-sm font-semibold text-content-primary mb-1">Sent Invitations</h3>
-            <p className="text-content-secondary text-xs font-medium mb-6">
+            <p className="text-content-secondary text-xs font-medium mb-4">
               {loading ? 'Loading...' : invitations.length === 0 ? 'No invitations sent yet.' : `${invitations.length} invitation${invitations.length > 1 ? 's' : ''} total (${pendingInvitations.length} pending)`}
             </p>
 
             {loading ? (
-              <div className="flex justify-center py-12">
+              <div className="flex justify-center py-8">
                 <svg className="animate-spin h-8 w-8 text-brand-blue" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
               </div>
             ) : invitations.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+              <div className="flex flex-col items-center justify-center py-8 text-content-muted">
                 <svg className="w-12 h-12 mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
