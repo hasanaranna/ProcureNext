@@ -214,13 +214,13 @@ export default function OngoingTenderDetailPage() {
 
   if (loading) {
     return (
-      <main className="w-full min-h-screen py-10 px-4 flex items-center justify-center bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
+      <main className="w-full min-h-screen py-10 px-4 flex items-center justify-center bg-app">
         <div className="text-center">
-          <svg className="animate-spin h-10 w-10 text-accent-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24">
+          <svg className="animate-spin h-10 w-10 text-content-muted mx-auto mb-4" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          <p className="text-slate-300 text-lg font-medium">Loading ongoing tender details...</p>
+          <p className="text-content-muted text-lg font-medium">Loading ongoing tender details...</p>
         </div>
       </main>
     );
@@ -228,16 +228,16 @@ export default function OngoingTenderDetailPage() {
 
   if (error || !tender) {
     return (
-      <main className="w-full min-h-screen py-10 px-4 flex flex-col items-center justify-center gap-4 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
-        <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-2">
-          <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <main className="w-full min-h-screen py-10 px-4 flex flex-col items-center justify-center gap-4 bg-app">
+        <div className="w-16 h-16 rounded-full bg-status-rejected-bg flex items-center justify-center mb-2">
+          <svg className="w-8 h-8 text-status-rejected-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
-        <p className="text-red-400 text-lg font-medium text-center max-w-md">{error || 'Tender not found'}</p>
+        <p className="text-status-rejected-text text-lg font-medium text-center max-w-md">{error || 'Tender not found'}</p>
         <button
           onClick={() => router.push('/ongoing-tenders')}
-          className="px-6 py-2.5 bg-white text-navy-900 font-semibold rounded-xl hover:bg-slate-100 transition shadow-lg"
+          className="bg-brand-navy text-white hover:bg-slate-900 text-sm font-medium h-9 px-3.5 rounded transition"
         >
           Back to Ongoing Tenders
         </button>
@@ -246,12 +246,12 @@ export default function OngoingTenderDetailPage() {
   }
 
   return (
-    <main className="w-full min-h-screen py-10 px-4 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
+    <main className="w-full min-h-screen py-10 px-4 bg-app">
       <div className="max-w-5xl mx-auto animate-fade-in">
         {/* Navigation */}
         <button
           onClick={() => router.push('/ongoing-tenders')}
-          className="mb-6 flex items-center gap-2 text-slate-400 hover:text-white transition-colors duration-200"
+          className="mb-6 flex items-center gap-2 text-content-muted hover:text-content-primary transition-colors duration-200"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -260,26 +260,24 @@ export default function OngoingTenderDetailPage() {
         </button>
 
         {/* Top Header Card */}
-        <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden mb-8">
-          <div className="bg-gradient-to-r from-navy-900 via-navy-850 to-navy-800 p-8 text-white">
+        <div className="bg-surface rounded border border-subtle overflow-hidden mb-8">
+          <div className="bg-brand-navy p-8 text-white">
             <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="px-3 py-1 bg-white/10 text-slate-300 rounded-lg text-xs font-mono font-bold">
+                <span className="px-3 py-1 bg-white/10 text-slate-300 rounded text-xs font-mono font-medium tabular-nums">
                   Tender #{tender.tender_id}
                 </span>
                 {contractStatus === 'Completed' ? (
-                  <span className="px-3 py-1 bg-emerald-500/30 text-emerald-200 border border-emerald-400/40 rounded-lg text-xs font-bold flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-300" />
-                    Contract Completed
+                  <span className="badge-status badge-approved">
+                    <span className="badge-dot" />Contract Completed
                   </span>
                 ) : (
-                  <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-bold flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    Awarded & Active
+                  <span className="badge-status badge-approved">
+                    <span className="badge-dot" />Awarded & Active
                   </span>
                 )}
-                <span className="px-3 py-1 bg-accent-500/20 text-accent-300 border border-accent-500/30 rounded-lg text-xs font-bold">
-                  Award ID: #{tender.award_id}
+                <span className="badge-status badge-draft">
+                  <span className="badge-dot" />Award ID: #{tender.award_id}
                 </span>
               </div>
               <span className="text-xs text-slate-400 font-medium">
@@ -287,31 +285,31 @@ export default function OngoingTenderDetailPage() {
               </span>
             </div>
 
-            <h1 className="text-2xl md:text-3xl font-black mb-3 leading-tight">{tender.tender_title}</h1>
+            <h1 className="text-2xl md:text-3xl font-bold mb-3 leading-tight">{tender.tender_title}</h1>
             <p className="text-slate-300 text-sm leading-relaxed max-w-3xl">{tender.tender_description}</p>
           </div>
 
           {/* Key Metrics Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 bg-slate-50 border-t border-slate-200">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-subtle bg-app border-t border-subtle">
             <div className="p-6">
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Contract / Award Value</p>
-              <p className="text-2xl font-black text-emerald-600">
+              <p className="text-2xl font-bold text-status-approved-text tabular-nums">
                 ৳ {tender.winning_bid_amount?.toLocaleString() || '0'}
               </p>
             </div>
             <div className="p-6">
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Estimated Budget</p>
-              <p className="text-lg font-bold text-navy-900">
+              <p className="text-lg font-bold text-content-primary tabular-nums">
                 ৳ {tender.budget_min?.toLocaleString() || 'N/A'} - {tender.budget_max?.toLocaleString() || 'N/A'}
               </p>
             </div>
             <div className="p-6">
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Submission Deadline</p>
-              <p className="text-lg font-bold text-navy-900">{formatDate(tender.submission_deadline)}</p>
+              <p className="text-lg font-bold text-content-primary">{formatDate(tender.submission_deadline)}</p>
             </div>
             <div className="p-6">
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Your Role</p>
-              <p className="text-lg font-black capitalize text-accent-700">
+              <p className="text-lg font-bold capitalize text-content-primary">
                 {tender.role_in_tender === 'buyer' ? '🛒 Buyer (Issuer)' : '🏪 Winning Vendor'}
               </p>
             </div>
@@ -319,61 +317,61 @@ export default function OngoingTenderDetailPage() {
         </div>
 
         {/* Lifecycle / Progress Timeline */}
-        <div className="bg-white rounded-3xl p-8 shadow-2xl border border-slate-200 mb-8">
-          <h2 className="text-lg font-black text-navy-900 mb-6 flex items-center gap-2">
+        <div className="bg-surface rounded p-8 border border-subtle mb-8">
+          <h2 className="text-lg font-bold text-content-primary mb-6 flex items-center gap-2">
             <span>Procurement Lifecycle & Progress</span>
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 relative">
-            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 relative">
+            <div className="bg-status-approved-bg border border-status-approved-text/20 rounded p-4 relative">
               <div className="flex items-center gap-2 mb-1">
-                <span className="w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-bold flex items-center justify-center">
+                <span className="w-6 h-6 rounded bg-status-approved-text text-white text-xs font-bold flex items-center justify-center">
                   ✓
                 </span>
-                <h4 className="font-bold text-emerald-900 text-sm">1. Published</h4>
+                <h4 className="font-medium text-status-approved-text text-sm">1. Published</h4>
               </div>
-              <p className="text-xs text-emerald-700">Tender created & bidding opened</p>
+              <p className="text-xs text-content-secondary">Tender created & bidding opened</p>
             </div>
 
-            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 relative">
+            <div className="bg-status-approved-bg border border-status-approved-text/20 rounded p-4 relative">
               <div className="flex items-center gap-2 mb-1">
-                <span className="w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-bold flex items-center justify-center">
+                <span className="w-6 h-6 rounded bg-status-approved-text text-white text-xs font-bold flex items-center justify-center">
                   ✓
                 </span>
-                <h4 className="font-bold text-emerald-900 text-sm">2. Evaluated</h4>
+                <h4 className="font-medium text-status-approved-text text-sm">2. Evaluated</h4>
               </div>
-              <p className="text-xs text-emerald-700">Proposals reviewed & scored</p>
+              <p className="text-xs text-content-secondary">Proposals reviewed & scored</p>
             </div>
 
-            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 relative">
+            <div className="bg-status-approved-bg border border-status-approved-text/20 rounded p-4 relative">
               <div className="flex items-center gap-2 mb-1">
-                <span className="w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-bold flex items-center justify-center">
+                <span className="w-6 h-6 rounded bg-status-approved-text text-white text-xs font-bold flex items-center justify-center">
                   ✓
                 </span>
-                <h4 className="font-bold text-emerald-900 text-sm">3. Bid Accepted</h4>
+                <h4 className="font-medium text-status-approved-text text-sm">3. Bid Accepted</h4>
               </div>
-              <p className="text-xs text-emerald-700">Award recorded in database</p>
+              <p className="text-xs text-content-secondary">Award recorded in database</p>
             </div>
 
             {contractStatus === 'Completed' ? (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 relative shadow-sm">
+              <div className="bg-status-approved-bg border border-status-approved-text/20 rounded p-4 relative">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-bold flex items-center justify-center">
+                  <span className="w-6 h-6 rounded bg-status-approved-text text-white text-xs font-bold flex items-center justify-center">
                     ✓
                   </span>
-                  <h4 className="font-bold text-emerald-900 text-sm">4. Contract Completed</h4>
+                  <h4 className="font-medium text-status-approved-text text-sm">4. Contract Completed</h4>
                 </div>
-                <p className="text-xs text-emerald-700">Fulfillment finalized & reviews unlocked</p>
+                <p className="text-xs text-content-secondary">Fulfillment finalized & reviews unlocked</p>
               </div>
             ) : (
-              <div className="bg-accent-50 border-2 border-accent-400 rounded-2xl p-4 relative shadow-sm">
+              <div className="bg-status-pending-bg border border-status-pending-text/20 rounded p-4 relative">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="w-6 h-6 rounded-full bg-accent-600 text-white text-xs font-bold flex items-center justify-center animate-spin">
+                  <span className="w-6 h-6 rounded bg-status-pending-text text-white text-xs font-bold flex items-center justify-center animate-spin">
                     ⚙
                   </span>
-                  <h4 className="font-bold text-accent-900 text-sm">4. Contract Ongoing</h4>
+                  <h4 className="font-medium text-status-pending-text text-sm">4. Contract Ongoing</h4>
                 </div>
-                <p className="text-xs text-accent-700">Fulfillment & milestone execution</p>
+                <p className="text-xs text-content-secondary">Fulfillment & milestone execution</p>
               </div>
             )}
           </div>
@@ -382,14 +380,14 @@ export default function OngoingTenderDetailPage() {
         {/* Counterpart Organizations Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           {/* Buyer Card */}
-          <div className="bg-white rounded-3xl p-6 shadow-xl border border-slate-200">
+          <div className="bg-surface rounded p-6 border border-subtle">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 text-cyan-700 flex items-center justify-center text-xl font-bold">
+              <div className="w-12 h-12 rounded bg-brand-navy/10 text-brand-navy flex items-center justify-center text-xl font-bold">
                 🛒
               </div>
               <div>
                 <p className="text-xs font-bold text-slate-400 uppercase">Buyer Organization</p>
-                <h3 className="text-lg font-black text-navy-900">{tender.buyer_org_name}</h3>
+                <h3 className="text-lg font-bold text-content-primary">{tender.buyer_org_name}</h3>
               </div>
             </div>
             <div className="space-y-2 text-sm text-slate-600">
@@ -403,7 +401,7 @@ export default function OngoingTenderDetailPage() {
                     href={tender.buyer_org_website}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-accent-600 hover:underline"
+                    className="text-brand-blue hover:underline"
                   >
                     {tender.buyer_org_website}
                   </a>
@@ -413,14 +411,14 @@ export default function OngoingTenderDetailPage() {
           </div>
 
           {/* Vendor Card */}
-          <div className="bg-white rounded-3xl p-6 shadow-xl border border-slate-200">
+          <div className="bg-surface rounded p-6 border border-subtle">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-700 flex items-center justify-center text-xl font-bold">
+              <div className="w-12 h-12 rounded bg-status-approved-bg text-status-approved-text flex items-center justify-center text-xl font-bold">
                 🏆
               </div>
               <div>
-                <p className="text-xs font-bold text-emerald-600 uppercase">Winning Vendor</p>
-                <h3 className="text-lg font-black text-navy-900">{tender.vendor_org_name}</h3>
+                <p className="text-content-secondary text-xs font-medium uppercase">Winning Vendor</p>
+                <h3 className="text-lg font-bold text-content-primary">{tender.vendor_org_name}</h3>
               </div>
             </div>
             <div className="space-y-2 text-sm text-slate-600">
@@ -434,7 +432,7 @@ export default function OngoingTenderDetailPage() {
                     href={tender.vendor_org_website}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-accent-600 hover:underline"
+                    className="text-brand-blue hover:underline"
                   >
                     {tender.vendor_org_website}
                   </a>
@@ -445,18 +443,19 @@ export default function OngoingTenderDetailPage() {
         </div>
 
         {/* ── Contract Performance & Mutual Reviews (Custom Extension) ───────────── */}
-        <div className="bg-white rounded-3xl p-8 shadow-xl border border-slate-200 mb-8">
+        <div className="bg-surface rounded p-8 border border-subtle mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-xl">⭐</span>
-                <h3 className="text-lg font-black text-navy-900">Contract Lifecycle & Mutual Reviews</h3>
-                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                <h3 className="text-lg font-bold text-content-primary">Contract Lifecycle & Mutual Reviews</h3>
+                <span className={`badge-status ${
                   contractStatus === 'Completed'
-                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                    : 'bg-blue-100 text-blue-800 border border-blue-300'
+                    ? 'badge-approved'
+                    : 'badge-pending'
                 }`}>
-                  {contractStatus === 'Completed' ? '✓ Completed' : '⚡ Active Contract'}
+                  <span className="badge-dot" />
+                  {contractStatus === 'Completed' ? 'Completed' : 'Active Contract'}
                 </span>
               </div>
               <p className="text-xs text-slate-500">
@@ -469,7 +468,7 @@ export default function OngoingTenderDetailPage() {
                 <button
                   onClick={handleCompleteContract}
                   disabled={completingContract}
-                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition shadow flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="bg-brand-navy text-white hover:bg-slate-900 text-sm font-medium h-9 px-3.5 rounded transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   {completingContract ? 'Marking Complete...' : '✓ Mark Contract Completed'}
                 </button>
@@ -481,7 +480,7 @@ export default function OngoingTenderDetailPage() {
                     setReviewError(null);
                     setShowReviewModal(true);
                   }}
-                  className="px-4 py-2.5 bg-navy-900 hover:bg-navy-800 text-white text-xs font-bold rounded-xl transition shadow flex items-center gap-1.5 cursor-pointer"
+                  className="bg-brand-navy text-white hover:bg-slate-900 text-sm font-medium h-9 px-3.5 rounded transition flex items-center gap-1.5 cursor-pointer"
                 >
                   <span>⭐</span> Submit Mutual Review
                 </button>
@@ -490,13 +489,13 @@ export default function OngoingTenderDetailPage() {
           </div>
 
           {reviewSuccess && (
-            <div className="mt-4 p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-xl flex items-center gap-2">
+            <div className="mt-4 p-3.5 bg-status-approved-bg border border-status-approved-text/20 text-status-approved-text text-xs font-medium rounded flex items-center gap-2">
               <span>✓</span> {reviewSuccess}
             </div>
           )}
 
           {contractStatus !== 'Completed' && (
-            <div className="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-2xl flex items-center gap-3 text-xs text-slate-600">
+            <div className="mt-6 p-4 bg-app border border-subtle rounded flex items-center gap-3 text-xs text-content-secondary">
               <span className="text-lg">ℹ️</span>
               <span>
                 This contract is currently in <strong>Active</strong> progress. Once deliverables are delivered and approved, the Buyer can mark the contract as <strong>Completed</strong> to unlock reciprocal 1–5 star ratings.
@@ -517,11 +516,11 @@ export default function OngoingTenderDetailPage() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {reviews.map((rev) => (
-                  <div key={rev.review_id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+                  <div key={rev.review_id} className="p-4 bg-app rounded border border-subtle space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5 text-amber-500 font-bold text-sm">
                         {'★'.repeat(rev.overall_rating)}{'☆'.repeat(5 - rev.overall_rating)}
-                        <span className="text-navy-900 text-xs ml-1">({rev.overall_rating}/5.0)</span>
+                        <span className="text-content-primary text-xs ml-1">({rev.overall_rating}/5.0)</span>
                       </div>
                       <span className="px-2 py-0.5 bg-white border border-slate-200 text-[10px] font-bold text-slate-600 rounded-md">
                         {rev.party_role === 'BuyerToSeller' ? '🛒 Buyer → Seller' : '🏪 Seller → Buyer'}
@@ -546,7 +545,7 @@ export default function OngoingTenderDetailPage() {
                       )}
                     </div>
 
-                    <p className="text-xs text-slate-700 leading-relaxed bg-white p-3 rounded-xl border border-slate-100">
+                    <p className="text-xs text-content-secondary leading-relaxed bg-surface p-3 rounded border border-subtle">
                       &quot;{rev.review_text}&quot;
                     </p>
                     <p className="text-[10px] text-slate-400">
@@ -560,16 +559,16 @@ export default function OngoingTenderDetailPage() {
         </div>
 
         {/* Winning Proposal & Award Remarks */}
-        <div className="bg-white rounded-3xl p-8 shadow-xl border border-slate-200 mb-8">
-          <h3 className="text-lg font-black text-navy-900 mb-4">Winning Bid Proposal Details</h3>
+        <div className="bg-surface rounded p-8 border border-subtle mb-8">
+          <h3 className="text-lg font-bold text-content-primary mb-4">Winning Bid Proposal Details</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200">
+            <div className="bg-app rounded p-5 border border-subtle">
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Proposal Summary</p>
               <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
                 {tender.winning_bid_description || 'No specific proposal text provided.'}
               </p>
             </div>
-            <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200">
+            <div className="bg-app rounded p-5 border border-subtle">
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Award Remarks</p>
               <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
                 {tender.remarks || 'Tender awarded upon bid acceptance.'}
@@ -579,8 +578,8 @@ export default function OngoingTenderDetailPage() {
         </div>
 
         {/* Documents Hub */}
-        <div className="bg-white rounded-3xl p-8 shadow-xl border border-slate-200 mb-8">
-          <h3 className="text-lg font-black text-navy-900 mb-6">Contract & Associated Documents</h3>
+        <div className="bg-surface rounded p-8 border border-subtle mb-8">
+          <h3 className="text-lg font-bold text-content-primary mb-6">Contract & Associated Documents</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Tender Docs */}
@@ -595,19 +594,19 @@ export default function OngoingTenderDetailPage() {
                   {tender.tender_documents.map((doc) => (
                     <div
                       key={doc.tender_doc_id}
-                      className="flex items-center justify-between p-3.5 bg-slate-50 hover:bg-slate-100 rounded-2xl border border-slate-200 transition"
+                      className="flex items-center justify-between p-3.5 bg-app hover:bg-slate-100 rounded border border-subtle transition"
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <svg className="w-5 h-5 text-red-500 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
                         </svg>
-                        <span className="text-sm font-semibold text-navy-900 truncate">
+                        <span className="text-sm font-medium text-content-primary truncate">
                           {doc.file_name || 'Tender Document'}
                         </span>
                       </div>
                       <button
                         onClick={() => handleViewTenderDoc(doc.tender_doc_id)}
-                        className="text-xs font-bold text-accent-600 hover:text-accent-700 px-3 py-1.5 rounded-lg bg-accent-50 hover:bg-accent-100 transition flex-shrink-0"
+                        className="text-xs font-bold text-brand-blue hover:text-brand-blue/80 px-3 py-1.5 rounded bg-app hover:bg-slate-200 transition flex-shrink-0"
                       >
                         View
                       </button>
@@ -629,17 +628,17 @@ export default function OngoingTenderDetailPage() {
                   {tender.bid_documents.map((doc) => (
                     <div
                       key={doc.bid_doc_id}
-                      className="flex items-center justify-between p-3.5 bg-slate-50 hover:bg-slate-100 rounded-2xl border border-slate-200 transition"
+                      className="flex items-center justify-between p-3.5 bg-app hover:bg-slate-100 rounded border border-subtle transition"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <svg className="w-5 h-5 text-accent-600 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                        <svg className="w-5 h-5 text-brand-blue flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
                         </svg>
-                        <span className="text-sm font-semibold text-navy-900 truncate">{doc.document_type}</span>
+                        <span className="text-sm font-medium text-content-primary truncate">{doc.document_type}</span>
                       </div>
                       <button
                         onClick={() => handleViewBidDoc(doc.bid_doc_id)}
-                        className="text-xs font-bold text-accent-600 hover:text-accent-700 px-3 py-1.5 rounded-lg bg-accent-50 hover:bg-accent-100 transition flex-shrink-0"
+                        className="text-xs font-bold text-brand-blue hover:text-brand-blue/80 px-3 py-1.5 rounded bg-app hover:bg-slate-200 transition flex-shrink-0"
                       >
                         View
                       </button>
@@ -654,22 +653,22 @@ export default function OngoingTenderDetailPage() {
 
       {/* Review Modal */}
       {showReviewModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-slate-200 animate-scale-in">
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-200">
-              <h3 className="text-lg font-black text-navy-900 flex items-center gap-2">
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-surface rounded p-6 sm:p-8 max-w-lg w-full border border-subtle animate-fade-in">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-subtle">
+              <h3 className="text-lg font-bold text-content-primary flex items-center gap-2">
                 <span>⭐</span> Submit Mutual Performance Review
               </h3>
               <button
                 onClick={() => setShowReviewModal(false)}
-                className="text-slate-400 hover:text-navy-900 font-bold text-lg"
+                className="text-content-muted hover:text-content-primary font-medium text-lg"
               >
                 ✕
               </button>
             </div>
 
             {reviewError && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-xl">
+              <div className="mb-4 p-3 bg-status-rejected-bg border border-status-rejected-text/20 text-status-rejected-text text-xs font-medium rounded">
                 {reviewError}
               </div>
             )}
@@ -686,13 +685,13 @@ export default function OngoingTenderDetailPage() {
                       type="button"
                       onClick={() => setOverallRating(star)}
                       className={`text-2xl transition ${
-                        star <= overallRating ? 'text-amber-400 scale-110' : 'text-slate-200 hover:text-amber-200'
+                        star <= overallRating ? 'text-amber-400' : 'text-slate-200 hover:text-amber-200'
                       }`}
                     >
                       ★
                     </button>
                   ))}
-                  <span className="text-xs font-bold text-navy-900 ml-2">
+                  <span className="text-xs font-bold text-content-primary ml-2 tabular-nums">
                     {overallRating} of 5 Stars
                   </span>
                 </div>
@@ -704,7 +703,7 @@ export default function OngoingTenderDetailPage() {
                   <select
                     value={qualityScore}
                     onChange={(e) => setQualityScore(Number(e.target.value))}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold"
+                    className="w-full px-2.5 py-1.5 border border-subtle rounded text-xs font-semibold"
                   >
                     {[5, 4, 3, 2, 1].map(n => <option key={n} value={n}>{n} Stars</option>)}
                   </select>
@@ -714,7 +713,7 @@ export default function OngoingTenderDetailPage() {
                   <select
                     value={timelinessScore}
                     onChange={(e) => setTimelinessScore(Number(e.target.value))}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold"
+                    className="w-full px-2.5 py-1.5 border border-subtle rounded text-xs font-semibold"
                   >
                     {[5, 4, 3, 2, 1].map(n => <option key={n} value={n}>{n} Stars</option>)}
                   </select>
@@ -724,7 +723,7 @@ export default function OngoingTenderDetailPage() {
                   <select
                     value={communicationScore}
                     onChange={(e) => setCommunicationScore(Number(e.target.value))}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-semibold"
+                    className="w-full px-2.5 py-1.5 border border-subtle rounded text-xs font-semibold"
                   >
                     {[5, 4, 3, 2, 1].map(n => <option key={n} value={n}>{n} Stars</option>)}
                   </select>
@@ -742,7 +741,7 @@ export default function OngoingTenderDetailPage() {
                   value={reviewText}
                   onChange={(e) => setReviewText(e.target.value)}
                   placeholder="Describe counterparty responsiveness, delivery quality, compliance with specifications..."
-                  className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs text-navy-900 resize-none focus:outline-none focus:ring-2 focus:ring-navy-900"
+                  className="w-full px-3 py-2 border border-subtle rounded text-xs text-content-primary resize-none focus:outline-none focus:ring-2 focus:ring-brand-blue"
                 />
               </div>
 
@@ -750,14 +749,14 @@ export default function OngoingTenderDetailPage() {
                 <button
                   type="button"
                   onClick={() => setShowReviewModal(false)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition"
+                  className="px-4 py-2 text-xs font-medium text-content-secondary hover:bg-app rounded transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submittingReview}
-                  className="px-5 py-2 bg-navy-900 hover:bg-navy-800 text-white text-xs font-bold rounded-xl transition shadow disabled:opacity-50"
+                  className="bg-brand-navy text-white hover:bg-slate-900 text-sm font-medium h-9 px-3.5 rounded transition disabled:opacity-50"
                 >
                   {submittingReview ? 'Submitting...' : 'Submit Review'}
                 </button>

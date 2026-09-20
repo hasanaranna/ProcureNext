@@ -175,16 +175,18 @@ function SignupUserContent() {
     }
   };
 
+  const inputClass = "w-full px-3 py-2 border border-subtle rounded bg-surface text-content-primary placeholder-content-muted text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent transition";
+
   // ─── Loading ──────────────────────────────────────────────
   if (loading) {
     return (
-      <main className="w-full min-h-screen flex items-center justify-center bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
+      <main className="w-full min-h-screen flex items-center justify-center bg-app">
         <div className="text-center">
-          <svg className="animate-spin h-10 w-10 text-accent-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24">
+          <svg className="animate-spin h-8 w-8 text-brand-blue mx-auto mb-4" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          <p className="text-slate-300 text-lg">Validating invitation...</p>
+          <p className="text-content-secondary text-sm">Validating invitation...</p>
         </div>
       </main>
     );
@@ -193,21 +195,21 @@ function SignupUserContent() {
   // ─── Token error ──────────────────────────────────────────
   if (tokenError) {
     return (
-      <main className="w-full min-h-screen flex items-center justify-center py-12 px-4 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8 text-center animate-scale-in">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-50 flex items-center justify-center">
-            <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <main className="w-full min-h-screen flex items-center justify-center py-12 px-4 bg-app">
+        <div className="max-w-md w-full bg-surface rounded border border-subtle p-8 text-center">
+          <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-status-rejected-bg flex items-center justify-center">
+            <svg className="w-7 h-7 text-status-rejected-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
             </svg>
           </div>
-          <h2 className="text-2xl font-black text-navy-900 mb-2">Invitation Error</h2>
-          <p className="text-slate-600 mb-6 text-sm">
+          <h2 className="text-xl font-bold text-content-primary mb-2">Invitation Error</h2>
+          <p className="text-content-secondary mb-6 text-sm">
             {tokenError === "no-token"
               ? "No invitation token found. Please use the link provided in your invitation email."
               : tokenError}
           </p>
           <button onClick={() => router.push("/login")}
-            className="w-full py-3 bg-navy-900 text-white font-bold rounded-xl hover:bg-navy-800 transition">
+            className="w-full h-9 bg-brand-navy text-white text-sm font-medium rounded hover:bg-slate-900 transition">
             Go to Login
           </button>
         </div>
@@ -218,19 +220,19 @@ function SignupUserContent() {
   // ─── Success state ────────────────────────────────────────
   if (submitSuccess) {
     return (
-      <main className="w-full min-h-screen flex items-center justify-center py-12 px-4 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8 text-center animate-scale-in">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-50 flex items-center justify-center">
-            <svg className="w-8 h-8 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <main className="w-full min-h-screen flex items-center justify-center py-12 px-4 bg-app">
+        <div className="max-w-md w-full bg-surface rounded border border-subtle p-8 text-center">
+          <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-status-approved-bg flex items-center justify-center">
+            <svg className="w-7 h-7 text-status-approved-text" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-2xl font-black text-navy-900 mb-2">Account Created!</h2>
-          <p className="text-slate-600 mb-6 text-sm">
-            You have successfully joined <strong className="text-navy-900">{invitation?.organization_name}</strong>.
+          <h2 className="text-xl font-bold text-content-primary mb-2">Account Created!</h2>
+          <p className="text-content-secondary mb-6 text-sm">
+            You have successfully joined <strong className="text-content-primary">{invitation?.organization_name}</strong>.
           </p>
           <button onClick={() => router.push("/home")}
-            className="w-full py-3 bg-gradient-to-r from-navy-900 to-navy-800 text-white font-bold rounded-xl hover:from-navy-800 hover:to-navy-700 transition shadow-lg">
+            className="w-full h-9 bg-brand-navy text-white text-sm font-medium rounded hover:bg-slate-900 transition">
             Go to Dashboard
           </button>
         </div>
@@ -240,29 +242,26 @@ function SignupUserContent() {
 
   // ─── Registration Form ────────────────────────────────────
   return (
-    <main className="w-full min-h-screen flex items-center justify-center py-12 px-4 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800 relative overflow-x-hidden">
-      <div className="absolute top-1/4 right-1/4 w-72 h-72 bg-accent-500/5 rounded-full blur-3xl" />
-      <div className="absolute bottom-1/4 left-1/4 w-56 h-56 bg-accent-400/5 rounded-full blur-3xl" />
-
-      <div className="relative z-10 max-w-2xl mx-auto w-full animate-fade-in">
-        <div className="bg-white rounded-2xl shadow-2xl p-8 md:p-10 border border-slate-200">
+    <main className="w-full min-h-screen flex items-center justify-center py-12 px-4 bg-app">
+      <div className="max-w-2xl mx-auto w-full">
+        <div className="bg-surface rounded border border-subtle p-8 md:p-10">
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-accent-500 to-accent-600 flex items-center justify-center shadow-lg">
-              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-12 h-12 mx-auto mb-4 rounded bg-brand-navy flex items-center justify-center">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
               </svg>
             </div>
-            <h1 className="text-3xl font-black text-navy-900 mb-1">Join Your Organization</h1>
-            <p className="text-slate-500 text-sm">
-              Complete your profile to join <strong className="text-navy-900">{invitation?.organization_name}</strong>
+            <h1 className="text-2xl font-bold text-content-primary mb-1">Join Your Organization</h1>
+            <p className="text-content-secondary text-sm">
+              Complete your profile to join <strong className="text-content-primary">{invitation?.organization_name}</strong>
             </p>
           </div>
 
           {/* Error Message */}
           {submitError && (
-            <div className="mb-6 p-4 bg-red-50 border-2 border-red-200 rounded-xl text-red-700 text-sm flex items-start gap-3 animate-fade-in">
-              <svg className="w-5 h-5 flex-shrink-0 mt-0.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="mb-6 p-3 bg-status-rejected-bg border border-red-200 rounded text-status-rejected-text text-sm flex items-start gap-3">
+              <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <div>
@@ -274,50 +273,50 @@ function SignupUserContent() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="name" className="block text-sm font-semibold text-navy-900 mb-1.5">Full Name <span className="text-red-500">*</span></label>
+                <label htmlFor="name" className="block text-sm font-medium text-content-primary mb-1.5">Full Name <span className="text-status-rejected-text">*</span></label>
                 <input type="text" id="name" name="name" value={formData.name} onChange={handleChange} placeholder="Enter your full name" required
-                  className="w-full px-4 py-3 border border-slate-300 rounded-xl bg-white text-navy-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent transition" />
+                  className={inputClass} />
               </div>
               <div>
-                <label htmlFor="email" className="block text-sm font-semibold text-navy-900 mb-1.5">Email Address</label>
+                <label htmlFor="email" className="block text-sm font-medium text-content-primary mb-1.5">Email Address</label>
                 <input type="email" id="email" name="email" value={formData.email} disabled
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" />
+                  className="w-full px-3 py-2 border border-subtle rounded bg-app text-content-muted text-sm cursor-not-allowed" />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="phone" className="block text-sm font-semibold text-navy-900 mb-1.5">Phone Number <span className="text-red-500">*</span></label>
+                <label htmlFor="phone" className="block text-sm font-medium text-content-primary mb-1.5">Phone Number <span className="text-status-rejected-text">*</span></label>
                 <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleChange} placeholder="Enter your phone number" required
-                  className="w-full px-4 py-3 border border-slate-300 rounded-xl bg-white text-navy-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent transition" />
+                  className={inputClass} />
               </div>
               <div>
-                <label htmlFor="nid" className="block text-sm font-semibold text-navy-900 mb-1.5">National ID Number <span className="text-red-500">*</span></label>
+                <label htmlFor="nid" className="block text-sm font-medium text-content-primary mb-1.5">National ID Number <span className="text-status-rejected-text">*</span></label>
                 <input type="number" id="nid" name="nid" value={formData.nid} onChange={handleChange} placeholder="Enter your NID number" required
-                  className="w-full px-4 py-3 border border-slate-300 rounded-xl bg-white text-navy-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent transition" />
+                  className={inputClass} />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="date_of_birth" className="block text-sm font-semibold text-navy-900 mb-1.5">Date of Birth <span className="text-red-500">*</span></label>
+                <label htmlFor="date_of_birth" className="block text-sm font-medium text-content-primary mb-1.5">Date of Birth <span className="text-status-rejected-text">*</span></label>
                 <input type="date" id="date_of_birth" name="date_of_birth" value={formData.date_of_birth} onChange={handleChange} required
-                  className="w-full px-4 py-3 border border-slate-300 rounded-xl bg-white text-navy-900 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent transition" />
+                  className={inputClass} />
               </div>
               <div>
-                <label htmlFor="password" className="block text-sm font-semibold text-navy-900 mb-1.5">Password <span className="text-red-500">*</span></label>
+                <label htmlFor="password" className="block text-sm font-medium text-content-primary mb-1.5">Password <span className="text-status-rejected-text">*</span></label>
                 <input type="password" id="password" name="password" value={formData.password} onChange={handleChange} placeholder="Min 8 characters" required minLength={8}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-xl bg-white text-navy-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent transition" />
+                  className={inputClass} />
               </div>
             </div>
 
             {/* NID — Front & Back */}
             <div className="pt-2">
               <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-semibold text-navy-900">
-                  National ID (NID) <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-content-primary">
+                  National ID (NID) <span className="text-status-rejected-text">*</span>
                 </label>
-                <span className="text-xs text-slate-400">JPG or PNG image</span>
+                <span className="text-xs text-content-muted">JPG or PNG image</span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -327,35 +326,35 @@ function SignupUserContent() {
                   const label = field === 'nidFront' ? 'Front Side' : 'Back Side';
 
                   return (
-                    <div key={field} className={`p-4 border-2 rounded-2xl transition-all ${
-                      hasError ? 'border-red-400 bg-red-50/60' : file ? 'border-emerald-300 bg-emerald-50/50' : 'border-slate-300 bg-slate-50'
+                    <div key={field} className={`p-4 border rounded transition-all ${
+                      hasError ? 'border-red-400 bg-status-rejected-bg' : file ? 'border-emerald-300 bg-status-approved-bg' : 'border-subtle bg-app'
                     }`}>
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-bold text-navy-900">{label} <span className="text-red-500">*</span></span>
+                        <span className="text-xs font-medium text-content-primary">{label} <span className="text-status-rejected-text">*</span></span>
                         {file ? (
-                          <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">✓ Attached</span>
+                          <span className="badge-status badge-approved text-[10px]"><span className="badge-dot"></span>Attached</span>
                         ) : (
-                          <span className="text-[10px] bg-red-100 text-red-700 font-bold px-2 py-0.5 rounded-full">Required</span>
+                          <span className="badge-status badge-rejected text-[10px]"><span className="badge-dot"></span>Required</span>
                         )}
                       </div>
 
                       {file ? (
-                        <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-xl border border-slate-200">
-                          <span className="text-xs text-navy-900 font-medium truncate">{file.name} ({formatFileSize(file.size)})</span>
-                          <button type="button" onClick={() => removeNidFile(field, field)} className="text-red-500 hover:text-red-700 p-1 text-xs font-bold">
+                        <div className="flex items-center justify-between gap-2 p-2 bg-surface rounded border border-subtle">
+                          <span className="text-xs text-content-primary font-medium truncate">{file.name} ({formatFileSize(file.size)})</span>
+                          <button type="button" onClick={() => removeNidFile(field, field)} className="text-status-rejected-text hover:text-red-700 p-1 text-xs font-medium">
                             Remove
                           </button>
                         </div>
                       ) : (
-                        <label htmlFor={field} className="flex flex-col items-center justify-center p-4 border border-dashed border-slate-300 rounded-xl cursor-pointer hover:border-accent-400 bg-white transition">
-                          <svg className="w-6 h-6 text-slate-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <label htmlFor={field} className="flex flex-col items-center justify-center p-4 border border-dashed border-subtle rounded cursor-pointer hover:border-brand-blue bg-surface transition">
+                          <svg className="w-6 h-6 text-content-muted mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                           </svg>
-                          <span className="text-xs font-semibold text-accent-600">Select Image ({label})</span>
+                          <span className="text-xs font-medium text-brand-blue">Select Image ({label})</span>
                           <input id={field} type="file" accept="image/*" className="hidden" onChange={(e) => handleNidFile(field, e)} />
                         </label>
                       )}
-                      {hasError && <p className="text-xs text-red-600 font-semibold mt-1.5">{fileErrors[field]}</p>}
+                      {hasError && <p className="text-xs text-status-rejected-text font-medium mt-1.5">{fileErrors[field]}</p>}
                     </div>
                   );
                 })}
@@ -364,10 +363,10 @@ function SignupUserContent() {
 
             {/* Submit Button */}
             <button type="submit" disabled={isSubmitting}
-              className="w-full py-3.5 bg-gradient-to-r from-navy-900 to-navy-800 text-white font-bold rounded-xl hover:from-navy-800 hover:to-navy-700 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+              className="w-full h-9 bg-brand-navy text-white text-sm font-medium rounded hover:bg-slate-900 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
               {isSubmitting ? (
                 <>
-                  <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                  <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
@@ -378,9 +377,9 @@ function SignupUserContent() {
               )}
             </button>
 
-            <p className="text-center text-slate-500 text-sm">
+            <p className="text-center text-content-secondary text-sm">
               Already have an account?{" "}
-              <a href="/login" className="text-accent-600 font-semibold hover:text-accent-700 transition">Login here</a>
+              <a href="/login" className="text-brand-blue font-medium hover:text-blue-700 transition">Login here</a>
             </p>
           </form>
         </div>
@@ -392,13 +391,13 @@ function SignupUserContent() {
 export default function SignupUserPage() {
   return (
     <Suspense fallback={
-      <main className="w-full min-h-screen flex items-center justify-center bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
+      <main className="w-full min-h-screen flex items-center justify-center bg-app">
         <div className="text-center">
-          <svg className="animate-spin h-10 w-10 text-accent-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24">
+          <svg className="animate-spin h-8 w-8 text-brand-blue mx-auto mb-4" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          <p className="text-slate-300 text-lg">Loading...</p>
+          <p className="text-content-secondary text-sm">Loading...</p>
         </div>
       </main>
     }>

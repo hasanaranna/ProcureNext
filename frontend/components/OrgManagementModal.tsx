@@ -15,25 +15,25 @@ export default function OrgManagementModal({ isOpen, onClose }: OrgManagementMod
   const [section, setSection] = useState<'invitations' | 'roles'>('invitations');
 
   return (
-    <ModalShell isOpen={isOpen} onClose={onClose} maxWidth="none" width="80vw" height="80vh">
-      <div className="flex flex-col h-full">
+    <ModalShell isOpen={isOpen} onClose={onClose} maxWidth="max-w-xl">
+      <div className="flex flex-col max-h-[min(560px,85vh)]">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 md:px-8 py-5 flex-shrink-0 bg-gradient-to-r from-navy-950 to-navy-900">
+        <div className="flex items-center justify-between px-5 py-3.5 flex-shrink-0 bg-surface border-b border-subtle">
           <div>
-            <h2 className="text-xl md:text-2xl font-black text-white">Organization Management</h2>
-            <p className="text-slate-400 text-sm mt-0.5">Manage invitations and member roles</p>
+            <h2 className="text-sm font-semibold text-content-primary">Organization Management</h2>
+            <p className="text-content-secondary text-xs font-medium mt-0.5">Manage invitations and member roles</p>
           </div>
           <button onClick={onClose}
-            className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition"
+            className="w-8 h-8 rounded bg-transparent hover:bg-app text-content-secondary hover:text-content-primary flex items-center justify-center transition"
             title="Close">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
         {/* Toggle */}
-        <div className="flex justify-center py-4 flex-shrink-0 border-b border-slate-200 bg-white">
+        <div className="flex justify-center py-2.5 flex-shrink-0 border-b border-subtle bg-app">
           <SlidingToggle
             options={[
               { value: 'invitations', label: 'Invitations' },
@@ -44,8 +44,8 @@ export default function OrgManagementModal({ isOpen, onClose }: OrgManagementMod
           />
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-hidden bg-white">
+        {/* Content — scrolls only when needed */}
+        <div className="overflow-y-auto min-h-0 bg-surface">
           {section === 'invitations' ? (
             <InvitationSection />
           ) : (

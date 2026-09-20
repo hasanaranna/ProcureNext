@@ -1,0 +1,27 @@
+# ProcureNext Frontend Design Rules
+
+## Visual Guidelines & Aesthetics
+- Mimic the high-density, formal design language in @documents/design-system/reference-design.html.
+- Styling must feel like Zip HQ, Ramp, or Linear: razor-thin borders (1px #E2E8F0), compact padding, high typography contrast, and 0px-4px radius on functional badges.
+- Avoid generic AI styles: NO large blurred glow effects, NO floating multi-colored gradients, NO rounded pill-heavy SaaS clutter, and NO arbitrary padding (> 24px on data rows).
+- Numbers and financial figures must always use tabular figures: CSS `font-variant-numeric: tabular-nums` or Tailwind `tabular-nums`.
+
+## Color System (WCAG AAA Enterprise Palette)
+- Always use CSS variables or defined Tailwind tokens—NEVER hardcode raw hex values:
+  - Background: var(--bg-app) [#F8FAFC]
+  - Card/Surface: var(--surface-card) [#FFFFFF]
+  - Borders: var(--border-subtle) [#E2E8F0]
+  - Text Primary: var(--text-primary) [#0F172A]
+  - Text Secondary: var(--text-secondary) [#475569]
+  - Text Muted: var(--text-muted) [#94A3B8]
+  - Primary Brand/Action: var(--primary-navy) [#1E293B] or var(--primary-blue) [#2563EB]
+  - Status Approved: var(--status-approved-bg) [#ECFDF5] / var(--status-approved-text) [#047857]
+  - Status Pending: var(--status-pending-bg) [#FFFBEB] / var(--status-pending-text) [#B45309]
+  - Status Rejected: var(--status-rejected-bg) [#FEF2F2] / var(--status-rejected-text) [#B91C1C]
+  - Status Draft: var(--status-draft-bg) [#F1F5F9] / var(--status-draft-text) [#475569]
+
+## Preserving Core Logic (CRITICAL)
+- NEVER remove, modify, simplify, or mock existing React/Vue/Svelte hooks, API handlers, event emitters, query parameters, or form logic.
+- Do not replace real backend models or API fields with placeholder mock data unless explicitly requested.
+- If rewriting a component layout, preserve 100% of existing `onClick`, `onChange`, `onSubmit`, `key`, `id`, and data bindings.
+- NEVER truncate code with comments like `// ... rest of the code`. Always produce complete, functional files.

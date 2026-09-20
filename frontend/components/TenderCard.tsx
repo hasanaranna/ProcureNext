@@ -9,62 +9,66 @@ interface TenderCardProps {
   onClick?: () => void;
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  Draft: 'bg-slate-100 text-slate-700 border-slate-200',
-  Published: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  Closed: 'bg-amber-50 text-amber-800 border-amber-200',
-  Awarded: 'bg-violet-50 text-violet-700 border-violet-200',
-  Cancelled: 'bg-red-50 text-red-700 border-red-200',
+const STATUS_BADGE: Record<string, string> = {
+  Draft: 'badge-draft',
+  Published: 'badge-approved',
+  Closed: 'badge-pending',
+  Awarded: 'badge-approved',
+  Cancelled: 'badge-rejected',
+  Approved: 'badge-approved',
+  Pending: 'badge-pending',
+  Rejected: 'badge-rejected',
 };
 
 export default function TenderCard({ title, subtitle, vendor, status, deadline, onClick }: TenderCardProps) {
-  const statusClass = status ? STATUS_STYLES[status] || 'bg-slate-100 text-slate-700 border-slate-200' : '';
+  const badgeClass = status ? STATUS_BADGE[status] || 'badge-draft' : '';
 
   return (
     <div
       onClick={onClick}
-      className={`group bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col transition-all duration-300 ${
+      className={`group bg-surface border border-subtle rounded shadow-subtle-card overflow-hidden flex flex-col transition-colors ${
         vendor ? 'h-full' : ''
       } ${
         onClick
-          ? 'cursor-pointer hover:shadow-xl hover:scale-[1.02] hover:border-accent-300'
+          ? 'cursor-pointer hover:border-content-muted'
           : ''
       }`}
     >
-      <div className="p-5 flex-1">
-        <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-xl bg-navy-800 flex items-center justify-center text-white flex-shrink-0 shadow-sm group-hover:bg-accent-600 transition-colors duration-300">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="p-3.5 flex-1">
+        <div className="flex items-start gap-2.5">
+          <div className="w-8 h-8 rounded bg-brand-navy flex items-center justify-center text-white flex-shrink-0">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex flex-wrap items-center gap-2 mb-1">
+            <div className="flex flex-wrap items-center gap-1.5 mb-1">
               {status && (
-                <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border ${statusClass}`}>
+                <span className={`badge-status ${badgeClass}`}>
+                  <span className="badge-dot" />
                   {status}
                 </span>
               )}
               {deadline && (
-                <span className="text-[10px] font-semibold text-slate-500">
+                <span className="text-content-secondary text-[11px] font-medium tabular-nums">
                   Due {new Date(deadline).toLocaleDateString()}
                 </span>
               )}
             </div>
-            <h3 className="text-base font-bold text-navy-900 leading-snug group-hover:text-accent-700 transition-colors duration-300">
+            <h3 className="text-sm font-semibold text-content-primary leading-snug">
               {title}
             </h3>
-            <p className="text-sm text-slate-500 mt-1 line-clamp-2">
+            <p className="text-xs text-content-secondary mt-0.5 line-clamp-2">
               {subtitle}
             </p>
           </div>
         </div>
       </div>
       {vendor && (
-        <div className="bg-navy-900 px-5 py-3">
-          <p className="text-sm font-medium text-slate-300">
-            <span className="text-slate-500">Vendor: </span>
-            <span className="text-white">{vendor}</span>
+        <div className="border-t border-subtle bg-app px-3.5 py-2">
+          <p className="text-[11px] font-medium text-content-secondary truncate">
+            <span className="text-content-muted">Org: </span>
+            <span className="text-content-primary">{vendor}</span>
           </p>
         </div>
       )}

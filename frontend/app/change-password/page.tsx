@@ -73,41 +73,41 @@ export default function ChangePasswordPage() {
   };
 
   const inputClass =
-    "w-full px-4 py-3 border border-slate-300 rounded-xl bg-white text-navy-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent";
+    "w-full px-3 py-2 border border-subtle rounded bg-surface text-content-primary placeholder-content-muted text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent transition";
 
   return (
-    <main className="w-full min-h-screen py-10 px-4 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
-      <div className="max-w-md mx-auto animate-fade-in">
+    <main className="w-full min-h-screen py-10 px-4 bg-app">
+      <div className="max-w-md mx-auto">
         <button
           onClick={() => router.push("/home")}
-          className="mb-6 flex items-center gap-2 text-slate-400 hover:text-white transition-colors duration-200"
+          className="mb-6 flex items-center gap-2 text-content-secondary hover:text-content-primary transition-colors duration-200"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
           <span className="font-medium text-sm">Back to Dashboard</span>
         </button>
 
-        <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-8">
-          <h1 className="text-2xl font-black text-navy-900 mb-1">Change Password</h1>
-          <p className="text-sm text-slate-500 mb-6">
+        <div className="bg-surface rounded border border-subtle p-8">
+          <h1 className="text-xl font-bold text-content-primary mb-1">Change Password</h1>
+          <p className="text-sm text-content-secondary mb-6">
             Update your account password. You will stay signed in after saving.
           </p>
 
           {error && (
-            <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
+            <div className="mb-4 p-3 rounded bg-status-rejected-bg border border-red-200 text-status-rejected-text text-sm">
               {error}
             </div>
           )}
           {success && (
-            <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm">
+            <div className="mb-4 p-3 rounded bg-status-approved-bg border border-emerald-200 text-status-approved-text text-sm">
               {success}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label htmlFor="currentPassword" className="block text-sm font-semibold text-navy-900 mb-1">
+              <label htmlFor="currentPassword" className="block text-sm font-medium text-content-primary mb-1">
                 Current password
               </label>
               <input
@@ -122,7 +122,7 @@ export default function ChangePasswordPage() {
               />
             </div>
             <div>
-              <label htmlFor="newPassword" className="block text-sm font-semibold text-navy-900 mb-1">
+              <label htmlFor="newPassword" className="block text-sm font-medium text-content-primary mb-1">
                 New password
               </label>
               <input
@@ -138,7 +138,7 @@ export default function ChangePasswordPage() {
               />
             </div>
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-semibold text-navy-900 mb-1">
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-content-primary mb-1">
                 Confirm new password
               </label>
               <input
@@ -156,7 +156,7 @@ export default function ChangePasswordPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-3 rounded-xl bg-navy-900 text-white font-bold hover:bg-navy-800 disabled:opacity-50 transition"
+              className="w-full h-9 rounded bg-brand-navy text-white text-sm font-medium hover:bg-slate-900 disabled:opacity-50 transition"
             >
               {submitting ? "Saving..." : "Update Password"}
             </button>

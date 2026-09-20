@@ -10,23 +10,17 @@ import { getAdminUser, clearAdminSession } from "@/lib/auth";
 
 const stats = [
   { label: "Total Tokens Sold", value: "48,320", sub: "+1,240 this month",
-    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>),
-    color: "from-amber-400 to-amber-500" },
+    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) },
   { label: "Approved Owners", value: "312", sub: "+14 this month",
-    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>),
-    color: "from-accent-500 to-accent-600" },
+    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) },
   { label: "Pending Approvals", value: "5", sub: "Awaiting review",
-    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>),
-    color: "from-orange-400 to-orange-500" },
+    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) },
   { label: "Active Tenders", value: "87", sub: "Across all companies",
-    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>),
-    color: "from-violet-500 to-violet-600" },
+    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>) },
   { label: "Total Bids Placed", value: "2,641", sub: "+318 this month",
-    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" /></svg>),
-    color: "from-rose-400 to-rose-500" },
+    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" /></svg>) },
   { label: "Revenue (BDT)", value: "৳ 24,16,000", sub: "From token purchases",
-    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>),
-    color: "from-emerald-400 to-emerald-500" },
+    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>) },
 ];
 
 export default function AdminHomePage() {
@@ -188,7 +182,7 @@ export default function AdminHomePage() {
     package_name: '',
     token_amount: '500',
     price_bdt: '400',
-    badge: 'Save 20%',
+    badge: '',
     is_active: true,
   });
   const [pkgSaving, setPkgSaving] = useState(false);
@@ -221,7 +215,7 @@ export default function AdminHomePage() {
       package_name: '',
       token_amount: '500',
       price_bdt: '400',
-      badge: 'Save 20%',
+      badge: '',
       is_active: true,
     });
     setPkgError(null);
@@ -430,35 +424,33 @@ export default function AdminHomePage() {
     }
   };
 
-  const inputClass = "w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl bg-white text-navy-900 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent transition text-sm";
+  const inputClass = "w-full pl-10 pr-4 py-2.5 border border-subtle rounded bg-surface text-content-primary focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent transition text-sm";
 
   return (
-    <main className="min-h-screen bg-slate-50">
+    <main className="min-h-screen bg-app">
       {/* Top Bar */}
-      <header className="bg-gradient-to-r from-navy-950 to-navy-900 text-white px-6 md:px-8 py-4 flex items-center justify-between shadow-2xl sticky top-0 z-30">
-        <div className="flex flex-col gap-0.5">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent-400 to-accent-600 flex items-center justify-center shadow-lg">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
-            <span className="text-xl font-bold tracking-tight">ProcureNext</span>
+      <header className="bg-brand-navy text-white px-6 md:px-8 py-3 flex items-center justify-between border-b border-subtle sticky top-0 z-30">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded bg-brand-blue flex items-center justify-center">
+            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
           </div>
-          <span className="ml-12 px-2.5 py-0.5 bg-accent-500/20 text-accent-300 text-xs rounded-full font-bold w-fit border border-accent-500/30">
+          <span className="text-base font-semibold tracking-tight">ProcureNext</span>
+          <span className="px-2 py-0.5 bg-white/10 text-white/80 text-[10px] rounded font-semibold border border-white/15">
             ADMIN
           </span>
         </div>
 
-        <div className="flex flex-col items-end gap-1.5">
-          <div className="flex items-center gap-2 text-sm text-slate-300">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 text-sm text-white/70">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
             <span className="font-medium">{adminName}</span>
           </div>
           <button onClick={handleLogout}
-            className="flex items-center gap-2 px-4 py-1.5 text-sm font-medium text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 hover:border-white/20 transition-all duration-200 cursor-pointer">
+            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white/70 hover:text-white bg-white/5 hover:bg-white/10 rounded border border-white/10 transition cursor-pointer">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
@@ -467,11 +459,11 @@ export default function AdminHomePage() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-8 space-y-8 animate-fade-in">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 space-y-6 animate-fade-in">
         {/* Page Title */}
         <div>
-          <h1 className="text-3xl font-black text-navy-900">Dashboard Overview</h1>
-          <p className="text-slate-500 mt-1 text-sm">Monitor platform activity and manage registrations.</p>
+          <h1 className="text-xl font-semibold text-content-primary">Dashboard Overview</h1>
+          <p className="text-content-secondary mt-0.5 text-sm">Monitor platform activity and manage registrations.</p>
         </div>
 
         {/* Stats Grid */}
@@ -479,14 +471,14 @@ export default function AdminHomePage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {stats.map((stat, i) => (
               <div key={i}
-                className="bg-white rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4 px-5 py-5 hover:shadow-lg hover:scale-[1.01] transition-all duration-300">
-                <div className={`bg-gradient-to-br ${stat.color} text-white rounded-xl p-3 flex-shrink-0 shadow-md`}>
+                className="bg-surface rounded border border-subtle flex items-center gap-4 px-4 py-4">
+                <div className="bg-app text-content-secondary rounded p-2.5 flex-shrink-0 border border-subtle">
                   {stat.icon}
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">{stat.label}</p>
-                  <p className="text-2xl font-black text-navy-900 mt-0.5">{stat.value}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">{stat.sub}</p>
+                  <p className="text-content-secondary text-xs font-medium uppercase tracking-wider">{stat.label}</p>
+                  <p className="text-lg font-semibold text-content-primary tabular-nums mt-0.5">{stat.value}</p>
+                  <p className="text-content-muted text-xs mt-0.5">{stat.sub}</p>
                 </div>
               </div>
             ))}
@@ -494,76 +486,76 @@ export default function AdminHomePage() {
         </section>
 
         {/* Pending Approvals */}
-        <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="px-6 py-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <section className="bg-surface rounded border border-subtle overflow-hidden">
+          <div className="px-5 py-4 border-b border-subtle flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-bold text-navy-900">Pending Master Account Approvals</h2>
-              <p className="text-sm text-slate-500 mt-0.5">Review and approve or reject company owner registrations.</p>
+              <h2 className="text-sm font-semibold text-content-primary">Pending Master Account Approvals</h2>
+              <p className="text-xs text-content-secondary mt-0.5">Review and approve or reject company owner registrations.</p>
             </div>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 text-sm font-bold rounded-full border border-amber-200">
-              <span className="w-2 h-2 bg-amber-500 rounded-full inline-block animate-pulse"></span>
+            <span className="badge-status badge-pending">
+              <span className="badge-dot" />
               {pending.filter((r) => !approvedIds.includes(r.id) && !rejectedIds.includes(r.id)).length} Pending
             </span>
           </div>
 
           <div className="overflow-x-auto">
             {loadingPending ? (
-              <div className="flex flex-col items-center justify-center py-16">
-                <svg className="animate-spin h-8 w-8 text-accent-500 mb-3" fill="none" viewBox="0 0 24 24">
+              <div className="flex flex-col items-center justify-center py-12">
+                <svg className="animate-spin h-6 w-6 text-content-muted mb-3" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                <p className="text-sm text-slate-400">Loading pending accounts…</p>
+                <p className="text-sm text-content-muted">Loading pending accounts…</p>
               </div>
             ) : pendingError ? (
-              <div className="py-12 text-center">
-                <p className="text-sm text-red-500">{pendingError}</p>
+              <div className="py-10 text-center">
+                <p className="text-sm text-status-rejected-text">{pendingError}</p>
               </div>
             ) : pending.length === 0 ? (
-              <div className="py-12 text-center">
-                <svg className="w-10 h-10 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="py-10 text-center">
+                <svg className="w-8 h-8 text-content-muted mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <p className="text-sm text-slate-400">No pending accounts to review.</p>
+                <p className="text-sm text-content-muted">No pending accounts to review.</p>
               </div>
             ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-slate-50 text-slate-400 uppercase text-xs tracking-wider">
-                  <th className="px-6 py-3 text-left font-semibold">#</th>
-                  <th className="px-6 py-3 text-left font-semibold">Full Name</th>
-                  <th className="px-6 py-3 text-left font-semibold">Company Name</th>
-                  <th className="px-6 py-3 text-left font-semibold">Email Address</th>
-                  <th className="px-6 py-3 text-left font-semibold">Submitted</th>
-                  <th className="px-6 py-3 text-left font-semibold">Status</th>
-                  <th className="px-6 py-3 text-left font-semibold"></th>
+                <tr className="bg-app text-content-secondary uppercase text-xs tracking-wider">
+                  <th className="px-5 py-2.5 text-left font-medium">#</th>
+                  <th className="px-5 py-2.5 text-left font-medium">Full Name</th>
+                  <th className="px-5 py-2.5 text-left font-medium">Company Name</th>
+                  <th className="px-5 py-2.5 text-left font-medium">Email Address</th>
+                  <th className="px-5 py-2.5 text-left font-medium">Submitted</th>
+                  <th className="px-5 py-2.5 text-left font-medium">Status</th>
+                  <th className="px-5 py-2.5 text-left font-medium"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-subtle">
                 {pending.map((reg, idx) => {
                   const isApproved = approvedIds.includes(reg.id);
                   const isRejected = rejectedIds.includes(reg.id);
                   const isActioned = isApproved || isRejected;
 
                   return (
-                    <tr key={reg.id} className={`transition ${isActioned ? "opacity-40" : "hover:bg-slate-50"}`}>
-                      <td className="px-6 py-4 text-slate-400 font-medium">{idx + 1}</td>
-                      <td className="px-6 py-4 font-semibold text-navy-900">{reg.name}</td>
-                      <td className="px-6 py-4 text-slate-600">{reg.company}</td>
-                      <td className="px-6 py-4 text-slate-500">{reg.email}</td>
-                      <td className="px-6 py-4 text-slate-400">{reg.submittedAt}</td>
-                      <td className="px-6 py-4">
+                    <tr key={reg.id} className={`transition ${isActioned ? "opacity-40" : "hover:bg-app"}`}>
+                      <td className="px-5 py-3 text-content-muted font-medium tabular-nums">{idx + 1}</td>
+                      <td className="px-5 py-3 font-medium text-content-primary">{reg.name}</td>
+                      <td className="px-5 py-3 text-content-secondary">{reg.company}</td>
+                      <td className="px-5 py-3 text-content-secondary">{reg.email}</td>
+                      <td className="px-5 py-3 text-content-muted">{reg.submittedAt}</td>
+                      <td className="px-5 py-3">
                         {isApproved ? (
-                          <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200">Approved</span>
+                          <span className="badge-status badge-approved"><span className="badge-dot" />Approved</span>
                         ) : isRejected ? (
-                          <span className="px-2.5 py-1 bg-red-50 text-red-600 text-xs font-bold rounded-full border border-red-200">Rejected</span>
+                          <span className="badge-status badge-rejected"><span className="badge-dot" />Rejected</span>
                         ) : (
-                          <span className="px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-full border border-amber-200">Pending</span>
+                          <span className="badge-status badge-pending"><span className="badge-dot" />Pending</span>
                         )}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-5 py-3">
                         <button onClick={() => handleViewDetails(reg)}
-                          className="px-4 py-1.5 text-white text-xs font-semibold rounded-lg transition shadow-sm bg-navy-900 hover:bg-navy-800 cursor-pointer">
+                          className="bg-brand-navy text-white hover:bg-slate-900 text-sm font-medium h-9 px-3.5 rounded cursor-pointer">
                           View Details
                         </button>
                       </td>
@@ -586,17 +578,17 @@ export default function AdminHomePage() {
         />
 
         {/* Token & Rate Settings */}
-        <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="px-6 py-5 border-b border-slate-200">
-            <h2 className="text-lg font-bold text-navy-900">Token & Rate Configuration</h2>
-            <p className="text-sm text-slate-500 mt-0.5">Set platform-wide token pricing and activity rates (in BDT tokens).</p>
+        <section className="bg-surface rounded border border-subtle overflow-hidden">
+          <div className="px-5 py-4 border-b border-subtle">
+            <h2 className="text-sm font-semibold text-content-primary">Token & Rate Configuration</h2>
+            <p className="text-xs text-content-secondary mt-0.5">Set platform-wide token pricing and activity rates (in BDT tokens).</p>
           </div>
 
-          <form onSubmit={handlePricingSave} className="px-6 py-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <form onSubmit={handlePricingSave} className="px-5 py-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div>
-                <label className="block text-sm font-semibold text-navy-900 mb-1">Token Price (BDT per token)</label>
-                <p className="text-xs text-slate-400 mb-2">How much a user pays in BDT to purchase one token.</p>
+                <label className="block text-sm font-medium text-content-primary mb-1">Token Price (BDT per token)</label>
+                <p className="text-content-secondary text-xs font-medium mb-2">How much a user pays in BDT to purchase one token.</p>
                 <div className="relative">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-semibold text-sm">৳</span>
                   <input type="number" name="pricePerToken" min="0.01" step="any" value={tokenPricing.pricePerToken}
@@ -605,8 +597,8 @@ export default function AdminHomePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-navy-900 mb-1">Tender Submission Rate (tokens)</label>
-                <p className="text-xs text-slate-400 mb-2">Tokens deducted when a company submits a new tender.</p>
+                <label className="block text-sm font-medium text-content-primary mb-1">Tender Submission Rate (tokens)</label>
+                <p className="text-content-secondary text-xs font-medium mb-2">Tokens deducted when a company submits a new tender.</p>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-yellow-500">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -619,8 +611,8 @@ export default function AdminHomePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-navy-900 mb-1">Bid Submission Rate (tokens)</label>
-                <p className="text-xs text-slate-400 mb-2">Tokens deducted each time a user places a bid on a tender.</p>
+                <label className="block text-sm font-medium text-content-primary mb-1">Bid Submission Rate (tokens)</label>
+                <p className="text-content-secondary text-xs font-medium mb-2">Tokens deducted each time a user places a bid on a tender.</p>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-yellow-500">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -634,22 +626,22 @@ export default function AdminHomePage() {
             </div>
 
             {/* Summary preview */}
-            <div className="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-xl">
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Current Rate Summary</p>
+            <div className="mt-5 p-4 bg-app border border-subtle rounded">
+              <p className="text-content-secondary text-xs font-medium uppercase tracking-wider mb-3">Current Rate Summary</p>
               <div className="flex flex-wrap gap-3">
                 {[{ label: "1 Token", val: `৳ ${tokenPricing.pricePerToken}` }].map((item, i) => (
-                  <div key={i} className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm shadow-sm">
-                    <span className="text-slate-500">{item.label}:</span>
-                    <span className="font-bold text-navy-900">{item.val}</span>
+                  <div key={i} className="flex items-center gap-2 bg-surface border border-subtle rounded px-3 py-2 text-sm">
+                    <span className="text-content-secondary">{item.label}:</span>
+                    <span className="font-semibold text-content-primary tabular-nums">{item.val}</span>
                   </div>
                 ))}
                 {[
                   { label: "Submit Tender", val: tokenPricing.tenderSubmitRate },
                   { label: "Place Bid", val: tokenPricing.bidRate },
                 ].map((item, i) => (
-                  <div key={`tkn-${i}`} className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm shadow-sm">
-                    <span className="text-slate-500">{item.label}:</span>
-                    <span className="font-bold text-navy-900">{item.val}</span>
+                  <div key={`tkn-${i}`} className="flex items-center gap-2 bg-surface border border-subtle rounded px-3 py-2 text-sm">
+                    <span className="text-content-secondary">{item.label}:</span>
+                    <span className="font-semibold text-content-primary tabular-nums">{item.val}</span>
                     <svg className="w-4 h-4 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
@@ -659,9 +651,9 @@ export default function AdminHomePage() {
             </div>
 
             {/* Save Button */}
-            <div className="mt-6 flex flex-wrap items-center gap-4">
+            <div className="mt-5 flex flex-wrap items-center gap-4">
               <button type="submit" disabled={pricingSaving}
-                className="px-6 py-2.5 bg-gradient-to-r from-navy-900 to-navy-800 text-white text-sm font-bold rounded-xl hover:from-navy-800 hover:to-navy-700 transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 cursor-pointer">
+                className="bg-brand-navy text-white hover:bg-slate-900 text-sm font-medium h-9 px-3.5 rounded disabled:opacity-50 cursor-pointer">
                 {pricingSaving ? "Saving Rates..." : "Save Changes"}
               </button>
               {pricingSaved && (
@@ -684,37 +676,28 @@ export default function AdminHomePage() {
         {/* ============================================================ */}
         {/* Token Packages Management Section */}
         {/* ============================================================ */}
-        <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-6 md:p-8 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <section className="bg-surface rounded border border-subtle overflow-hidden">
+          <div className="px-5 py-4 border-b border-subtle flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-600">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                  </svg>
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-navy-900">Token Bundles & Discount Packages</h2>
-                  <p className="text-sm text-slate-500 mt-0.5">
-                    Create custom bundles (e.g. 500 tokens for ৳400). Sellers and buyers will see these with live savings % badges.
-                  </p>
-                </div>
-              </div>
+              <h2 className="text-sm font-semibold text-content-primary">Token Bundles & Discount Packages</h2>
+              <p className="text-xs text-content-secondary mt-0.5">
+                Create custom bundles (e.g. 500 tokens for ৳400). Sellers and buyers will see these with live savings % badges.
+              </p>
             </div>
 
             <button
               onClick={handleOpenCreatePackage}
-              className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-navy-950 font-black text-sm rounded-xl transition-all duration-200 shadow-md shadow-amber-500/20 hover:scale-[1.02] flex items-center gap-2 cursor-pointer whitespace-nowrap"
+              className="bg-brand-navy text-white hover:bg-slate-900 text-sm font-medium h-9 px-3.5 rounded flex items-center gap-2 cursor-pointer whitespace-nowrap"
             >
-              <svg className="w-4 h-4 text-navy-950" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>
-              + Create New Package
+              Create New Package
             </button>
           </div>
 
           {pkgSuccess && (
-            <div className="mx-6 md:mx-8 mt-4 p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-700 text-sm font-semibold flex items-center gap-2 animate-fade-in">
+            <div className="mx-5 mt-4 p-3 bg-status-approved-bg border border-subtle rounded text-status-approved-text text-sm font-medium flex items-center gap-2 animate-fade-in">
               <svg className="w-5 h-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
@@ -722,52 +705,50 @@ export default function AdminHomePage() {
             </div>
           )}
 
-          <div className="p-6 md:p-8">
+          <div className="p-5">
             {loadingPackages ? (
-              <div className="py-12 text-center text-slate-400">
-                <svg className="animate-spin h-7 w-7 text-amber-500 mx-auto mb-2" fill="none" viewBox="0 0 24 24">
+              <div className="py-10 text-center text-content-muted">
+                <svg className="animate-spin h-6 w-6 text-content-muted mx-auto mb-2" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
                 Loading token packages...
               </div>
             ) : packages.length === 0 ? (
-              <div className="py-12 text-center text-slate-400 bg-slate-50 rounded-2xl border border-slate-200">
-                <p className="text-sm font-semibold">No token packages created yet.</p>
-                <p className="text-xs text-slate-400 mt-1">Click "+ Create New Package" above to add your first package bundle.</p>
+              <div className="py-10 text-center text-content-muted bg-app rounded border border-subtle">
+                <p className="text-sm font-medium">No token packages created yet.</p>
+                <p className="text-xs text-content-muted mt-1">Click "+ Create New Package" above to add your first package bundle.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                 {packages.map((pkg) => (
                   <div
                     key={pkg.package_id}
-                    className={`relative rounded-2xl p-5 border-2 transition-all flex flex-col justify-between ${
+                    className={`relative rounded border p-4 transition-all flex flex-col justify-between ${
                       pkg.is_active
-                        ? 'border-slate-200 bg-white hover:border-amber-400 hover:shadow-md'
-                        : 'border-slate-200 bg-slate-50/70 opacity-75'
+                        ? 'border-subtle bg-surface hover:border-brand-blue'
+                        : 'border-subtle bg-app opacity-75'
                     }`}
                   >
-                    {/* Header with badge */}
+                    {/* Header with status + optional marketing badge */}
                     <div className="flex items-start justify-between gap-2 mb-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-extrabold text-navy-900 text-base">{pkg.package_name}</h4>
-                          <span
-                            onClick={() => handleTogglePackageStatus(pkg)}
-                            className={`cursor-pointer px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                              pkg.is_active
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : 'bg-slate-100 text-slate-500 border border-slate-200'
-                            }`}
-                            title="Click to toggle active status"
-                          >
-                            {pkg.is_active ? 'Active' : 'Disabled'}
-                          </span>
-                        </div>
+                      <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                        <h4 className="font-semibold text-content-primary text-sm">{pkg.package_name}</h4>
+                        <span
+                          onClick={() => handleTogglePackageStatus(pkg)}
+                          className={`cursor-pointer badge-status ${
+                            pkg.is_active ? 'badge-approved' : 'badge-draft'
+                          }`}
+                          title="Click to toggle active status"
+                        >
+                          <span className="badge-dot" />
+                          {pkg.is_active ? 'Active' : 'Disabled'}
+                        </span>
                       </div>
 
-                      {pkg.badge && (
-                        <span className="px-2 py-0.5 bg-gradient-to-r from-amber-500 to-yellow-500 text-navy-950 font-black text-[10px] rounded-full uppercase shadow-sm">
+                      {pkg.badge && !/^save\s*\d/i.test(pkg.badge.trim()) && (
+                        <span className="badge-status badge-pending flex-shrink-0">
+                          <span className="badge-dot" />
                           {pkg.badge}
                         </span>
                       )}
@@ -776,8 +757,8 @@ export default function AdminHomePage() {
                     {/* Token Size & Pricing */}
                     <div className="space-y-2 py-2">
                       <div className="flex items-baseline gap-2">
-                        <span className="text-3xl font-black text-navy-900">{pkg.token_amount.toLocaleString()}</span>
-                        <span className="text-xs font-bold text-amber-600 flex items-center gap-1">
+                        <span className="text-2xl font-semibold text-content-primary tabular-nums">{pkg.token_amount.toLocaleString()}</span>
+                        <span className="text-xs font-medium text-content-secondary flex items-center gap-1">
                           Tokens
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -785,15 +766,15 @@ export default function AdminHomePage() {
                         </span>
                       </div>
 
-                      <div className="flex items-baseline justify-between pt-1 border-t border-slate-100">
+                      <div className="flex items-baseline justify-between pt-1 border-t border-subtle">
                         <div>
-                          <p className="text-[11px] text-slate-400">Package Price</p>
-                          <p className="text-lg font-black text-navy-900">৳ {pkg.price_bdt.toLocaleString()}</p>
+                          <p className="text-[11px] text-content-muted">Package Price</p>
+                          <p className="text-base font-semibold text-content-primary tabular-nums">৳ {pkg.price_bdt.toLocaleString()}</p>
                         </div>
                         {pkg.savings_percentage > 0 && (
                           <div className="text-right">
-                            <p className="text-[11px] text-slate-400 line-through">৳ {pkg.original_price_bdt.toLocaleString()}</p>
-                            <span className="px-2 py-0.5 rounded-full text-xs font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <p className="text-[11px] text-content-muted line-through tabular-nums">৳ {pkg.original_price_bdt.toLocaleString()}</p>
+                            <span className="badge-status badge-approved">
                               Save {pkg.savings_percentage}%
                             </span>
                           </div>
@@ -802,10 +783,10 @@ export default function AdminHomePage() {
                     </div>
 
                     {/* Actions */}
-                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                    <div className="mt-4 pt-3 border-t border-subtle flex items-center justify-end gap-2">
                       <button
                         onClick={() => handleOpenEditPackage(pkg)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition flex items-center gap-1.5"
+                        className="px-3 py-1.5 rounded text-xs font-medium text-content-secondary bg-app hover:bg-subtle border border-subtle transition flex items-center gap-1.5"
                       >
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -814,7 +795,7 @@ export default function AdminHomePage() {
                       </button>
                       <button
                         onClick={() => handleDeletePackage(pkg.package_id, pkg.package_name)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 transition flex items-center gap-1.5"
+                        className="px-3 py-1.5 rounded text-xs font-medium text-status-rejected-text bg-status-rejected-bg hover:opacity-80 transition flex items-center gap-1.5"
                       >
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -834,39 +815,34 @@ export default function AdminHomePage() {
       {/* Create / Edit Package Modal */}
       {/* ============================================================ */}
       {packageModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/70 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden animate-scale-up">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30">
+          <div className="bg-surface rounded border border-subtle shadow-xl w-full max-w-lg overflow-hidden animate-fade-in">
             {/* Header */}
-            <div className="bg-gradient-to-r from-navy-950 to-navy-900 text-white px-6 py-5 flex items-center justify-between border-b border-white/10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-400 text-navy-950 flex items-center justify-center font-black">
-                  📦
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white">
-                    {editingPackage ? `Edit Package: ${editingPackage.package_name}` : 'Create New Token Package'}
-                  </h3>
-                  <p className="text-xs text-slate-300">Set token size, price in BDT, and discount badge</p>
-                </div>
+            <div className="bg-brand-navy text-white px-5 py-4 flex items-center justify-between border-b border-white/10">
+              <div>
+                <h3 className="text-sm font-semibold text-white">
+                  {editingPackage ? `Edit Package: ${editingPackage.package_name}` : 'Create New Token Package'}
+                </h3>
+                <p className="text-xs text-white/60 mt-0.5">Set token size, price in BDT, and discount badge</p>
               </div>
               <button
                 onClick={() => setPackageModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 flex items-center justify-center"
+                className="w-7 h-7 rounded bg-white/10 hover:bg-white/20 text-white/70 flex items-center justify-center text-sm"
               >
                 ✕
               </button>
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSavePackage} className="p-6 space-y-4">
+            <form onSubmit={handleSavePackage} className="p-5 space-y-4">
               {pkgError && (
-                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold">
+                <div className="p-3 bg-status-rejected-bg border border-subtle rounded text-status-rejected-text text-xs font-medium">
                   ⚠️ {pkgError}
                 </div>
               )}
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 uppercase mb-1.5">
+                <label className="block text-content-secondary text-xs font-medium uppercase mb-1.5">
                   Package Name *
                 </label>
                 <input
@@ -875,13 +851,13 @@ export default function AdminHomePage() {
                   placeholder="e.g. Pro Business, Summer Special, Starter Pack"
                   value={pkgForm.package_name}
                   onChange={(e) => setPkgForm({ ...pkgForm, package_name: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold text-navy-900 focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  className="w-full px-3.5 py-2.5 rounded border border-subtle text-sm font-medium text-content-primary focus:ring-2 focus:ring-brand-blue focus:border-transparent"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 uppercase mb-1.5">
+                  <label className="block text-content-secondary text-xs font-medium uppercase mb-1.5">
                     Token Size (Amount) *
                   </label>
                   <input
@@ -891,12 +867,12 @@ export default function AdminHomePage() {
                     placeholder="e.g. 500"
                     value={pkgForm.token_amount}
                     onChange={(e) => setPkgForm({ ...pkgForm, token_amount: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold text-navy-900 focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    className="w-full px-3.5 py-2.5 rounded border border-subtle text-sm font-medium text-content-primary focus:ring-2 focus:ring-brand-blue focus:border-transparent"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 uppercase mb-1.5">
+                  <label className="block text-content-secondary text-xs font-medium uppercase mb-1.5">
                     Price in BDT (৳) *
                   </label>
                   <input
@@ -907,22 +883,25 @@ export default function AdminHomePage() {
                     placeholder="e.g. 400.00"
                     value={pkgForm.price_bdt}
                     onChange={(e) => setPkgForm({ ...pkgForm, price_bdt: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold text-navy-900 focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    className="w-full px-3.5 py-2.5 rounded border border-subtle text-sm font-medium text-content-primary focus:ring-2 focus:ring-brand-blue focus:border-transparent"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 uppercase mb-1.5">
-                  Badge / Tag (Optional)
+                <label className="block text-content-secondary text-xs font-medium uppercase mb-1.5">
+                  Marketing Badge (Optional)
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Save 20%, Popular, Best Value, Limited Offer"
+                  placeholder="e.g. Popular, Best Value, Limited Offer"
                   value={pkgForm.badge}
                   onChange={(e) => setPkgForm({ ...pkgForm, badge: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold text-navy-900 focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  className="w-full px-3.5 py-2.5 rounded border border-subtle text-sm font-medium text-content-primary focus:ring-2 focus:ring-brand-blue focus:border-transparent"
                 />
+                <p className="mt-1 text-[11px] text-content-muted">
+                  Savings % is calculated automatically below — use this for labels like “Popular”, not “Save 20%”.
+                </p>
               </div>
 
               <div className="flex items-center gap-2 pt-1">
@@ -931,9 +910,9 @@ export default function AdminHomePage() {
                   id="pkg-active-toggle"
                   checked={pkgForm.is_active}
                   onChange={(e) => setPkgForm({ ...pkgForm, is_active: e.target.checked })}
-                  className="rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                  className="rounded border-subtle text-brand-blue focus:ring-brand-blue"
                 />
-                <label htmlFor="pkg-active-toggle" className="text-sm font-semibold text-navy-900 cursor-pointer">
+                <label htmlFor="pkg-active-toggle" className="text-sm font-medium text-content-primary cursor-pointer">
                   Enable package immediately (Visible to users)
                 </label>
               </div>
@@ -948,19 +927,19 @@ export default function AdminHomePage() {
                 const savingsPct = original > 0 ? Math.round((savings / original) * 100) : 0;
 
                 return (
-                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
-                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Live Savings Preview</p>
+                  <div className="bg-app border border-subtle rounded p-4 space-y-2">
+                    <p className="text-content-secondary text-xs font-medium uppercase tracking-wider">Live Savings Preview</p>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-500">Standard Rate ({tokens} × ৳{basePrice.toFixed(2)}):</span>
-                      <span className="font-semibold text-slate-700">৳ {original.toLocaleString()} BDT</span>
+                      <span className="text-content-secondary">Standard Rate ({tokens} × ৳{basePrice.toFixed(2)}):</span>
+                      <span className="font-medium text-content-primary tabular-nums">৳ {original.toLocaleString()} BDT</span>
                     </div>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-500">Package Price:</span>
-                      <span className="font-black text-navy-900">৳ {price.toLocaleString()} BDT</span>
+                      <span className="text-content-secondary">Package Price:</span>
+                      <span className="font-semibold text-content-primary tabular-nums">৳ {price.toLocaleString()} BDT</span>
                     </div>
-                    <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-700">User Savings:</span>
-                      <span className="px-2.5 py-1 rounded-full text-xs font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <div className="pt-2 border-t border-subtle flex items-center justify-between">
+                      <span className="text-xs font-medium text-content-primary">User Savings:</span>
+                      <span className="badge-status badge-approved tabular-nums">
                         {savings > 0 ? `Save ${savingsPct}% (৳${savings.toLocaleString()} BDT)` : 'No Discount (0%)'}
                       </span>
                     </div>
@@ -972,14 +951,14 @@ export default function AdminHomePage() {
                 <button
                   type="button"
                   onClick={() => setPackageModalOpen(false)}
-                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-sm transition"
+                  className="px-3.5 h-9 bg-app hover:bg-subtle text-content-secondary font-medium rounded text-sm transition border border-subtle"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={pkgSaving}
-                  className="px-6 py-2.5 bg-navy-900 hover:bg-navy-800 text-white font-bold rounded-xl text-sm transition shadow-md disabled:opacity-50"
+                  className="bg-brand-navy text-white hover:bg-slate-900 text-sm font-medium h-9 px-3.5 rounded disabled:opacity-50"
                 >
                   {pkgSaving ? 'Saving...' : editingPackage ? 'Update Package' : 'Create Package'}
                 </button>

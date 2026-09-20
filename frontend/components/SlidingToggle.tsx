@@ -25,14 +25,14 @@ export default function SlidingToggle<T extends string>({
   options,
   value,
   onChange,
-  background = 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-  boxShadow = '0 4px 15px rgba(15, 23, 42, 0.25)',
-  pillColor = '#ffffff',
-  activeTextColor = '#0f172a',
-  inactiveTextColor = '#94a3b8',
-  paddingX = 'px-5',
-  paddingY = 'py-1.5',
-  fontSize = 'text-sm',
+  background = 'var(--color-app)',
+  boxShadow = 'none',
+  pillColor = 'var(--color-surface)',
+  activeTextColor = 'var(--color-content-primary)',
+  inactiveTextColor = 'var(--color-content-secondary)',
+  paddingX = 'px-3',
+  paddingY = 'py-1',
+  fontSize = 'text-xs',
 }: SlidingToggleProps<T>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const btn0Ref = useRef<HTMLButtonElement>(null);
@@ -55,19 +55,19 @@ export default function SlidingToggle<T extends string>({
   return (
     <div
       ref={containerRef}
-      className="relative rounded-full p-1 flex items-center"
+      className="relative rounded p-0.5 flex items-center border border-subtle"
       style={{ background, boxShadow }}
     >
       {/* Sliding pill */}
       <div
-        className="absolute rounded-full transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
+        className="absolute rounded transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
         style={{
           backgroundColor: pillColor,
-          height: 'calc(100% - 8px)',
-          top: '4px',
+          height: 'calc(100% - 4px)',
+          top: '2px',
           left: `${pillStyle.left}px`,
           width: `${pillStyle.width}px`,
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+          boxShadow: '0 1px 2px rgba(15, 23, 42, 0.08)',
         }}
       />
       {[btn0Ref, btn1Ref].map((ref, i) => (
@@ -75,7 +75,7 @@ export default function SlidingToggle<T extends string>({
           key={options[i].value}
           ref={ref}
           onClick={() => onChange(options[i].value)}
-          className={`relative z-10 ${paddingX} ${paddingY} rounded-full ${fontSize} font-semibold transition-colors duration-300 whitespace-nowrap`}
+          className={`relative z-10 ${paddingX} ${paddingY} rounded ${fontSize} font-medium transition-colors duration-300 whitespace-nowrap`}
           style={{
             color: value === options[i].value ? activeTextColor : inactiveTextColor,
           }}

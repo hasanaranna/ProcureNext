@@ -51,35 +51,35 @@ export default function NewsPage() {
   const filteredArticles = filter === "All" ? NEWS_ARTICLES : NEWS_ARTICLES.filter(a => a.category === filter);
 
   return (
-    <main className="w-full min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-between">
+    <main className="w-full min-h-screen bg-app text-content-primary flex flex-col justify-between">
       {/* ── Header / Navigation ──────────────────────────── */}
-      <header className="w-full border-b border-slate-800 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <header className="w-full border-b border-subtle bg-surface sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent-400 to-accent-600 flex items-center justify-center shadow-lg">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-8 h-8 rounded bg-brand-navy flex items-center justify-center">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
             </div>
-            <span className="text-xl font-bold text-white tracking-tight">ProcureNext</span>
+            <span className="text-lg font-bold text-content-primary tracking-tight">ProcureNext</span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-400">
-            <Link href="/about" className="hover:text-white transition">About</Link>
-            <Link href="/policies" className="hover:text-white transition">Policies</Link>
-            <Link href="/legal" className="hover:text-white transition">Legal Notices</Link>
-            <Link href="/news" className="text-accent-400 font-bold">News</Link>
-            <Link href="/events" className="hover:text-white transition">Events</Link>
-            <Link href="/help" className="hover:text-white transition">Help & Support</Link>
+          <nav className="hidden md:flex items-center gap-6 text-xs font-medium text-content-secondary">
+            <Link href="/about" className="hover:text-content-primary transition">About</Link>
+            <Link href="/policies" className="hover:text-content-primary transition">Policies</Link>
+            <Link href="/legal" className="hover:text-content-primary transition">Legal Notices</Link>
+            <Link href="/news" className="text-brand-blue font-semibold">News</Link>
+            <Link href="/events" className="hover:text-content-primary transition">Events</Link>
+            <Link href="/help" className="hover:text-content-primary transition">Help & Support</Link>
           </nav>
 
           <div className="flex items-center gap-3">
             <button onClick={() => router.push("/login")}
-              className="px-4 py-2 text-xs sm:text-sm font-semibold text-slate-300 hover:text-white transition">
+              className="px-3.5 py-2 text-xs sm:text-sm font-medium text-content-secondary hover:text-content-primary transition">
               Login
             </button>
             <button onClick={() => router.push("/signup-master")}
-              className="px-4 py-2 text-xs sm:text-sm font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-xl transition shadow">
+              className="h-9 px-3.5 text-sm font-medium bg-brand-navy text-white rounded hover:bg-slate-900 transition">
               Get Started
             </button>
           </div>
@@ -87,23 +87,23 @@ export default function NewsPage() {
       </header>
 
       {/* ── Main Content ─────────────────────────────────── */}
-      <div className="flex-1 max-w-5xl mx-auto px-6 py-16 w-full animate-fade-in">
+      <div className="flex-1 max-w-5xl mx-auto px-6 py-16 w-full">
         {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 mb-6">
-          <Link href="/" className="hover:text-white transition">Home</Link>
+        <div className="flex items-center gap-2 text-xs font-medium text-content-secondary mb-6">
+          <Link href="/" className="hover:text-content-primary transition">Home</Link>
           <span>/</span>
-          <span className="text-accent-400">News & Announcements</span>
+          <span className="text-brand-blue">News & Announcements</span>
         </div>
 
         {/* Hero */}
         <div className="mb-10 text-center sm:text-left">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent-500/10 border border-accent-500/20 text-accent-300 text-xs font-bold mb-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded border border-subtle bg-surface text-content-secondary text-xs font-medium mb-4">
             📰 Press Releases & Updates
           </div>
-          <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight mb-4">
+          <h1 className="text-3xl sm:text-4xl font-bold text-content-primary tracking-tight mb-4">
             Latest News & Announcements
           </h1>
-          <p className="text-base sm:text-lg text-slate-400 max-w-3xl leading-relaxed">
+          <p className="text-sm sm:text-base text-content-secondary max-w-3xl leading-relaxed">
             Stay informed on platform improvements, procurement regulatory changes, feature releases, and supply chain insights.
           </p>
         </div>
@@ -114,10 +114,10 @@ export default function NewsPage() {
             <button
               key={cat}
               onClick={() => setFilter(cat)}
-              className={`px-4 py-1.5 text-xs font-bold rounded-xl transition ${
+              className={`px-3.5 py-1.5 text-xs font-medium rounded transition ${
                 filter === cat
-                  ? "bg-accent-500 text-white shadow"
-                  : "bg-slate-800/80 text-slate-400 hover:text-white"
+                  ? "bg-brand-navy text-white"
+                  : "bg-app text-content-secondary border border-subtle hover:text-content-primary"
               }`}
             >
               {cat}
@@ -130,25 +130,26 @@ export default function NewsPage() {
           {filteredArticles.map((article) => (
             <article
               key={article.id}
-              className="p-6 rounded-3xl bg-slate-800/40 border border-slate-800 hover:border-accent-500/50 hover:bg-slate-800/70 transition-all duration-300 flex flex-col justify-between shadow-lg group"
+              className="p-6 rounded bg-surface border border-subtle hover:shadow-subtle-card transition-all duration-200 flex flex-col justify-between group"
             >
               <div>
                 <div className="flex items-center justify-between gap-2 mb-3">
-                  <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-accent-500/20 text-accent-300">
+                  <span className="badge-status badge-draft text-[10px]">
+                    <span className="badge-dot"></span>
                     {article.badge}
                   </span>
-                  <span className="text-xs text-slate-500">{article.readTime}</span>
+                  <span className="text-xs text-content-muted">{article.readTime}</span>
                 </div>
-                <h2 className="text-lg font-bold text-white mb-2 group-hover:text-accent-400 transition-colors">
+                <h2 className="text-base font-bold text-content-primary mb-2 group-hover:text-brand-blue transition-colors">
                   {article.title}
                 </h2>
-                <p className="text-xs text-slate-400 leading-relaxed mb-4">
+                <p className="text-xs text-content-secondary leading-relaxed mb-4">
                   {article.summary}
                 </p>
               </div>
-              <div className="pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-500">
+              <div className="pt-4 border-t border-subtle flex items-center justify-between text-xs text-content-muted">
                 <span>{article.date}</span>
-                <span className="text-accent-400 font-semibold group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
+                <span className="text-brand-blue font-medium group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
                   Read Article →
                 </span>
               </div>
@@ -158,19 +159,19 @@ export default function NewsPage() {
       </div>
 
       {/* ── Footer ─────────────────────────────────────── */}
-      <footer className="w-full py-8 px-6 bg-slate-950 border-t border-slate-800">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+      <footer className="w-full py-8 px-6 bg-surface border-t border-subtle">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-content-muted">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-slate-400">ProcureNext</span>
+            <span className="font-bold text-content-secondary">ProcureNext</span>
             <span>• Enterprise Procurement Platform</span>
           </div>
           <div className="flex flex-wrap gap-4">
-            <Link href="/about" className="hover:text-white">About</Link>
-            <Link href="/policies" className="hover:text-white">Policies</Link>
-            <Link href="/legal" className="hover:text-white">Legal</Link>
-            <Link href="/news" className="hover:text-white">News</Link>
-            <Link href="/events" className="hover:text-white">Events</Link>
-            <Link href="/help" className="hover:text-white">Help</Link>
+            <Link href="/about" className="hover:text-content-primary">About</Link>
+            <Link href="/policies" className="hover:text-content-primary">Policies</Link>
+            <Link href="/legal" className="hover:text-content-primary">Legal</Link>
+            <Link href="/news" className="hover:text-content-primary">News</Link>
+            <Link href="/events" className="hover:text-content-primary">Events</Link>
+            <Link href="/help" className="hover:text-content-primary">Help</Link>
           </div>
           <p>© {new Date().getFullYear()} ProcureNext. All rights reserved.</p>
         </div>

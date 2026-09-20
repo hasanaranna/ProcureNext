@@ -99,40 +99,41 @@ export default function OngoingTendersPage() {
 
   if (loading) {
     return (
-      <main className="w-full min-h-screen py-10 px-4 flex items-center justify-center bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
+      <main className="w-full min-h-screen py-10 px-4 flex items-center justify-center bg-app">
         <div className="text-center">
-          <svg className="animate-spin h-10 w-10 text-accent-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24">
+          <svg className="animate-spin h-8 w-8 text-content-muted mx-auto mb-4" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          <p className="text-slate-300 text-lg font-medium">Loading ongoing tenders...</p>
+          <p className="text-content-muted text-sm font-medium">Loading ongoing tenders...</p>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="w-full min-h-screen py-10 px-4 bg-gradient-to-br from-navy-950 via-navy-900 to-navy-800">
+    <main className="w-full min-h-screen py-8 px-4 bg-app">
       <div className="max-w-6xl mx-auto animate-fade-in">
         {/* Navigation & Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <div>
             <button
               onClick={() => router.push('/home')}
-              className="mb-4 flex items-center gap-2 text-slate-400 hover:text-white transition-colors duration-200"
+              className="mb-3 flex items-center gap-2 text-content-muted hover:text-content-primary transition-colors"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
               <span className="font-medium text-sm">Back to Dashboard</span>
             </button>
-            <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight flex items-center gap-3">
+            <h1 className="text-xl font-semibold text-content-primary flex items-center gap-3">
               Ongoing Tenders & Awards
-              <span className="text-xs px-3 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full font-bold">
+              <span className="badge-status badge-approved">
+                <span className="badge-dot" />
                 Live
               </span>
             </h1>
-            <p className="text-slate-400 mt-2 text-sm md:text-base">
+            <p className="text-content-secondary mt-1 text-sm">
               Track awarded contracts, monitor counterpart progress, and view fulfillment details.
             </p>
           </div>
@@ -140,7 +141,7 @@ export default function OngoingTendersPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push('/home')}
-              className="px-5 py-2.5 bg-white/10 hover:bg-white/15 text-white text-sm font-semibold rounded-xl border border-white/10 transition"
+              className="bg-brand-navy text-white hover:bg-slate-900 text-sm font-medium h-9 px-3.5 rounded"
             >
               Dashboard
             </button>
@@ -148,53 +149,33 @@ export default function OngoingTendersPage() {
         </div>
 
         {/* Overview Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white/10 rounded-2xl p-5 border border-white/10 backdrop-blur-sm">
-            <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Total Ongoing Tenders</p>
-            <div className="flex items-center justify-between mt-2">
-              <p className="text-3xl font-black text-white">{tenders.length}</p>
-              <div className="w-10 h-10 bg-accent-500/20 rounded-xl flex items-center justify-center text-accent-400 text-lg">
-                📋
-              </div>
-            </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="bg-surface rounded border border-subtle px-4 py-4">
+            <p className="text-content-secondary text-xs font-medium uppercase tracking-wider">Total Ongoing Tenders</p>
+            <p className="text-lg font-semibold text-content-primary tabular-nums mt-1">{tenders.length}</p>
           </div>
 
-          <div className="bg-white/10 rounded-2xl p-5 border border-white/10 backdrop-blur-sm">
-            <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Total Contract Volume</p>
-            <div className="flex items-center justify-between mt-2">
-              <p className="text-2xl font-black text-emerald-400">৳ {totalValue.toLocaleString()}</p>
-              <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center text-emerald-400 text-lg">
-                💰
-              </div>
-            </div>
+          <div className="bg-surface rounded border border-subtle px-4 py-4">
+            <p className="text-content-secondary text-xs font-medium uppercase tracking-wider">Total Contract Volume</p>
+            <p className="text-lg font-semibold text-content-primary tabular-nums mt-1">৳ {totalValue.toLocaleString()}</p>
           </div>
 
-          <div className="bg-white/10 rounded-2xl p-5 border border-white/10 backdrop-blur-sm">
-            <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">As Buyer (Awarded)</p>
-            <div className="flex items-center justify-between mt-2">
-              <p className="text-3xl font-black text-cyan-300">{buyerCount}</p>
-              <div className="w-10 h-10 bg-cyan-500/20 rounded-xl flex items-center justify-center text-cyan-300 text-lg">
-                🛒
-              </div>
-            </div>
+          <div className="bg-surface rounded border border-subtle px-4 py-4">
+            <p className="text-content-secondary text-xs font-medium uppercase tracking-wider">As Buyer (Awarded)</p>
+            <p className="text-lg font-semibold text-content-primary tabular-nums mt-1">{buyerCount}</p>
           </div>
 
-          <div className="bg-white/10 rounded-2xl p-5 border border-white/10 backdrop-blur-sm">
-            <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider">As Vendor (Won)</p>
-            <div className="flex items-center justify-between mt-2">
-              <p className="text-3xl font-black text-purple-300">{vendorCount}</p>
-              <div className="w-10 h-10 bg-purple-500/20 rounded-xl flex items-center justify-center text-purple-300 text-lg">
-                🏆
-              </div>
-            </div>
+          <div className="bg-surface rounded border border-subtle px-4 py-4">
+            <p className="text-content-secondary text-xs font-medium uppercase tracking-wider">As Vendor (Won)</p>
+            <p className="text-lg font-semibold text-content-primary tabular-nums mt-1">{vendorCount}</p>
           </div>
         </div>
 
         {/* Filter and Search Bar */}
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-8 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+        <div className="bg-surface border border-subtle rounded p-4 mb-6 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
           {/* Search */}
           <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-content-muted">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
@@ -204,74 +185,74 @@ export default function OngoingTendersPage() {
               placeholder="Search tenders by title, buyer, or vendor..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-white/15 bg-white/10 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500 text-sm"
+              className="w-full pl-10 pr-4 py-2 rounded border border-subtle bg-app text-content-primary placeholder-content-muted focus:outline-none focus:ring-2 focus:ring-brand-blue text-sm"
             />
           </div>
 
           {/* Filters */}
           <div className="flex flex-wrap items-center gap-2">
             {/* Status Filter */}
-            <div className="flex items-center gap-1 p-1 bg-navy-950/60 rounded-xl border border-white/10">
+            <div className="flex items-center gap-1 p-1 bg-app rounded border border-subtle">
               <button
                 onClick={() => setFilterStatus('all')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
                   filterStatus === 'all'
-                    ? 'bg-accent-500 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-brand-navy text-white'
+                    : 'text-content-secondary hover:text-content-primary'
                 }`}
               >
                 All Status
               </button>
               <button
                 onClick={() => setFilterStatus('active')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
                   filterStatus === 'active'
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-brand-navy text-white'
+                    : 'text-content-secondary hover:text-content-primary'
                 }`}
               >
-                ⚡ Active ({activeCount})
+                Active ({activeCount})
               </button>
               <button
                 onClick={() => setFilterStatus('completed')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
                   filterStatus === 'completed'
-                    ? 'bg-emerald-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-brand-navy text-white'
+                    : 'text-content-secondary hover:text-content-primary'
                 }`}
               >
-                ✓ Completed ({completedCount})
+                Completed ({completedCount})
               </button>
             </div>
 
             {/* Role Filter Pills */}
-            <div className="flex items-center gap-1 p-1 bg-navy-950/60 rounded-xl border border-white/10">
+            <div className="flex items-center gap-1 p-1 bg-app rounded border border-subtle">
               <button
                 onClick={() => setFilterRole('all')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
                   filterRole === 'all'
-                    ? 'bg-accent-500 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-brand-navy text-white'
+                    : 'text-content-secondary hover:text-content-primary'
                 }`}
               >
                 All Roles
               </button>
               <button
                 onClick={() => setFilterRole('buyer')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
                   filterRole === 'buyer'
-                    ? 'bg-cyan-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-brand-navy text-white'
+                    : 'text-content-secondary hover:text-content-primary'
                 }`}
               >
                 Buyer ({buyerCount})
               </button>
               <button
                 onClick={() => setFilterRole('vendor')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
                   filterRole === 'vendor'
-                    ? 'bg-purple-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-brand-navy text-white'
+                    : 'text-content-secondary hover:text-content-primary'
                 }`}
               >
                 Vendor ({vendorCount})
@@ -282,31 +263,31 @@ export default function OngoingTendersPage() {
 
         {/* Error message */}
         {error && (
-          <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-4 mb-8 flex items-start gap-3">
-            <svg className="w-6 h-6 text-red-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="bg-status-rejected-bg border border-subtle rounded p-4 mb-6 flex items-start gap-3">
+            <svg className="w-5 h-5 text-status-rejected-text flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <p className="text-red-400 font-medium">{error}</p>
+            <p className="text-status-rejected-text text-sm font-medium">{error}</p>
           </div>
         )}
 
         {/* Ongoing Tenders Grid / Cards */}
         {filteredTenders.length === 0 ? (
-          <div className="bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 p-12 text-center shadow-2xl">
-            <div className="w-20 h-20 mx-auto bg-slate-800/50 rounded-full flex items-center justify-center mb-6 border border-white/5">
-              <svg className="w-10 h-10 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="bg-surface rounded border border-subtle p-12 text-center">
+            <div className="w-14 h-14 mx-auto bg-app rounded border border-subtle flex items-center justify-center mb-4">
+              <svg className="w-7 h-7 text-content-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </div>
-            <h2 className="text-xl font-bold text-white mb-2">No Tenders Found</h2>
-            <p className="text-slate-400 mb-8 max-w-md mx-auto text-sm">
+            <h2 className="text-base font-semibold text-content-primary mb-1">No Tenders Found</h2>
+            <p className="text-content-secondary text-sm mb-6 max-w-md mx-auto">
               {searchTerm || filterRole !== 'all' || filterStatus !== 'all'
                 ? 'No tenders matched your current filter criteria.'
                 : 'Once you accept bids or have your bids accepted, ongoing tenders and contracts will appear here.'}
             </p>
             <button
               onClick={() => router.push('/home')}
-              className="px-6 py-2.5 bg-gradient-to-r from-accent-500 to-accent-600 text-white font-bold rounded-xl hover:from-accent-600 hover:to-accent-700 transition shadow-lg"
+              className="bg-brand-navy text-white hover:bg-slate-900 text-sm font-medium h-9 px-3.5 rounded"
             >
               Go to Dashboard
             </button>
@@ -316,79 +297,71 @@ export default function OngoingTendersPage() {
             {filteredTenders.map((tender) => (
               <div
                 key={tender.award_id}
-                className="bg-white rounded-2xl p-6 shadow-xl border-2 border-slate-200 hover:border-accent-400 transition-all duration-300 group relative overflow-hidden"
+                className="bg-surface rounded border border-subtle p-5 hover:border-brand-blue transition-all group relative overflow-hidden"
               >
                 {/* Top ribbon / indicator */}
-                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-slate-400 uppercase tracking-wider">
+                    <span className="text-content-muted text-xs font-medium tabular-nums">
                       Tender #{tender.tender_id} • Award #{tender.award_id}
                     </span>
                     {tender.contract_status === 'Completed' ? (
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
-                        ✓ Contract Completed
-                      </span>
+                      <span className="badge-status badge-approved"><span className="badge-dot" />Contract Completed</span>
                     ) : (
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-300 flex items-center gap-1">
-                        ⚡ Active / In Progress
-                      </span>
+                      <span className="badge-status badge-pending"><span className="badge-dot" />Active / In Progress</span>
                     )}
                     {tender.role_in_tender === 'buyer' ? (
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-cyan-100 text-cyan-800 border border-cyan-300">
-                        Your Org: Buyer
-                      </span>
+                      <span className="badge-status badge-draft"><span className="badge-dot" />Your Org: Buyer</span>
                     ) : (
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800 border border-purple-300">
-                        Your Org: Winning Vendor
-                      </span>
+                      <span className="badge-status badge-approved"><span className="badge-dot" />Your Org: Winning Vendor</span>
                     )}
                   </div>
 
-                  <div className="text-xs text-slate-500 font-medium">
-                    Awarded: <strong className="text-slate-700">{formatDate(tender.awarded_at)}</strong>
+                  <div className="text-xs text-content-secondary font-medium">
+                    Awarded: <strong className="text-content-primary">{formatDate(tender.awarded_at)}</strong>
                   </div>
                 </div>
 
                 {/* Main content */}
                 <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-xl font-black text-navy-900 mb-2 group-hover:text-accent-600 transition-colors">
+                    <h3 className="text-base font-semibold text-content-primary mb-1 group-hover:text-brand-blue transition-colors">
                       {tender.tender_title}
                     </h3>
                     {tender.tender_description && (
-                      <p className="text-slate-600 text-sm line-clamp-2 mb-4 leading-relaxed">
+                      <p className="text-content-secondary text-sm line-clamp-2 mb-3 leading-relaxed">
                         {tender.tender_description}
                       </p>
                     )}
 
                     {/* Parties involved */}
-                    <div className="flex flex-wrap items-center gap-4 text-xs">
-                      <div className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
-                        <span className="text-slate-400 font-semibold uppercase">Buyer:</span>
-                        <strong className="text-navy-900">{tender.buyer_org_name}</strong>
+                    <div className="flex flex-wrap items-center gap-3 text-xs">
+                      <div className="flex items-center gap-2 bg-app px-3 py-1.5 rounded border border-subtle">
+                        <span className="text-content-muted font-medium uppercase">Buyer:</span>
+                        <strong className="text-content-primary">{tender.buyer_org_name}</strong>
                       </div>
-                      <div className="flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
-                        <span className="text-emerald-600 font-semibold uppercase">Winning Vendor:</span>
-                        <strong className="text-emerald-900">{tender.vendor_org_name}</strong>
+                      <div className="flex items-center gap-2 bg-status-approved-bg px-3 py-1.5 rounded border border-subtle">
+                        <span className="text-status-approved-text font-medium uppercase">Winning Vendor:</span>
+                        <strong className="text-status-approved-text">{tender.vendor_org_name}</strong>
                       </div>
                     </div>
                   </div>
 
                   {/* Financial & Action button */}
-                  <div className="flex flex-col sm:flex-row lg:flex-col items-start sm:items-center lg:items-end justify-between w-full lg:w-auto gap-4 border-t lg:border-t-0 pt-4 lg:pt-0 border-slate-100 min-w-[220px]">
+                  <div className="flex flex-col sm:flex-row lg:flex-col items-start sm:items-center lg:items-end justify-between w-full lg:w-auto gap-4 border-t lg:border-t-0 pt-4 lg:pt-0 border-subtle min-w-[220px]">
                     <div>
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider lg:text-right mb-0.5">
+                      <p className="text-content-secondary text-xs font-medium uppercase tracking-wider lg:text-right mb-0.5">
                         Awarded Contract Value
                       </p>
-                      <p className="text-2xl font-black text-navy-900 lg:text-right">
-                        <span className="text-slate-400 text-base font-semibold mr-1">৳</span>
+                      <p className="text-lg font-semibold text-content-primary lg:text-right tabular-nums">
+                        <span className="text-content-muted text-sm font-medium mr-1">৳</span>
                         {tender.winning_bid_amount?.toLocaleString() || '0'}
                       </p>
                     </div>
 
                     <button
                       onClick={() => router.push(`/ongoing-tenders/${tender.tender_id}`)}
-                      className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-navy-900 to-navy-800 text-white font-bold rounded-xl hover:from-accent-600 hover:to-accent-700 transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 text-sm"
+                      className="w-full sm:w-auto bg-brand-navy text-white hover:bg-slate-900 text-sm font-medium h-9 px-3.5 rounded flex items-center justify-center gap-2"
                     >
                       View Details
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

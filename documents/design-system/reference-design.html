@@ -1,0 +1,1489 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-[#F8FAFC]">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ProcureNext — Enterprise Spend & Requisitions</title>
+
+  <!-- Typography: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS Engine -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            app: '#F8FAFC',
+            surface: '#FFFFFF',
+            subtle: '#E2E8F0',
+            primaryNavy: '#1E293B',
+            primaryBlue: '#2563EB',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    :root {
+      /* Surface & Base */
+      --bg-app: #F8FAFC;
+      --surface-card: #FFFFFF;
+      --border-subtle: #E2E8F0;
+
+      /* Typography */
+      --text-primary: #0F172A;
+      --text-secondary: #475569;
+      --text-muted: #94A3B8;
+
+      /* Brand / Primary Action */
+      --primary-navy: #1E293B;
+      --primary-blue: #2563EB;
+
+      /* Procurement Semantic Statuses (WCAG AAA Compliant) */
+      --status-approved-bg: #ECFDF5;
+      --status-approved-text: #047857;
+
+      --status-pending-bg: #FFFBEB;
+      --status-pending-text: #B45309;
+
+      --status-rejected-bg: #FEF2F2;
+      --status-rejected-text: #B91C1C;
+
+      --status-draft-bg: #F1F5F9;
+      --status-draft-text: #475569;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--bg-app);
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum";
+    }
+
+    .badge-approved {
+      background-color: var(--status-approved-bg);
+      color: var(--status-approved-text);
+      border: 1px solid rgba(4, 120, 87, 0.25);
+    }
+
+    .badge-pending {
+      background-color: var(--status-pending-bg);
+      color: var(--status-pending-text);
+      border: 1px solid rgba(180, 83, 9, 0.25);
+    }
+
+    .badge-rejected {
+      background-color: var(--status-rejected-bg);
+      color: var(--status-rejected-text);
+      border: 1px solid rgba(185, 28, 28, 0.25);
+    }
+
+    .badge-draft {
+      background-color: var(--status-draft-bg);
+      color: var(--status-draft-text);
+      border: 1px solid rgba(71, 85, 105, 0.25);
+    }
+
+    /* Enterprise Scrollbar */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94A3B8;
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col overflow-hidden text-xs select-none">
+
+  <!-- Top Global Header (52px authentic enterprise shell) -->
+  <header class="h-[52px] bg-white border-b border-[#E2E8F0] px-4 flex items-center justify-between z-30 shrink-0 select-none shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+    
+    <!-- Left: Brand, Workspace Switcher & Breadcrumbs -->
+    <div class="flex items-center space-x-3">
+      <!-- ProcureNext Minimal Logo Monogram -->
+      <a href="#" class="flex items-center space-x-2 group">
+        <div class="w-7 h-7 rounded bg-[#1E293B] text-white flex items-center justify-center font-bold tracking-tight shadow-xs group-hover:bg-black transition-colors">
+          <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </div>
+        <span class="font-bold text-[14px] text-[#0F172A] tracking-tight">ProcureNext</span>
+      </a>
+
+      <span class="text-[#CBD5E1]">/</span>
+
+      <!-- Workspace Entity Switcher Dropdown -->
+      <div class="relative">
+        <button id="btnWorkspaceSwitcher" class="flex items-center space-x-1.5 px-2 py-1 rounded hover:bg-slate-100 text-[#0F172A] transition-colors">
+          <span id="currentWorkspaceLabel" class="font-medium text-[12px] text-[#0F172A]">Acme Global Inc.</span>
+          <span class="text-[10px] bg-slate-100 text-[#475569] px-1.5 py-0.2 rounded font-mono font-medium border border-slate-200">FY26</span>
+          <svg class="w-3.5 h-3.5 text-[#94A3B8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        <!-- Dropdown Menu -->
+        <div id="workspaceMenu" class="hidden absolute left-0 mt-1.5 w-64 bg-white border border-[#E2E8F0] rounded-lg shadow-xl py-1.5 z-50 text-[12px]">
+          <div class="px-3 py-1.5 text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider">Select Legal Entity</div>
+          <button class="workspace-item w-full text-left px-3 py-1.5 flex items-center justify-between hover:bg-slate-50 font-medium text-[#0F172A]">
+            <span>Acme Global Inc. (US Core)</span>
+            <span class="text-[10px] text-emerald-700 font-mono">Active</span>
+          </button>
+          <button class="workspace-item w-full text-left px-3 py-1.5 flex items-center justify-between hover:bg-slate-50 text-[#475569]">
+            <span>Acme EMEA B.V. (Netherlands)</span>
+            <span class="text-[10px] text-slate-400 font-mono">EUR</span>
+          </button>
+          <button class="workspace-item w-full text-left px-3 py-1.5 flex items-center justify-between hover:bg-slate-50 text-[#475569]">
+            <span>Acme APAC Pte. Ltd. (Singapore)</span>
+            <span class="text-[10px] text-slate-400 font-mono">SGD</span>
+          </button>
+        </div>
+      </div>
+
+      <span class="text-[#CBD5E1] hidden sm:inline">/</span>
+
+      <!-- Breadcrumbs -->
+      <div class="hidden sm:flex items-center space-x-1.5 text-[12px]">
+        <span class="text-[#475569]">Procurement</span>
+        <span class="text-[#CBD5E1]">/</span>
+        <span class="text-[#0F172A] font-medium">Requisitions</span>
+      </div>
+    </div>
+
+    <!-- Center: Linear/Raycast-Inspired Command Omnibar Trigger -->
+    <div class="flex-1 max-w-md mx-6 hidden md:block">
+      <button 
+        id="btnOmnibarTrigger" 
+        class="w-full h-8 bg-[#F8FAFC] hover:bg-white border border-[#E2E8F0] hover:border-slate-300 rounded-md px-3 flex items-center justify-between text-slate-400 hover:text-slate-600 transition-all shadow-2xs group"
+      >
+        <div class="flex items-center space-x-2">
+          <svg class="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <span class="text-[12px] text-slate-500 font-normal">Search requests, POs, vendors, cost centers...</span>
+        </div>
+        <kbd class="text-[10px] bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-500 font-mono shadow-2xs">⌘K</kbd>
+      </button>
+    </div>
+
+    <!-- Right Actions: Sync status, notifications, docs & user badge -->
+    <div class="flex items-center space-x-2.5">
+      <!-- Sync Status Badge -->
+      <div class="hidden lg:flex items-center space-x-1.5 text-[#475569] text-[11px] px-2 py-1 rounded bg-slate-50 border border-slate-200">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span class="font-medium text-slate-600">Synced 2m ago</span>
+      </div>
+
+      <!-- Quick Command icon for Mobile -->
+      <button id="btnMobileSearch" class="md:hidden p-1.5 text-[#475569] hover:bg-slate-100 rounded">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+      </button>
+
+      <!-- Notification Bell with Popover -->
+      <div class="relative">
+        <button id="btnNotifications" class="p-1.5 text-[#475569] hover:text-[#0F172A] hover:bg-slate-100 rounded relative transition-colors">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+          <span class="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white"></span>
+        </button>
+
+        <!-- Notification Popover -->
+        <div id="notificationsMenu" class="hidden absolute right-0 mt-2 w-80 bg-white border border-[#E2E8F0] rounded-lg shadow-xl z-50 overflow-hidden text-xs">
+          <div class="p-3 border-b border-[#E2E8F0] flex items-center justify-between bg-slate-50">
+            <span class="font-semibold text-[#0F172A]">Action Items</span>
+            <span class="text-[10px] bg-amber-100 text-amber-800 font-semibold px-1.5 py-0.5 rounded">3 pending</span>
+          </div>
+          <div class="divide-y divide-[#E2E8F0] max-h-64 overflow-y-auto">
+            <div class="p-3 hover:bg-slate-50 cursor-pointer transition-colors" onclick="openInspectionDrawer('REQ-8891'); closeAllMenus();">
+              <div class="flex items-center justify-between text-[11px] text-[#475569] mb-1">
+                <span class="font-semibold text-[#0F172A]">Snowflake Inc. · $42,500</span>
+                <span>12m ago</span>
+              </div>
+              <p class="text-[11px] text-[#475569]">Sarah Jenkins requested VP signoff for Q4 Capacity reservation.</p>
+            </div>
+            <div class="p-3 hover:bg-slate-50 cursor-pointer transition-colors" onclick="openInspectionDrawer('REQ-8887'); closeAllMenus();">
+              <div class="flex items-center justify-between text-[11px] text-[#475569] mb-1">
+                <span class="font-semibold text-[#0F172A]">AWS Annual Plan · $18,450</span>
+                <span>2h ago</span>
+              </div>
+              <p class="text-[11px] text-[#475569]">Auto-verified against Engineering Cloud Budget CC-401.</p>
+            </div>
+            <div class="p-3 hover:bg-slate-50 cursor-pointer transition-colors" onclick="openInspectionDrawer('REQ-8884'); closeAllMenus();">
+              <div class="flex items-center justify-between text-[11px] text-[#475569] mb-1">
+                <span class="font-semibold text-[#0F172A]">Salesforce Cloud · $8,200</span>
+                <span>4h ago</span>
+              </div>
+              <p class="text-[11px] text-[#475569]">Security review complete. Ready for final authorization.</p>
+            </div>
+          </div>
+          <div class="p-2 border-t border-[#E2E8F0] text-center bg-slate-50">
+            <button class="text-[11px] text-[#2563EB] font-medium hover:underline">Mark all as viewed</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Help / Docs Link -->
+      <button class="p-1.5 text-[#475569] hover:text-[#0F172A] hover:bg-slate-100 rounded transition-colors hidden sm:block" title="Documentation & Policies">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </button>
+
+      <!-- User Profile Badge & Dropdown -->
+      <div class="relative pl-1 border-l border-[#E2E8F0]">
+        <button id="btnUserProfile" class="flex items-center space-x-2 p-1 rounded hover:bg-slate-100 transition-colors">
+          <div class="w-7 h-7 rounded-full bg-[#1E293B] text-white flex items-center justify-center font-semibold text-[11px] ring-1 ring-slate-200">
+            SC
+          </div>
+          <div class="hidden xl:flex flex-col text-left leading-none">
+            <span class="text-[12px] font-semibold text-[#0F172A]">Sarah Chen</span>
+            <span class="text-[10px] text-[#475569] mt-0.5">Sr. Procurement Specialist</span>
+          </div>
+          <svg class="w-3.5 h-3.5 text-[#94A3B8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        <!-- Profile Menu -->
+        <div id="userMenu" class="hidden absolute right-0 mt-2 w-56 bg-white border border-[#E2E8F0] rounded-lg shadow-xl py-1 z-50 text-[12px]">
+          <div class="px-3 py-2 border-b border-slate-100">
+            <p class="font-semibold text-[#0F172A]">Sarah Chen</p>
+            <p class="text-[11px] text-[#475569]">s.chen@acmeglobal.com</p>
+          </div>
+          <div class="py-1">
+            <button class="w-full text-left px-3 py-1.5 text-[#475569] hover:bg-slate-50 flex items-center justify-between">
+              <span>Approval Authority</span>
+              <span class="text-[10px] font-mono font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">Tier III ($100k)</span>
+            </button>
+            <button class="w-full text-left px-3 py-1.5 text-[#475569] hover:bg-slate-50">Procurement Settings</button>
+            <button class="w-full text-left px-3 py-1.5 text-[#475569] hover:bg-slate-50">Audit & Security Log</button>
+          </div>
+          <div class="border-t border-slate-100 py-1">
+            <button class="w-full text-left px-3 py-1.5 text-rose-600 hover:bg-rose-50">Sign Out</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Page Header: Title, Counts & Primary Actions -->
+  <div class="bg-white border-b border-[#E2E8F0] px-6 py-3 shrink-0 flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <div class="flex items-center space-x-2.5">
+        <h1 class="text-lg font-bold tracking-tight text-[#0F172A]">Purchase Requisitions</h1>
+        <span id="requisitionTotalBadge" class="text-[11px] font-medium text-[#475569] bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full">
+          7 active · 4 awaiting action
+        </span>
+      </div>
+      <p class="text-[11px] text-[#475569] mt-0.5">Centralized queue for corporate spend authorization, SOC2 checks, and ERP PO generation.</p>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex items-center space-x-2.5">
+      <button 
+        id="btnExportCSV" 
+        class="h-8 px-3 border border-[#E2E8F0] hover:bg-slate-50 text-[#475569] hover:text-[#0F172A] rounded font-medium flex items-center space-x-1.5 transition-colors shadow-2xs"
+      >
+        <svg class="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+        </svg>
+        <span>Export CSV</span>
+      </button>
+
+      <button 
+        id="btnNewRequisition" 
+        class="h-8 px-3.5 bg-[#1E293B] hover:bg-slate-800 active:bg-black text-white rounded font-medium flex items-center space-x-1.5 shadow-sm transition-all focus:ring-2 focus:ring-slate-400"
+      >
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+        </svg>
+        <span>+ New Requisition</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 flex flex-col overflow-hidden bg-[#F8FAFC]">
+    
+    <!-- Ramp-Inspired Minimal Spend Metrics Ribbon (4 crisp KPI cards) -->
+    <section class="px-6 pt-4 pb-3 shrink-0">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        
+        <!-- Metric 1: Pending Approvals -->
+        <div class="bg-white border border-[#E2E8F0] rounded-lg p-3.5 shadow-2xs flex flex-col justify-between">
+          <div class="flex items-center justify-between text-[#475569]">
+            <span class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Pending Approvals</span>
+            <span class="w-2 h-2 rounded-full bg-amber-500 ring-4 ring-amber-50"></span>
+          </div>
+          <div class="mt-2 flex items-baseline justify-between">
+            <span id="kpiPendingAmount" class="text-xl font-bold tracking-tight text-[#0F172A] tabular-nums">$74,320.00</span>
+            <span id="kpiPendingCount" class="text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">4 In Queue</span>
+          </div>
+          <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-[#475569]">
+            <span>Average ticket: <span class="font-medium text-[#0F172A] tabular-nums">$18,580</span></span>
+            <span class="text-amber-700 font-medium">Action required</span>
+          </div>
+        </div>
+
+        <!-- Metric 2: Pipeline Spend Q4 -->
+        <div class="bg-white border border-[#E2E8F0] rounded-lg p-3.5 shadow-2xs flex flex-col justify-between">
+          <div class="flex items-center justify-between text-[#475569]">
+            <span class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Committed Spend (Q4)</span>
+            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+            </svg>
+          </div>
+          <div class="mt-2 flex items-baseline justify-between">
+            <span id="kpiApprovedAmount" class="text-xl font-bold tracking-tight text-[#0F172A] tabular-nums">$512,890.00</span>
+            <span class="text-[11px] font-medium text-slate-500 font-mono">68.3% Cap</span>
+          </div>
+          <div class="mt-2.5 pt-2 border-t border-slate-100">
+            <div class="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+              <div class="bg-[#1E293B] h-full rounded-full" style="width: 68.3%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Metric 3: Approval Velocity -->
+        <div class="bg-white border border-[#E2E8F0] rounded-lg p-3.5 shadow-2xs flex flex-col justify-between">
+          <div class="flex items-center justify-between text-[#475569]">
+            <span class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Approval Velocity</span>
+            <svg class="w-3.5 h-3.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div class="mt-2 flex items-baseline justify-between">
+            <span class="text-xl font-bold tracking-tight text-[#0F172A] tabular-nums">1.4 Days</span>
+            <span class="text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">-0.6d SLA</span>
+          </div>
+          <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-[#475569]">
+            <span>94.2% within SLA policy</span>
+            <span class="text-emerald-700 font-mono font-medium">Optimal</span>
+          </div>
+        </div>
+
+        <!-- Metric 4: Active Purchase Orders -->
+        <div class="bg-white border border-[#E2E8F0] rounded-lg p-3.5 shadow-2xs flex flex-col justify-between">
+          <div class="flex items-center justify-between text-[#475569]">
+            <span class="text-[11px] font-medium uppercase tracking-wider text-slate-500">ERP Synced Suppliers</span>
+            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+          </div>
+          <div class="mt-2 flex items-baseline justify-between">
+            <span id="kpiActiveSuppliers" class="text-xl font-bold tracking-tight text-[#0F172A] tabular-nums">48</span>
+            <span class="text-[11px] font-semibold text-slate-700 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">100% Tax Verified</span>
+          </div>
+          <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-[#475569]">
+            <span>NetSuite 2-Way Sync</span>
+            <span class="text-emerald-700 font-mono font-medium">Online</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Table Container Card -->
+    <div class="flex-1 mx-6 mb-6 bg-white border border-[#E2E8F0] rounded-lg shadow-2xs flex flex-col overflow-hidden">
+      
+      <!-- Linear-style Filter Bar & Segmented Controls -->
+      <div class="px-4 py-2.5 border-b border-[#E2E8F0] flex flex-wrap items-center justify-between gap-3 bg-white">
+        
+        <!-- Segmented Tabs -->
+        <div class="flex items-center space-x-1 bg-slate-100 p-0.5 rounded-md text-xs font-medium">
+          <button data-filter="all" class="filter-tab px-3 py-1 rounded bg-white text-[#0F172A] shadow-2xs font-semibold transition-all">
+            All Requests <span id="countAll" class="text-slate-400 text-[10px] ml-1 font-mono">7</span>
+          </button>
+          <button data-filter="pending" class="filter-tab px-3 py-1 rounded text-[#475569] hover:text-[#0F172A] transition-all">
+            Needs My Approval <span id="countPending" class="text-amber-800 bg-amber-100 text-[10px] px-1.5 py-0.2 rounded-full ml-1 font-semibold">4</span>
+          </button>
+          <button data-filter="approved" class="filter-tab px-3 py-1 rounded text-[#475569] hover:text-[#0F172A] transition-all">
+            Approved <span id="countApproved" class="text-slate-400 text-[10px] ml-1 font-mono">2</span>
+          </button>
+          <button data-filter="draft" class="filter-tab px-3 py-1 rounded text-[#475569] hover:text-[#0F172A] transition-all">
+            Drafts <span id="countDraft" class="text-slate-400 text-[10px] ml-1 font-mono">1</span>
+          </button>
+          <button data-filter="rejected" class="filter-tab px-3 py-1 rounded text-[#475569] hover:text-[#0F172A] transition-all">
+            Rejected <span id="countRejected" class="text-slate-400 text-[10px] ml-1 font-mono">0</span>
+          </button>
+        </div>
+
+        <!-- Filter Controls: Department Selector & Live Filter Input -->
+        <div class="flex items-center space-x-2">
+          <!-- Department Select -->
+          <div class="relative">
+            <select id="departmentFilter" class="h-7 pl-2.5 pr-7 bg-slate-50 border border-[#E2E8F0] rounded text-[11px] font-medium text-[#475569] focus:outline-none focus:border-[#2563EB] focus:bg-white transition-all cursor-pointer">
+              <option value="all">All Departments</option>
+              <option value="Engineering">Engineering (CC-401)</option>
+              <option value="Marketing">Marketing (CC-202)</option>
+              <option value="Executive">Executive (CC-101)</option>
+            </select>
+            <svg class="w-3 h-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+
+          <!-- Inline Table Search -->
+          <div class="relative w-48 lg:w-56">
+            <svg class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input 
+              id="tableSearchInput" 
+              type="text" 
+              placeholder="Filter table rows..." 
+              class="w-full h-7 pl-8 pr-2.5 bg-slate-50 border border-[#E2E8F0] rounded text-[11px] text-[#0F172A] placeholder-slate-400 focus:outline-none focus:bg-white focus:border-[#2563EB] transition-all"
+            />
+          </div>
+        </div>
+
+      </div>
+
+      <!-- High Density Tabular Data Grid -->
+      <div class="flex-1 overflow-auto">
+        <table class="w-full text-left border-collapse min-w-[960px]">
+          <thead class="bg-[#F8FAFC] text-[11px] uppercase font-semibold text-[#475569] tracking-wider sticky top-0 z-10 border-b border-[#E2E8F0]">
+            <tr>
+              <th class="py-2.5 px-3 w-9 text-center">
+                <input type="checkbox" id="selectAllCheckbox" class="rounded border-slate-300 text-[#1E293B] focus:ring-0 focus:ring-offset-0 cursor-pointer" />
+              </th>
+              <th class="py-2.5 px-3 w-28">Requisition ID</th>
+              <th class="py-2.5 px-4">Vendor & Category</th>
+              <th class="py-2.5 px-4">Requester</th>
+              <th class="py-2.5 px-3">Cost Center</th>
+              <th class="py-2.5 px-3">Date</th>
+              <th class="py-2.5 px-4 text-right">Amount (USD)</th>
+              <th class="py-2.5 px-3 text-center w-28">Status</th>
+              <th class="py-2.5 px-4 text-right w-24">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="poTableBody" class="divide-y divide-[#E2E8F0] text-xs">
+            <!-- Dynamic rows generated by JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Table Batch Selection Floating Footer Bar (Conditional) -->
+      <div id="batchActionBar" class="hidden px-4 py-2 bg-[#1E293B] text-white border-t border-slate-800 flex items-center justify-between animate-in fade-in">
+        <div class="flex items-center space-x-2">
+          <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+          <span id="batchCountLabel" class="font-medium text-xs">2 requisitions selected</span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <button id="btnBatchApprove" class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 rounded text-white font-medium text-xs transition-colors">
+            Approve Selected
+          </button>
+          <button id="btnBatchClear" class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 rounded text-slate-200 text-xs transition-colors">
+            Deselect All
+          </button>
+        </div>
+      </div>
+
+      <!-- Table Pagination & Count Footer -->
+      <div class="h-9 px-4 border-t border-[#E2E8F0] bg-white flex items-center justify-between text-[11px] text-[#475569] shrink-0">
+        <div>Showing <span id="visibleRowCount" class="font-semibold text-[#0F172A]">7</span> orders</div>
+        <div class="flex items-center space-x-1.5">
+          <button class="px-2 py-0.5 border border-slate-200 rounded text-slate-400 cursor-not-allowed">Previous</button>
+          <button class="px-2 py-0.5 border border-slate-200 rounded bg-slate-100 text-slate-800 font-semibold font-mono">1</button>
+          <button class="px-2 py-0.5 border border-slate-200 rounded text-slate-400 cursor-not-allowed">Next</button>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- 560px Slide-out Inspection Drawer -->
+  <div id="drawerOverlay" class="fixed inset-0 bg-slate-900/35 backdrop-blur-[1px] opacity-0 pointer-events-none transition-opacity duration-200 z-40"></div>
+  
+  <aside id="inspectionDrawer" class="fixed top-0 right-0 bottom-0 w-full max-w-[560px] bg-white border-l border-[#E2E8F0] shadow-2xl z-50 transform translate-x-full transition-transform duration-200 ease-out flex flex-col">
+    
+    <!-- Drawer Header -->
+    <div class="px-5 py-3.5 border-b border-[#E2E8F0] flex items-center justify-between bg-white shrink-0">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-8 h-8 rounded bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 font-mono font-semibold text-xs">
+          PO
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h2 id="drawerPoId" class="text-sm font-bold text-[#0F172A] tracking-tight font-mono">REQ-2026-8891</h2>
+            <span id="drawerStatusBadge" class="text-[10px] font-semibold px-2 py-0.5 rounded badge-pending">Needs Review</span>
+          </div>
+          <p id="drawerVendorSubtitle" class="text-[11px] text-[#475569]">Snowflake Inc. · Cloud Infrastructure</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-1">
+        <button id="btnCloseDrawer" class="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors" title="Close Panel (Esc)">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Drawer Content (Scrollable) -->
+    <div class="flex-1 overflow-y-auto p-5 space-y-5">
+      
+      <!-- Top Metrics Summary in Drawer -->
+      <div class="grid grid-cols-2 gap-3 p-3 bg-slate-50 border border-[#E2E8F0] rounded-lg">
+        <div>
+          <span class="text-[11px] text-[#475569] block">Total Amount</span>
+          <span id="drawerTotalAmount" class="text-lg font-bold text-[#0F172A] tabular-nums block mt-0.5">$42,500.00</span>
+          <span class="text-[10px] text-slate-500 font-mono">USD · Tax Included</span>
+        </div>
+        <div>
+          <span class="text-[11px] text-[#475569] block">Cost Center Remaining</span>
+          <span class="text-lg font-bold text-emerald-700 tabular-nums block mt-0.5">$148,200</span>
+          <span class="text-[10px] text-slate-500 font-mono">CC-401 Engineering</span>
+        </div>
+      </div>
+
+      <!-- 3-Way Match & Compliance Verification Strip -->
+      <div class="border border-[#E2E8F0] rounded-lg p-3 space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-semibold uppercase tracking-wider text-[#475569]">Audit & Compliance Pre-Flight</span>
+          <span class="text-[10px] bg-emerald-50 text-emerald-800 font-semibold px-1.5 py-0.5 rounded border border-emerald-200">Pre-Verified</span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 pt-1 text-[11px]">
+          <div class="flex items-center space-x-1 text-emerald-700">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+            <span>SOC2 Type II</span>
+          </div>
+          <div class="flex items-center space-x-1 text-emerald-700">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+            <span>DPA Executed</span>
+          </div>
+          <div class="flex items-center space-x-1 text-slate-600">
+            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m2 0a2 2 0 100-4m0 4a2 2 0 110 4"/></svg>
+            <span>Net 30 Terms</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Itemized Line Items Table -->
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-[11px] font-semibold text-[#0F172A] uppercase tracking-wider">Line Items Ledger</h3>
+          <span id="drawerItemCount" class="text-[11px] text-[#475569]">2 items</span>
+        </div>
+        <div class="border border-[#E2E8F0] rounded-lg overflow-hidden">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead class="bg-slate-50 text-[10px] uppercase text-[#475569] font-medium border-b border-[#E2E8F0]">
+              <tr>
+                <th class="py-2 px-3">Description</th>
+                <th class="py-2 px-2 text-center">Qty</th>
+                <th class="py-2 px-3 text-right">Unit Price</th>
+                <th class="py-2 px-3 text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody id="drawerItemsTable" class="divide-y divide-[#E2E8F0]">
+              <!-- Generated items -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Visual Multi-Stakeholder Approval Chain (Zip style) -->
+      <div>
+        <h3 class="text-[11px] font-semibold text-[#0F172A] uppercase tracking-wider mb-2.5">Stakeholder Approval Chain</h3>
+        <div id="drawerAuditTrail" class="space-y-3 relative before:absolute before:inset-0 before:left-3 before:w-0.5 before:bg-[#E2E8F0] ml-1">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <!-- Internal Justification & Context -->
+      <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
+        <span class="text-[11px] font-semibold text-[#0F172A] block mb-1">Business Justification</span>
+        <p id="drawerJustification" class="text-[11px] text-[#475569] leading-relaxed">
+          Approved in Q4 cloud infrastructure forecast. Required to accommodate enterprise data pipeline migration without concurrency throttling.
+        </p>
+      </div>
+
+    </div>
+
+    <!-- Drawer Fixed Bottom Action Bar -->
+    <div class="p-3.5 border-t border-[#E2E8F0] bg-white flex items-center justify-between space-x-2 shrink-0">
+      <div class="flex items-center space-x-2">
+        <button id="btnRejectPo" class="px-3 py-1.5 text-xs font-medium text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded transition-colors">
+          Reject
+        </button>
+        <button id="btnRequestInfo" class="px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded transition-colors">
+          Clarify
+        </button>
+      </div>
+
+      <button id="btnApprovePo" class="flex items-center space-x-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-[#1E293B] hover:bg-slate-800 active:bg-black rounded shadow-2xs transition-all focus:ring-2 focus:ring-slate-400">
+        <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+        </svg>
+        <span>Authorize & Issue PO</span>
+      </button>
+    </div>
+
+  </aside>
+
+  <!-- Command Palette Modal (Cmd+K) -->
+  <div id="commandPaletteOverlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs opacity-0 pointer-events-none transition-opacity duration-150 z-50 flex items-start justify-center pt-24 p-4">
+    <div class="bg-white rounded-xl border border-[#E2E8F0] shadow-2xl w-full max-w-xl overflow-hidden animate-in fade-in zoom-in-95">
+      <!-- Input Header -->
+      <div class="p-3 border-b border-[#E2E8F0] flex items-center space-x-3">
+        <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        <input 
+          id="cmdPaletteInput" 
+          type="text" 
+          placeholder="Type a command or search requisitions..." 
+          class="w-full text-xs text-[#0F172A] placeholder-slate-400 focus:outline-none bg-transparent"
+        />
+        <kbd class="text-[10px] bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded text-slate-500 font-mono">ESC</kbd>
+      </div>
+
+      <!-- Quick Command Results List -->
+      <div id="cmdPaletteResults" class="max-h-72 overflow-y-auto p-1.5 text-xs">
+        <!-- Filled dynamically -->
+      </div>
+
+      <!-- Palette Footer -->
+      <div class="px-3 py-2 bg-slate-50 border-t border-[#E2E8F0] flex items-center justify-between text-[11px] text-[#475569]">
+        <div class="flex items-center space-x-2">
+          <span><kbd class="px-1 py-0.5 bg-white border border-slate-200 rounded font-mono">↑↓</kbd> to navigate</span>
+          <span><kbd class="px-1 py-0.5 bg-white border border-slate-200 rounded font-mono">↵</kbd> to select</span>
+        </div>
+        <span>ProcureNext Command v2.4</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Requisition Modal Dialog -->
+  <div id="modalOverlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs opacity-0 pointer-events-none transition-opacity duration-150 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg border border-[#E2E8F0] shadow-xl w-full max-w-lg overflow-hidden">
+      <div class="px-5 py-3 border-b border-[#E2E8F0] flex items-center justify-between">
+        <h3 class="font-bold text-xs text-[#0F172A]">Submit Purchase Requisition</h3>
+        <button id="btnCloseModal" class="text-slate-400 hover:text-slate-700">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <form id="newPoForm" class="p-5 space-y-3">
+        <div>
+          <label class="block text-[11px] font-medium text-[#475569] mb-1">Vendor / Supplier Entity</label>
+          <input id="inputVendor" required type="text" placeholder="e.g., Datadog Inc." class="w-full px-3 py-1.5 border border-[#E2E8F0] rounded text-xs text-[#0F172A] focus:outline-none focus:border-[#2563EB]" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[11px] font-medium text-[#475569] mb-1">Procurement Category</label>
+            <select id="inputCategory" class="w-full px-2.5 py-1.5 border border-[#E2E8F0] rounded text-xs text-[#0F172A] bg-white focus:outline-none focus:border-[#2563EB]">
+              <option>Cloud Infrastructure</option>
+              <option>SaaS Licensing</option>
+              <option>Hardware & Peripherals</option>
+              <option>Professional Services</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[11px] font-medium text-[#475569] mb-1">Cost Center</label>
+            <select id="inputCostCenter" class="w-full px-2.5 py-1.5 border border-[#E2E8F0] rounded text-xs text-[#0F172A] bg-white focus:outline-none focus:border-[#2563EB]">
+              <option value="Engineering">CC-401 (Engineering)</option>
+              <option value="Marketing">CC-202 (Marketing)</option>
+              <option value="Executive">CC-101 (Executive)</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[11px] font-medium text-[#475569] mb-1">Description</label>
+            <input id="inputItemDesc" required type="text" placeholder="e.g., Annual Log Ingestion" class="w-full px-3 py-1.5 border border-[#E2E8F0] rounded text-xs text-[#0F172A] focus:outline-none focus:border-[#2563EB]" />
+          </div>
+          <div>
+            <label class="block text-[11px] font-medium text-[#475569] mb-1">Total Amount ($ USD)</label>
+            <input id="inputAmount" required type="number" step="0.01" placeholder="12500.00" class="w-full px-3 py-1.5 border border-[#E2E8F0] rounded text-xs text-[#0F172A] focus:outline-none focus:border-[#2563EB]" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-[11px] font-medium text-[#475569] mb-1">Business Justification</label>
+          <textarea id="inputJustification" rows="2" placeholder="Explain why this spend is required..." class="w-full px-3 py-1.5 border border-[#E2E8F0] rounded text-xs text-[#0F172A] focus:outline-none focus:border-[#2563EB]"></textarea>
+        </div>
+        <div class="pt-2 flex justify-end space-x-2 border-t border-[#E2E8F0]">
+          <button type="button" id="btnCancelModal" class="px-3 py-1.5 border border-slate-200 text-xs font-medium rounded text-slate-700 hover:bg-slate-50">Cancel</button>
+          <button type="submit" class="px-4 py-1.5 bg-[#1E293B] text-white text-xs font-semibold rounded hover:bg-slate-800">Submit for Approval</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-12 opacity-0 transition-all duration-200 flex items-center space-x-2 bg-[#1E293B] text-white px-3.5 py-2.5 rounded-lg shadow-xl border border-slate-700 text-xs">
+    <div id="toastIcon">
+      <svg class="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+      </svg>
+    </div>
+    <span id="toastMessage" class="font-medium">Action processed successfully.</span>
+  </div>
+
+  <script>
+    // Authentic Procurement Data
+    const mockPurchaseOrders = [
+      {
+        id: "REQ-8891",
+        vendor: "Snowflake Inc.",
+        category: "Cloud Infrastructure",
+        dept: "Engineering",
+        requester: "Sarah Jenkins",
+        requesterRole: "VP of Data Engineering",
+        costCenter: "CC-401",
+        date: "Sep 18, 2026",
+        amount: 42500.00,
+        status: "pending",
+        justification: "Approved in Q4 infrastructure plan to accommodate high-volume analytics workloads without rate limiting.",
+        items: [
+          { desc: "Snowflake Enterprise Capacity Reserve (Q4)", qty: 1, unitPrice: 38000.00, total: 38000.00 },
+          { desc: "Dedicated Virtual Warehouse Multi-Cluster", qty: 3, unitPrice: 1500.00, total: 4500.00 }
+        ],
+        audit: [
+          { role: "Requester", name: "Sarah Jenkins", status: "Submitted", time: "Sep 18, 09:15 AM", note: "Forecasted within data platform budget." },
+          { role: "Dept Head", name: "Alex Chen (CTO)", status: "Approved", time: "Sep 18, 11:30 AM", note: "Verified capacity requirements." },
+          { role: "IT & Security", name: "David Vance (CISO)", status: "Approved", time: "Sep 18, 01:20 PM", note: "SOC 2 Type II & DPA verified." },
+          { role: "Procurement Lead", name: "Sarah Chen", status: "Pending Action", time: "Awaiting review", note: "Authorizing ERP NetSuite generation." }
+        ]
+      },
+      {
+        id: "REQ-8887",
+        vendor: "Amazon Web Services",
+        category: "Cloud Infrastructure",
+        dept: "Engineering",
+        requester: "Marcus Brody",
+        requesterRole: "Lead Cloud Architect",
+        costCenter: "CC-401",
+        date: "Sep 17, 2026",
+        amount: 18450.00,
+        status: "pending",
+        justification: "1-year Savings Plan commitment for EC2 & Kubernetes compute pods.",
+        items: [
+          { desc: "AWS Compute Savings Plan (12-Mo Upfront)", qty: 1, unitPrice: 18450.00, total: 18450.00 }
+        ],
+        audit: [
+          { role: "Requester", name: "Marcus Brody", status: "Submitted", time: "Sep 17, 02:20 PM", note: "Reduces run-rate by 32%." },
+          { role: "Procurement Lead", name: "Sarah Chen", status: "Pending Action", time: "Awaiting review", note: "Finalizing budget allocation." }
+        ]
+      },
+      {
+        id: "REQ-8884",
+        vendor: "Salesforce Inc.",
+        category: "SaaS Licensing",
+        dept: "Marketing",
+        requester: "Elena Rostova",
+        requesterRole: "Director RevOps",
+        costCenter: "CC-202",
+        date: "Sep 17, 2026",
+        amount: 8200.00,
+        status: "pending",
+        justification: "Q4 seat expansion for newly hired Account Executives.",
+        items: [
+          { desc: "Sales Cloud Enterprise Tier (10 seats)", qty: 10, unitPrice: 750.00, total: 7500.00 },
+          { desc: "Developer Sandbox Addon", qty: 1, unitPrice: 700.00, total: 700.00 }
+        ],
+        audit: [
+          { role: "Requester", name: "Elena Rostova", status: "Submitted", time: "Sep 17, 08:45 AM", note: "Approved in sales plan." },
+          { role: "Procurement Lead", name: "Sarah Chen", status: "Pending Action", time: "Awaiting review", note: "Ready for sign-off." }
+        ]
+      },
+      {
+        id: "REQ-8879",
+        vendor: "Workday Ltd.",
+        category: "SaaS Licensing",
+        dept: "Executive",
+        requester: "David Kim",
+        requesterRole: "Head of People",
+        costCenter: "CC-101",
+        date: "Sep 16, 2026",
+        amount: 5170.00,
+        status: "pending",
+        justification: "Annual performance appraisal software module renewal.",
+        items: [
+          { desc: "Workday Talent Module Subscription", qty: 1, unitPrice: 5170.00, total: 5170.00 }
+        ],
+        audit: [
+          { role: "Requester", name: "David Kim", status: "Submitted", time: "Sep 16, 03:00 PM", note: "Annual appraisal renewal." },
+          { role: "Procurement Lead", name: "Sarah Chen", status: "Pending Action", time: "Awaiting review", note: "Verifying seat count." }
+        ]
+      },
+      {
+        id: "REQ-8865",
+        vendor: "GitHub Inc.",
+        category: "Software Tooling",
+        dept: "Engineering",
+        requester: "Sarah Jenkins",
+        requesterRole: "VP of Data Engineering",
+        costCenter: "CC-401",
+        date: "Sep 14, 2026",
+        amount: 24200.00,
+        status: "approved",
+        justification: "Annual renewal for engineering licenses and automated Actions runners.",
+        items: [
+          { desc: "GitHub Enterprise + Copilot (120 Seats)", qty: 120, unitPrice: 190.00, total: 22800.00 },
+          { desc: "Hosted Runner Minutes Pack", qty: 2, unitPrice: 700.00, total: 1400.00 }
+        ],
+        audit: [
+          { role: "Requester", name: "Sarah Jenkins", status: "Submitted", time: "Sep 14, 10:00 AM", note: "Renewal contract." },
+          { role: "Procurement Lead", name: "Sarah Chen", status: "Approved", time: "Sep 14, 04:15 PM", note: "Authorized and dispatched to ERP." }
+        ]
+      },
+      {
+        id: "REQ-8842",
+        vendor: "Herman Miller Global",
+        category: "Hardware & Facilities",
+        dept: "Executive",
+        requester: "Claire Sterling",
+        requesterRole: "Facilities Lead",
+        costCenter: "CC-101",
+        date: "Sep 12, 2026",
+        amount: 14800.00,
+        status: "approved",
+        justification: "Ergonomic seating for Floor 3 tech workstation upgrade.",
+        items: [
+          { desc: "Aeron Ergonomic Chairs (20 units)", qty: 20, unitPrice: 740.00, total: 14800.00 }
+        ],
+        audit: [
+          { role: "Requester", name: "Claire Sterling", status: "Submitted", time: "Sep 12, 11:20 AM", note: "Facilities expansion." },
+          { role: "Procurement Lead", name: "Sarah Chen", status: "Approved", time: "Sep 12, 02:40 PM", note: "Purchase authorized." }
+        ]
+      },
+      {
+        id: "REQ-8830",
+        vendor: "McKinsey & Co.",
+        category: "Professional Services",
+        dept: "Executive",
+        requester: "Robert Vance",
+        requesterRole: "VP Strategy",
+        costCenter: "CC-101",
+        date: "Sep 10, 2026",
+        amount: 85000.00,
+        status: "draft",
+        justification: "M&A technical due diligence advisory.",
+        items: [
+          { desc: "Advisory Services Retainer Phase 1", qty: 1, unitPrice: 85000.00, total: 85000.00 }
+        ],
+        audit: [
+          { role: "Requester", name: "Robert Vance", status: "Draft Saved", time: "Sep 10, 09:00 AM", note: "Awaiting board scope memo." }
+        ]
+      }
+    ];
+
+    // State management
+    let currentFilter = 'all';
+    let currentDeptFilter = 'all';
+    let currentSearch = '';
+    let selectedPoId = null;
+    let selectedRowIds = new Set();
+
+    function formatCurrency(num) {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2
+      }).format(num);
+    }
+
+    function getStatusBadge(status) {
+      switch (status) {
+        case 'approved':
+          return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold badge-approved">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 mr-1.5"></span>Approved
+                  </span>`;
+        case 'pending':
+          return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold badge-pending">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-600 mr-1.5"></span>Needs Review
+                  </span>`;
+        case 'rejected':
+          return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold badge-rejected">
+                    <span class="w-1.5 h-1.5 rounded-full bg-rose-600 mr-1.5"></span>Rejected
+                  </span>`;
+        case 'draft':
+        default:
+          return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold badge-draft">
+                    <span class="w-1.5 h-1.5 rounded-full bg-slate-500 mr-1.5"></span>Draft
+                  </span>`;
+      }
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('poTableBody');
+      tbody.innerHTML = '';
+
+      const filtered = mockPurchaseOrders.filter(po => {
+        const matchesTab = currentFilter === 'all' || po.status === currentFilter;
+        const matchesDept = currentDeptFilter === 'all' || po.dept === currentDeptFilter;
+        const q = currentSearch.toLowerCase().trim();
+        const matchesSearch = !q || 
+          po.id.toLowerCase().includes(q) ||
+          po.vendor.toLowerCase().includes(q) ||
+          po.requester.toLowerCase().includes(q) ||
+          po.costCenter.toLowerCase().includes(q);
+        return matchesTab && matchesDept && matchesSearch;
+      });
+
+      document.getElementById('visibleRowCount').textContent = filtered.length;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="9" class="text-center py-12 text-[#94A3B8]">
+              <svg class="w-7 h-7 mx-auto mb-2 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              No purchase requisitions match your criteria.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      filtered.forEach(po => {
+        const isChecked = selectedRowIds.has(po.id);
+        const tr = document.createElement('tr');
+        tr.className = `hover:bg-slate-50/80 transition-colors cursor-pointer group ${selectedPoId === po.id ? 'bg-blue-50/50' : ''} ${isChecked ? 'bg-slate-50' : ''}`;
+        
+        tr.onclick = (e) => {
+          if (e.target.closest('input[type="checkbox"]') || e.target.closest('button')) return;
+          openInspectionDrawer(po.id);
+        };
+
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 text-center">
+            <input type="checkbox" data-id="${po.id}" class="row-checkbox rounded border-slate-300 text-[#1E293B] focus:ring-0 focus:ring-offset-0 cursor-pointer" ${isChecked ? 'checked' : ''} />
+          </td>
+          <td class="py-2.5 px-3 font-mono font-semibold text-[#0F172A] tracking-tight">
+            ${po.id}
+          </td>
+          <td class="py-2.5 px-4">
+            <div class="font-medium text-[#0F172A] flex items-center space-x-1.5">
+              <span>${po.vendor}</span>
+            </div>
+            <div class="text-[11px] text-[#475569]">${po.category}</div>
+          </td>
+          <td class="py-2.5 px-4">
+            <div class="text-[#0F172A] font-medium">${po.requester}</div>
+            <div class="text-[11px] text-[#94A3B8]">${po.dept}</div>
+          </td>
+          <td class="py-2.5 px-3">
+            <span class="font-mono text-[11px] text-[#475569] bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">${po.costCenter}</span>
+          </td>
+          <td class="py-2.5 px-3 text-[#475569] tabular-nums font-mono text-[11px]">
+            ${po.date}
+          </td>
+          <td class="py-2.5 px-4 text-right font-semibold text-[#0F172A] tabular-nums">
+            ${formatCurrency(po.amount)}
+          </td>
+          <td class="py-2.5 px-3 text-center">
+            ${getStatusBadge(po.status)}
+          </td>
+          <td class="py-2.5 px-4 text-right">
+            <button onclick="openInspectionDrawer('${po.id}')" class="px-2.5 py-1 text-xs font-medium text-slate-700 bg-white hover:bg-slate-100 border border-[#E2E8F0] rounded transition-all shadow-2xs">
+              Review
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // Bind Row Checkboxes
+      document.querySelectorAll('.row-checkbox').forEach(box => {
+        box.addEventListener('change', (e) => {
+          const id = e.target.getAttribute('data-id');
+          if (e.target.checked) {
+            selectedRowIds.add(id);
+          } else {
+            selectedRowIds.delete(id);
+          }
+          updateBatchBar();
+        });
+      });
+
+      updateCounts();
+    }
+
+    function updateBatchBar() {
+      const bar = document.getElementById('batchActionBar');
+      const label = document.getElementById('batchCountLabel');
+      if (selectedRowIds.size > 0) {
+        bar.classList.remove('hidden');
+        label.textContent = `${selectedRowIds.size} requisition${selectedRowIds.size > 1 ? 's' : ''} selected`;
+      } else {
+        bar.classList.add('hidden');
+      }
+    }
+
+    function updateCounts() {
+      const counts = { all: mockPurchaseOrders.length, pending: 0, approved: 0, draft: 0, rejected: 0 };
+      let pendingTotal = 0;
+      let approvedTotal = 0;
+      const vendors = new Set();
+
+      mockPurchaseOrders.forEach(p => {
+        counts[p.status] = (counts[p.status] || 0) + 1;
+        vendors.add(p.vendor);
+        if (p.status === 'pending') pendingTotal += p.amount;
+        if (p.status === 'approved') approvedTotal += p.amount;
+      });
+
+      document.getElementById('countAll').textContent = counts.all;
+      document.getElementById('countPending').textContent = counts.pending;
+      document.getElementById('countApproved').textContent = counts.approved;
+      document.getElementById('countDraft').textContent = counts.draft;
+      document.getElementById('countRejected').textContent = counts.rejected;
+
+      document.getElementById('kpiPendingAmount').textContent = formatCurrency(pendingTotal);
+      document.getElementById('kpiPendingCount').textContent = `${counts.pending} In Queue`;
+      document.getElementById('kpiApprovedAmount').textContent = formatCurrency(approvedTotal);
+      document.getElementById('kpiActiveSuppliers').textContent = vendors.size;
+      document.getElementById('requisitionTotalBadge').textContent = `${counts.all} active · ${counts.pending} awaiting action`;
+    }
+
+    function openInspectionDrawer(poId) {
+      selectedPoId = poId;
+      const po = mockPurchaseOrders.find(p => p.id === poId);
+      if (!po) return;
+
+      document.getElementById('drawerPoId').textContent = po.id;
+      document.getElementById('drawerVendorSubtitle').textContent = `${po.vendor} · ${po.category}`;
+      document.getElementById('drawerStatusBadge').outerHTML = `<span id="drawerStatusBadge">${getStatusBadge(po.status)}</span>`;
+      document.getElementById('drawerTotalAmount').textContent = formatCurrency(po.amount);
+      document.getElementById('drawerJustification').textContent = po.justification;
+      document.getElementById('drawerItemCount').textContent = `${po.items.length} item${po.items.length > 1 ? 's' : ''}`;
+
+      // Populate Items Table
+      const itemsTable = document.getElementById('drawerItemsTable');
+      itemsTable.innerHTML = '';
+      po.items.forEach(item => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td class="py-2 px-3 text-[#0F172A] font-medium">${item.desc}</td>
+          <td class="py-2 px-2 text-center tabular-nums font-mono text-[#475569]">${item.qty}</td>
+          <td class="py-2 px-3 text-right tabular-nums text-[#475569]">${formatCurrency(item.unitPrice)}</td>
+          <td class="py-2 px-3 text-right tabular-nums font-semibold text-[#0F172A]">${formatCurrency(item.total)}</td>
+        `;
+        itemsTable.appendChild(row);
+      });
+
+      // Populate Visual Audit Trail
+      const auditContainer = document.getElementById('drawerAuditTrail');
+      auditContainer.innerHTML = '';
+      po.audit.forEach((step, idx) => {
+        const isDone = step.status.toLowerCase().includes('approved') || step.status.toLowerCase().includes('submitted');
+        const isPending = step.status.toLowerCase().includes('pending');
+
+        const stepDiv = document.createElement('div');
+        stepDiv.className = 'relative flex items-start space-x-3 text-xs';
+        stepDiv.innerHTML = `
+          <div class="relative z-10 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+            isDone ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 
+            isPending ? 'bg-amber-100 text-amber-800 border border-amber-300 animate-pulse' : 
+            'bg-slate-100 text-slate-500 border border-slate-300'
+          }">
+            ${idx + 1}
+          </div>
+          <div class="flex-1 bg-white p-2.5 rounded border border-[#E2E8F0]">
+            <div class="flex items-center justify-between">
+              <span class="font-semibold text-[#0F172A]">${step.role} <span class="font-normal text-slate-500">(${step.name})</span></span>
+              <span class="text-[10px] text-[#94A3B8] font-mono">${step.time}</span>
+            </div>
+            <div class="mt-0.5 text-[11px] font-medium ${isDone ? 'text-emerald-700' : isPending ? 'text-amber-800' : 'text-slate-600'}">${step.status}</div>
+            ${step.note ? `<p class="mt-1 text-[11px] text-slate-500 bg-slate-50 p-1 rounded font-mono">${step.note}</p>` : ''}
+          </div>
+        `;
+        auditContainer.appendChild(stepDiv);
+      });
+
+      // Set button availability
+      const btnApprove = document.getElementById('btnApprovePo');
+      if (po.status === 'approved') {
+        btnApprove.disabled = true;
+        btnApprove.classList.add('opacity-40', 'cursor-not-allowed');
+        btnApprove.innerHTML = `<span>Requisition Authorized</span>`;
+      } else {
+        btnApprove.disabled = false;
+        btnApprove.classList.remove('opacity-40', 'cursor-not-allowed');
+        btnApprove.innerHTML = `
+          <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+          </svg>
+          <span>Authorize & Issue PO</span>
+        `;
+      }
+
+      const drawer = document.getElementById('inspectionDrawer');
+      const overlay = document.getElementById('drawerOverlay');
+      overlay.classList.remove('pointer-events-none', 'opacity-0');
+      overlay.classList.add('opacity-100');
+      drawer.classList.remove('translate-x-full');
+      renderTable();
+    }
+
+    function closeDrawer() {
+      const drawer = document.getElementById('inspectionDrawer');
+      const overlay = document.getElementById('drawerOverlay');
+      drawer.classList.add('translate-x-full');
+      overlay.classList.remove('opacity-100');
+      overlay.classList.add('opacity-0', 'pointer-events-none');
+      selectedPoId = null;
+      renderTable();
+    }
+
+    function showToast(message, isSuccess = true) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMessage');
+      const toastIcon = document.getElementById('toastIcon');
+
+      toastMsg.textContent = message;
+      if (isSuccess) {
+        toastIcon.innerHTML = `<svg class="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>`;
+      } else {
+        toastIcon.innerHTML = `<svg class="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>`;
+      }
+
+      toast.classList.remove('opacity-0', 'translate-y-12');
+      toast.classList.add('opacity-100', 'translate-y-0');
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-12');
+        toast.classList.remove('opacity-100', 'translate-y-0');
+      }, 3500);
+    }
+
+    // Single PO Approve
+    document.getElementById('btnApprovePo').addEventListener('click', () => {
+      if (!selectedPoId) return;
+      const po = mockPurchaseOrders.find(p => p.id === selectedPoId);
+      if (po) {
+        po.status = 'approved';
+        po.audit.push({
+          role: "Procurement Lead",
+          name: "Sarah Chen",
+          status: "Authorized & Issued",
+          time: "Just now",
+          note: "Authorized via ProcureNext Executive Panel."
+        });
+        showToast(`PO ${po.id} generated and dispatched to NetSuite.`);
+        openInspectionDrawer(selectedPoId);
+      }
+    });
+
+    // Single PO Reject
+    document.getElementById('btnRejectPo').addEventListener('click', () => {
+      if (!selectedPoId) return;
+      const po = mockPurchaseOrders.find(p => p.id === selectedPoId);
+      if (po) {
+        po.status = 'rejected';
+        po.audit.push({
+          role: "Procurement Lead",
+          name: "Sarah Chen",
+          status: "Rejected",
+          time: "Just now",
+          note: "Budget allocation cap reached for Q4."
+        });
+        showToast(`Requisition ${po.id} was rejected.`, false);
+        openInspectionDrawer(selectedPoId);
+      }
+    });
+
+    // Clarification button
+    document.getElementById('btnRequestInfo').addEventListener('click', () => {
+      if (!selectedPoId) return;
+      showToast(`Clarification ping sent to requester.`, false);
+    });
+
+    // Batch Actions
+    document.getElementById('btnBatchApprove').addEventListener('click', () => {
+      selectedRowIds.forEach(id => {
+        const po = mockPurchaseOrders.find(p => p.id === id);
+        if (po && po.status !== 'approved') {
+          po.status = 'approved';
+          po.audit.push({
+            role: "Procurement Lead",
+            name: "Sarah Chen",
+            status: "Batch Authorized",
+            time: "Just now",
+            note: "Batch approval execution."
+          });
+        }
+      });
+      showToast(`${selectedRowIds.size} requisitions approved and issued.`);
+      selectedRowIds.clear();
+      updateBatchBar();
+      renderTable();
+    });
+
+    document.getElementById('btnBatchClear').addEventListener('click', () => {
+      selectedRowIds.clear();
+      updateBatchBar();
+      renderTable();
+    });
+
+    // Master checkbox
+    document.getElementById('selectAllCheckbox').addEventListener('change', (e) => {
+      if (e.target.checked) {
+        mockPurchaseOrders.forEach(p => selectedRowIds.add(p.id));
+      } else {
+        selectedRowIds.clear();
+      }
+      updateBatchBar();
+      renderTable();
+    });
+
+    // Filter Tabs
+    document.querySelectorAll('.filter-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.filter-tab').forEach(t => {
+          t.classList.remove('bg-white', 'text-[#0F172A]', 'shadow-2xs', 'font-semibold');
+          t.classList.add('text-[#475569]');
+        });
+        tab.classList.add('bg-white', 'text-[#0F172A]', 'shadow-2xs', 'font-semibold');
+        tab.classList.remove('text-[#475569]');
+        currentFilter = tab.getAttribute('data-filter');
+        renderTable();
+      });
+    });
+
+    // Department Filter
+    document.getElementById('departmentFilter').addEventListener('change', (e) => {
+      currentDeptFilter = e.target.value;
+      renderTable();
+    });
+
+    // Table search input
+    document.getElementById('tableSearchInput').addEventListener('input', (e) => {
+      currentSearch = e.target.value;
+      renderTable();
+    });
+
+    // Command Palette Logic
+    const cmdPaletteOverlay = document.getElementById('commandPaletteOverlay');
+    const cmdPaletteInput = document.getElementById('cmdPaletteInput');
+    const cmdPaletteResults = document.getElementById('cmdPaletteResults');
+
+    function openCommandPalette() {
+      cmdPaletteOverlay.classList.remove('opacity-0', 'pointer-events-none');
+      cmdPaletteOverlay.classList.add('opacity-100');
+      cmdPaletteInput.value = '';
+      renderPaletteResults('');
+      setTimeout(() => cmdPaletteInput.focus(), 50);
+    }
+
+    function closeCommandPalette() {
+      cmdPaletteOverlay.classList.remove('opacity-100');
+      cmdPaletteOverlay.classList.add('opacity-0', 'pointer-events-none');
+    }
+
+    function renderPaletteResults(query) {
+      const q = query.toLowerCase().trim();
+      const commands = [
+        { label: "Create New Requisition", meta: "Action", action: () => { closeCommandPalette(); openNewReqModal(); } },
+        { label: "Export Full Spend Report (CSV)", meta: "Report", action: () => { closeCommandPalette(); document.getElementById('btnExportCSV').click(); } },
+        { label: "Switch Legal Entity: Acme EMEA", meta: "Entity", action: () => { closeCommandPalette(); switchWorkspace('Acme EMEA B.V.'); } },
+        { label: "Switch Legal Entity: Acme APAC", meta: "Entity", action: () => { closeCommandPalette(); switchWorkspace('Acme APAC Pte. Ltd.'); } },
+      ];
+
+      // Add Matching POs
+      mockPurchaseOrders.forEach(p => {
+        if (!q || p.id.toLowerCase().includes(q) || p.vendor.toLowerCase().includes(q) || p.requester.toLowerCase().includes(q)) {
+          commands.push({
+            label: `${p.id} — ${p.vendor} (${formatCurrency(p.amount)})`,
+            meta: p.status.toUpperCase(),
+            action: () => {
+              closeCommandPalette();
+              openInspectionDrawer(p.id);
+            }
+          });
+        }
+      });
+
+      cmdPaletteResults.innerHTML = '';
+      commands.forEach((c, idx) => {
+        const item = document.createElement('div');
+        item.className = `p-2.5 rounded-md hover:bg-slate-100 cursor-pointer flex items-center justify-between text-xs transition-colors ${idx === 0 ? 'bg-slate-50' : ''}`;
+        item.innerHTML = `
+          <span class="font-medium text-[#0F172A]">${c.label}</span>
+          <span class="text-[10px] font-mono uppercase bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">${c.meta}</span>
+        `;
+        item.onclick = c.action;
+        cmdPaletteResults.appendChild(item);
+      });
+    }
+
+    document.getElementById('btnOmnibarTrigger').addEventListener('click', openCommandPalette);
+    document.getElementById('btnMobileSearch').addEventListener('click', openCommandPalette);
+    cmdPaletteInput.addEventListener('input', (e) => renderPaletteResults(e.target.value));
+
+    // Global Shortcut: Cmd+K or Ctrl+K
+    document.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        openCommandPalette();
+      }
+      if (e.key === 'Escape') {
+        closeCommandPalette();
+        closeDrawer();
+        closeNewReqModal();
+        closeAllMenus();
+      }
+    });
+
+    cmdPaletteOverlay.addEventListener('click', (e) => {
+      if (e.target === cmdPaletteOverlay) closeCommandPalette();
+    });
+
+    // Dropdowns: Workspace, Notifications, User Menu
+    const workspaceMenu = document.getElementById('workspaceMenu');
+    const notificationsMenu = document.getElementById('notificationsMenu');
+    const userMenu = document.getElementById('userMenu');
+
+    function closeAllMenus() {
+      workspaceMenu.classList.add('hidden');
+      notificationsMenu.classList.add('hidden');
+      userMenu.classList.add('hidden');
+    }
+
+    document.getElementById('btnWorkspaceSwitcher').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const wasHidden = workspaceMenu.classList.contains('hidden');
+      closeAllMenus();
+      if (wasHidden) workspaceMenu.classList.remove('hidden');
+    });
+
+    document.getElementById('btnNotifications').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const wasHidden = notificationsMenu.classList.contains('hidden');
+      closeAllMenus();
+      if (wasHidden) notificationsMenu.classList.remove('hidden');
+    });
+
+    document.getElementById('btnUserProfile').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const wasHidden = userMenu.classList.contains('hidden');
+      closeAllMenus();
+      if (wasHidden) userMenu.classList.remove('hidden');
+    });
+
+    document.addEventListener('click', closeAllMenus);
+
+    function switchWorkspace(name) {
+      document.getElementById('currentWorkspaceLabel').textContent = name;
+      showToast(`Switched active workspace to ${name}`);
+    }
+
+    document.querySelectorAll('.workspace-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const name = item.querySelector('span').textContent;
+        switchWorkspace(name);
+      });
+    });
+
+    // Modal New Requisition Handlers
+    const modalOverlay = document.getElementById('modalOverlay');
+    function openNewReqModal() {
+      modalOverlay.classList.remove('pointer-events-none', 'opacity-0');
+      modalOverlay.classList.add('opacity-100');
+    }
+    function closeNewReqModal() {
+      modalOverlay.classList.remove('opacity-100');
+      modalOverlay.classList.add('opacity-0', 'pointer-events-none');
+    }
+
+    document.getElementById('btnNewRequisition').addEventListener('click', openNewReqModal);
+    document.getElementById('btnCloseModal').addEventListener('click', closeNewReqModal);
+    document.getElementById('btnCancelModal').addEventListener('click', closeNewReqModal);
+
+    document.getElementById('newPoForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const vendor = document.getElementById('inputVendor').value;
+      const category = document.getElementById('inputCategory').value;
+      const dept = document.getElementById('inputCostCenter').value;
+      const itemDesc = document.getElementById('inputItemDesc').value;
+      const amount = parseFloat(document.getElementById('inputAmount').value) || 0;
+      const justification = document.getElementById('inputJustification').value || "Procurement request for Q4 operations.";
+
+      const newId = `REQ-${Math.floor(1000 + Math.random() * 9000)}`;
+      const newPo = {
+        id: newId,
+        vendor,
+        category,
+        dept,
+        requester: "Sarah Chen",
+        requesterRole: "Sr. Procurement Specialist",
+        costCenter: dept === 'Engineering' ? 'CC-401' : dept === 'Marketing' ? 'CC-202' : 'CC-101',
+        date: "Today",
+        amount,
+        status: "pending",
+        justification,
+        items: [
+          { desc: itemDesc, qty: 1, unitPrice: amount, total: amount }
+        ],
+        audit: [
+          { role: "Requester", name: "Sarah Chen", status: "Submitted", time: "Just now", note: "Created via quick requisition intake." },
+          { role: "Procurement Lead", name: "Sarah Chen", status: "Pending Action", time: "Awaiting review", note: "Routing for departmental check." }
+        ]
+      };
+
+      mockPurchaseOrders.unshift(newPo);
+      closeNewReqModal();
+      document.getElementById('newPoForm').reset();
+      showToast(`New requisition ${newId} submitted for authorization.`);
+      renderTable();
+      openInspectionDrawer(newId);
+    });
+
+    // Drawer close events
+    document.getElementById('btnCloseDrawer').addEventListener('click', closeDrawer);
+    document.getElementById('drawerOverlay').addEventListener('click', closeDrawer);
+
+    // Export CSV
+    document.getElementById('btnExportCSV').addEventListener('click', () => {
+      const csvRows = [
+        ["Requisition ID", "Vendor", "Category", "Department", "Requester", "Cost Center", "Date", "Amount", "Status"]
+      ];
+      mockPurchaseOrders.forEach(p => {
+        csvRows.push([p.id, `"${p.vendor}"`, `"${p.category}"`, p.dept, `"${p.requester}"`, p.costCenter, p.date, p.amount, p.status]);
+      });
+      const csvContent = "data:text/csv;charset=utf-8," + csvRows.map(e => e.join(",")).join("\n");
+      const link = document.createElement("a");
+      link.setAttribute("href", encodeURI(csvContent));
+      link.setAttribute("download", `ProcureNext_Requisitions_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast("Requisitions exported to CSV file.");
+    });
+
+    // Initial render
+    renderTable();
+  </script>
+</body>
+</html>

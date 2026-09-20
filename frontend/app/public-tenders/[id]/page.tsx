@@ -71,10 +71,10 @@ export default function PublicTenderDetailPage({ params }: { params: Promise<{ i
 
   if (loading) {
     return (
-      <main className="w-full min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center">
+      <main className="w-full min-h-screen bg-app text-content-primary flex items-center justify-center">
         <div className="text-center space-y-3">
-          <div className="w-8 h-8 border-2 border-accent-400 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-xs text-slate-400">Loading public tender notice...</p>
+          <div className="w-8 h-8 border-2 border-brand-navy border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs text-content-muted">Loading public tender notice...</p>
         </div>
       </main>
     );
@@ -82,15 +82,15 @@ export default function PublicTenderDetailPage({ params }: { params: Promise<{ i
 
   if (!tender) {
     return (
-      <main className="w-full min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center p-6">
-        <div className="max-w-md w-full text-center p-8 rounded-3xl bg-slate-800/40 border border-slate-800">
-          <h2 className="text-xl font-bold text-white mb-2">Tender Notice Not Found</h2>
-          <p className="text-xs text-slate-400 mb-6">
+      <main className="w-full min-h-screen bg-app text-content-primary flex items-center justify-center p-6">
+        <div className="max-w-md w-full text-center p-8 rounded bg-surface border border-subtle">
+          <h2 className="text-xl font-bold text-content-primary mb-2">Tender Notice Not Found</h2>
+          <p className="text-xs text-content-muted mb-6">
             {fetchError || "This tender may be restricted, draft, or closed to public viewing."}
           </p>
           <button
             onClick={() => router.push("/public-tenders")}
-            className="px-6 py-2.5 bg-accent-500 text-white text-xs font-bold rounded-xl transition"
+            className="bg-brand-navy text-white hover:bg-slate-900 text-sm font-medium h-9 px-3.5 rounded transition"
           >
             Back to Active Tenders
           </button>
@@ -105,37 +105,37 @@ export default function PublicTenderDetailPage({ params }: { params: Promise<{ i
     : null;
 
   return (
-    <main className="w-full min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-between">
+    <main className="w-full min-h-screen bg-app text-content-primary flex flex-col justify-between">
       {/* ── Sticky Navigation ──────────────────────────── */}
-      <header className="w-full border-b border-slate-800 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50">
+      <header className="w-full border-b border-subtle bg-surface sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent-400 to-accent-600 flex items-center justify-center shadow-lg">
+            <div className="w-9 h-9 rounded bg-brand-navy flex items-center justify-center">
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
             </div>
-            <span className="text-xl font-bold text-white tracking-tight">ProcureNext</span>
+            <span className="text-xl font-bold text-content-primary tracking-tight">ProcureNext</span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-400">
-            <Link href="/public-tenders" className="text-accent-400 font-bold">Active Tenders</Link>
-            <Link href="/about" className="hover:text-white transition">About</Link>
-            <Link href="/policies" className="hover:text-white transition">Policies</Link>
-            <Link href="/legal" className="hover:text-white transition">Legal</Link>
-            <Link href="/help" className="hover:text-white transition">Help & Support</Link>
+          <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-content-secondary">
+            <Link href="/public-tenders" className="text-brand-blue font-bold">Active Tenders</Link>
+            <Link href="/about" className="hover:text-content-primary transition">About</Link>
+            <Link href="/policies" className="hover:text-content-primary transition">Policies</Link>
+            <Link href="/legal" className="hover:text-content-primary transition">Legal</Link>
+            <Link href="/help" className="hover:text-content-primary transition">Help & Support</Link>
           </nav>
 
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push("/login")}
-              className="px-4 py-2 text-xs sm:text-sm font-semibold text-slate-300 hover:text-white transition"
+              className="px-4 py-2 text-xs sm:text-sm font-semibold text-content-secondary hover:text-content-primary transition"
             >
               Login
             </button>
             <button
               onClick={() => router.push("/signup-master")}
-              className="px-4 py-2 text-xs sm:text-sm font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-xl transition shadow"
+              className="bg-brand-navy text-white hover:bg-slate-900 text-sm font-medium h-9 px-3.5 rounded transition"
             >
               Register to Bid
             </button>
@@ -144,45 +144,48 @@ export default function PublicTenderDetailPage({ params }: { params: Promise<{ i
       </header>
 
       {/* ── Main Content ─────────────────────────────────── */}
-      <div className="flex-1 max-w-5xl mx-auto px-6 py-12 w-full animate-fade-in space-y-8">
+      <div className="flex-1 max-w-5xl mx-auto px-6 py-12 w-full animate-fade-in space-y-6">
         {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-xs font-semibold text-slate-400">
-          <Link href="/" className="hover:text-white transition">Home</Link>
+        <div className="flex items-center gap-2 text-content-secondary text-xs font-medium">
+          <Link href="/" className="hover:text-content-primary transition">Home</Link>
           <span>/</span>
-          <Link href="/public-tenders" className="hover:text-white transition">Active Tenders</Link>
+          <Link href="/public-tenders" className="hover:text-content-primary transition">Active Tenders</Link>
           <span>/</span>
-          <span className="text-accent-400">Notice #{tender.tender_id}</span>
+          <span className="text-brand-blue tabular-nums">Notice #{tender.tender_id}</span>
         </div>
 
         {/* Public Notice Banner */}
-        <div className="p-8 rounded-3xl bg-slate-800/40 border border-slate-800 shadow-2xl space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-6">
+        <div className="p-6 sm:p-8 rounded bg-surface border border-subtle space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-subtle pb-5">
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded bg-slate-700/60 text-slate-300 border border-slate-600">
-                  TENDER ID: #{tender.tender_id}
+                <span className="badge-status badge-draft">
+                  <span className="badge-dot" />
+                  <span className="tabular-nums">TENDER ID: #{tender.tender_id}</span>
                 </span>
-                <span className="text-xs font-bold px-2.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300">
-                  ● ACTIVE FOR BIDDING
+                <span className="badge-status badge-approved">
+                  <span className="badge-dot" />
+                  ACTIVE FOR BIDDING
                 </span>
                 {tender.category_name && (
-                  <span className="text-xs font-bold px-2.5 py-0.5 rounded bg-accent-500/20 text-accent-300">
+                  <span className="badge-status badge-draft">
+                    <span className="badge-dot" />
                     {tender.category_name}
                   </span>
                 )}
               </div>
-              <h1 className="text-2xl sm:text-3xl font-black text-white leading-tight">
+              <h1 className="text-xl sm:text-2xl font-bold text-content-primary leading-tight">
                 {tender.title}
               </h1>
             </div>
 
             <div className="text-right">
-              <span className="text-[11px] uppercase font-bold text-slate-400 block">Submission Deadline</span>
-              <span className="text-sm sm:text-base font-mono font-bold text-amber-300 block">
+              <span className="text-content-secondary text-xs font-medium uppercase block">Submission Deadline</span>
+              <span className="text-sm font-semibold text-content-primary tabular-nums block">
                 {deadlineDate ? deadlineDate.toLocaleDateString(undefined, { dateStyle: "long" }) : "N/A"}
               </span>
               {daysRemaining !== null && (
-                <span className="text-xs text-emerald-400 font-semibold block">
+                <span className="text-xs text-status-approved-text font-medium block tabular-nums">
                   {daysRemaining > 0 ? `(${daysRemaining} days left)` : "(Closing today)"}
                 </span>
               )}
@@ -190,21 +193,21 @@ export default function PublicTenderDetailPage({ params }: { params: Promise<{ i
           </div>
 
           {/* Quick Notice Action Box */}
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-accent-500/10 via-slate-800/60 to-purple-500/10 border border-accent-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-xs text-slate-300 space-y-0.5 text-center sm:text-left">
-              <p className="font-bold text-white">📢 Verified Vendor Participation Required</p>
-              <p className="text-slate-400">To view full technical drawings or submit a proposal, log in with a verified vendor account.</p>
+          <div className="p-4 rounded bg-app border border-subtle flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-xs text-content-secondary space-y-0.5 text-center sm:text-left">
+              <p className="font-semibold text-content-primary">Verified Vendor Participation Required</p>
+              <p className="text-content-muted">To view full technical drawings or submit a proposal, log in with a verified vendor account.</p>
             </div>
             <div className="flex gap-2 flex-shrink-0">
               <button
                 onClick={() => router.push("/login")}
-                className="px-4 py-2 bg-white text-navy-900 text-xs font-bold rounded-xl hover:bg-slate-100 transition shadow"
+                className="bg-surface text-content-primary border border-subtle hover:bg-slate-100 text-sm font-medium h-9 px-3.5 rounded transition"
               >
                 Login to Bid
               </button>
               <button
                 onClick={() => router.push("/signup-master")}
-                className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white text-xs font-bold rounded-xl transition shadow"
+                className="bg-brand-navy text-white hover:bg-slate-900 text-sm font-medium h-9 px-3.5 rounded transition"
               >
                 Register Vendor
               </button>
@@ -213,145 +216,146 @@ export default function PublicTenderDetailPage({ params }: { params: Promise<{ i
         </div>
 
         {/* Structured Information Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Section 1: Procuring Entity & Legal Info */}
-          <div className="p-6 rounded-3xl bg-slate-800/30 border border-slate-800 space-y-4">
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <span>🏛️</span> Procuring Entity & Administrative Details
+          <div className="p-5 rounded bg-surface border border-subtle space-y-3">
+            <h2 className="text-sm font-semibold text-content-primary">
+              Procuring Entity & Administrative Details
             </h2>
-            <div className="space-y-2 text-xs text-slate-300">
-              <div className="flex justify-between py-1.5 border-b border-slate-800/80">
-                <span className="text-slate-400">Procuring Entity:</span>
-                <span className="font-bold text-white flex items-center gap-1">
+            <div className="space-y-1 text-xs text-content-secondary">
+              <div className="flex justify-between py-1.5 border-b border-subtle">
+                <span className="text-content-muted">Procuring Entity:</span>
+                <span className="font-semibold text-content-primary flex items-center gap-1">
                   {tender.buyer_org_name}
-                  {tender.buyer_verified && <span className="text-emerald-400">✓</span>}
+                  {tender.buyer_verified && <span className="text-status-approved-text">✓</span>}
                 </span>
               </div>
-              <div className="flex justify-between py-1.5 border-b border-slate-800/80">
-                <span className="text-slate-400">Organization Type:</span>
+              <div className="flex justify-between py-1.5 border-b border-subtle">
+                <span className="text-content-muted">Organization Type:</span>
                 <span>{tender.buyer_org_type || "Commercial Buyer"}</span>
               </div>
-              <div className="flex justify-between py-1.5 border-b border-slate-800/80">
-                <span className="text-slate-400">Procurement Method:</span>
-                <span className="font-semibold text-accent-300">{tender.procurement_method || "Open Tendering Method"}</span>
+              <div className="flex justify-between py-1.5 border-b border-subtle">
+                <span className="text-content-muted">Procurement Method:</span>
+                <span className="font-medium text-content-primary">{tender.procurement_method || "Open Tendering Method"}</span>
               </div>
-              <div className="flex justify-between py-1.5 border-b border-slate-800/80">
-                <span className="text-slate-400">Procurement Nature:</span>
-                <span className="font-semibold text-purple-300">{tender.procurement_nature || "Goods"}</span>
+              <div className="flex justify-between py-1.5 border-b border-subtle">
+                <span className="text-content-muted">Procurement Nature:</span>
+                <span className="font-medium text-content-primary">{tender.procurement_nature || "Goods"}</span>
               </div>
               <div className="flex justify-between py-1.5">
-                <span className="text-slate-400">Visibility:</span>
-                <span className="text-emerald-400 font-bold">Public (Open Competition)</span>
+                <span className="text-content-muted">Visibility:</span>
+                <span className="text-status-approved-text font-semibold">Public (Open Competition)</span>
               </div>
             </div>
           </div>
 
           {/* Section 2: Key Dates & Timeline */}
-          <div className="p-6 rounded-3xl bg-slate-800/30 border border-slate-800 space-y-4">
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <span>⏰</span> Key Dates & Schedule
+          <div className="p-5 rounded bg-surface border border-subtle space-y-3">
+            <h2 className="text-sm font-semibold text-content-primary">
+              Key Dates & Schedule
             </h2>
-            <div className="space-y-2 text-xs text-slate-300">
-              <div className="flex justify-between py-1.5 border-b border-slate-800/80">
-                <span className="text-slate-400">Publication Date:</span>
-                <span>{tender.tender_public_date ? new Date(tender.tender_public_date).toLocaleDateString() : "Immediate"}</span>
+            <div className="space-y-1 text-xs text-content-secondary">
+              <div className="flex justify-between py-1.5 border-b border-subtle">
+                <span className="text-content-muted">Publication Date:</span>
+                <span className="tabular-nums">{tender.tender_public_date ? new Date(tender.tender_public_date).toLocaleDateString() : "Immediate"}</span>
               </div>
-              <div className="flex justify-between py-1.5 border-b border-slate-800/80">
-                <span className="text-slate-400">Pre-Bid Meeting:</span>
-                <span>{tender.pre_bid_meeting ? new Date(tender.pre_bid_meeting).toLocaleDateString() : "Not Applicable"}</span>
+              <div className="flex justify-between py-1.5 border-b border-subtle">
+                <span className="text-content-muted">Pre-Bid Meeting:</span>
+                <span className="tabular-nums">{tender.pre_bid_meeting ? new Date(tender.pre_bid_meeting).toLocaleDateString() : "Not Applicable"}</span>
               </div>
-              <div className="flex justify-between py-1.5 border-b border-slate-800/80">
-                <span className="text-slate-400">Submission Closing:</span>
-                <span className="font-bold text-amber-300">{deadlineDate ? deadlineDate.toLocaleDateString() : "Open"}</span>
+              <div className="flex justify-between py-1.5 border-b border-subtle">
+                <span className="text-content-muted">Submission Closing:</span>
+                <span className="font-semibold text-status-pending-text tabular-nums">{deadlineDate ? deadlineDate.toLocaleDateString() : "Open"}</span>
               </div>
               <div className="flex justify-between py-1.5">
-                <span className="text-slate-400">Tender Opening Date:</span>
-                <span>{tender.tender_opening_date ? new Date(tender.tender_opening_date).toLocaleDateString() : "Upon Closing"}</span>
+                <span className="text-content-muted">Tender Opening Date:</span>
+                <span className="tabular-nums">{tender.tender_opening_date ? new Date(tender.tender_opening_date).toLocaleDateString() : "Upon Closing"}</span>
               </div>
             </div>
           </div>
 
           {/* Section 3: Financial Terms & Bid Security */}
-          <div className="p-6 rounded-3xl bg-slate-800/30 border border-slate-800 space-y-4">
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <span>💰</span> Financial Terms & Guarantees
+          <div className="p-5 rounded bg-surface border border-subtle space-y-3">
+            <h2 className="text-sm font-semibold text-content-primary">
+              Financial Terms & Guarantees
             </h2>
-            <div className="space-y-2 text-xs text-slate-300">
-              <div className="flex justify-between py-1.5 border-b border-slate-800/80">
-                <span className="text-slate-400">Estimated Budget Range:</span>
-                <span className="font-mono font-bold text-emerald-400">
+            <div className="space-y-1 text-xs text-content-secondary">
+              <div className="flex justify-between py-1.5 border-b border-subtle">
+                <span className="text-content-muted">Estimated Budget Range:</span>
+                <span className="font-semibold text-content-primary tabular-nums">
                   {tender.budget_min && tender.budget_max
                     ? `BDT ${tender.budget_min.toLocaleString()} - ${tender.budget_max.toLocaleString()}`
                     : "Published in Tender Document"}
                 </span>
               </div>
-              <div className="flex justify-between py-1.5 border-b border-slate-800/80">
-                <span className="text-slate-400">Bid Security Required:</span>
-                <span className={tender.security_required ? "text-emerald-400 font-bold" : "text-slate-400"}>
+              <div className="flex justify-between py-1.5 border-b border-subtle">
+                <span className="text-content-muted">Bid Security Required:</span>
+                <span className={tender.security_required ? "text-status-approved-text font-semibold" : "text-content-muted"}>
                   {tender.security_required ? "Yes (Bank Guarantee / Pay Order)" : "No Security Required"}
                 </span>
               </div>
               <div className="flex justify-between py-1.5">
-                <span className="text-slate-400">Proposal Validity Period:</span>
-                <span>{tender.proposal_valid_until ? new Date(tender.proposal_valid_until).toLocaleDateString() : "90 Days"}</span>
+                <span className="text-content-muted">Proposal Validity Period:</span>
+                <span className="tabular-nums">{tender.proposal_valid_until ? new Date(tender.proposal_valid_until).toLocaleDateString() : "90 Days"}</span>
               </div>
             </div>
           </div>
 
           {/* Section 4: Eligibility & Mandatory Checklist */}
-          <div className="p-6 rounded-3xl bg-slate-800/30 border border-slate-800 space-y-4">
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <span>📋</span> Eligibility & Required Compliance Documents
+          <div className="p-5 rounded bg-surface border border-subtle space-y-3">
+            <h2 className="text-sm font-semibold text-content-primary">
+              Eligibility & Required Compliance Documents
             </h2>
             {tender.required_documents && tender.required_documents.length > 0 ? (
               <ul className="space-y-2 text-xs">
                 {tender.required_documents.map((doc) => (
                   <li
                     key={doc.req_doc_id}
-                    className="flex items-center justify-between p-2 rounded-xl bg-slate-900/60 border border-slate-800/80"
+                    className="flex items-center justify-between p-2 rounded bg-app border border-subtle"
                   >
-                    <span className="text-slate-300">{doc.custom_doc_name}</span>
+                    <span className="text-content-primary">{doc.custom_doc_name}</span>
                     <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                        doc.is_mandatory ? "bg-red-500/20 text-red-300" : "bg-slate-700 text-slate-400"
+                      className={`badge-status ${
+                        doc.is_mandatory ? "badge-rejected" : "badge-draft"
                       }`}
                     >
-                      {doc.is_mandatory ? "* Mandatory" : "Optional"}
+                      <span className="badge-dot" />
+                      {doc.is_mandatory ? "Mandatory" : "Optional"}
                     </span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-xs text-slate-400">Standard regulatory trade license and TIN compliance required.</p>
+              <p className="text-xs text-content-muted">Standard regulatory trade license and TIN compliance required.</p>
             )}
           </div>
         </div>
 
         {/* Section 5: Public Scope of Work */}
-        <div className="p-8 rounded-3xl bg-slate-800/30 border border-slate-800 space-y-4">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <span>📦</span> Detailed Scope of Work & Specification Notice
+        <div className="p-6 sm:p-8 rounded bg-surface border border-subtle space-y-3">
+          <h2 className="text-sm font-semibold text-content-primary">
+            Detailed Scope of Work & Specification Notice
           </h2>
-          <div className="text-xs sm:text-sm text-slate-300 leading-relaxed whitespace-pre-line bg-slate-900/60 p-6 rounded-2xl border border-slate-800">
+          <div className="text-xs sm:text-sm text-content-secondary leading-relaxed whitespace-pre-line bg-app p-5 rounded border border-subtle">
             {tender.description}
           </div>
         </div>
       </div>
 
       {/* ── Footer ─────────────────────────────────────── */}
-      <footer className="w-full py-8 px-6 bg-slate-950 border-t border-slate-800">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+      <footer className="w-full py-8 px-6 bg-surface border-t border-subtle">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-content-muted">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-slate-400">ProcureNext</span>
+            <span className="font-semibold text-content-secondary">ProcureNext</span>
             <span>• Enterprise Procurement Platform</span>
           </div>
           <div className="flex flex-wrap gap-4">
-            <Link href="/about" className="hover:text-white">About</Link>
-            <Link href="/policies" className="hover:text-white">Policies</Link>
-            <Link href="/legal" className="hover:text-white">Legal</Link>
-            <Link href="/news" className="hover:text-white">News</Link>
-            <Link href="/events" className="hover:text-white">Events</Link>
-            <Link href="/help" className="hover:text-white">Help</Link>
+            <Link href="/about" className="hover:text-content-primary">About</Link>
+            <Link href="/policies" className="hover:text-content-primary">Policies</Link>
+            <Link href="/legal" className="hover:text-content-primary">Legal</Link>
+            <Link href="/news" className="hover:text-content-primary">News</Link>
+            <Link href="/events" className="hover:text-content-primary">Events</Link>
+            <Link href="/help" className="hover:text-content-primary">Help</Link>
           </div>
           <p>© {new Date().getFullYear()} ProcureNext. All rights reserved.</p>
         </div>
