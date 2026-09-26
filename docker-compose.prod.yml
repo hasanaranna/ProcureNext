@@ -1,0 +1,71 @@
+services:
+  backend:
+    image: procurenext-backend
+    build:
+      context: ./backend_fast_api
+      dockerfile: Dockerfile
+    container_name: fastapi-backend
+    env_file:
+      - ./backend_fast_api/.env
+    environment:
+      PORT: 8000
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      ML_SERVICE_URL: http://ml:8001
+      ML_SERVICE_TIMEOUT: 120
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      - redis
+      - ml
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis-cache
+
+  ml:
+    build:
+      context: ./ml
+      dockerfile: Dockerfile
+    container_name: ml-service
+    env_file:
+      - ./ml/.env
+    volumes:
+      - huggingface_cache:/root/.cache/huggingface
+
+  celery_worker:
+    image: procurenext-backend
+    build:
+      context: ./backend_fast_api
+      dockerfile: Dockerfile
+    container_name: celery-worker
+    env_file:
+      - ./backend_fast_api/.env
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      ML_SERVICE_URL: http://ml:8001
+      ML_SERVICE_TIMEOUT: 120
+    volumes:
+      - uploads_data:/app/uploads
+    command: ["celery", "-A", "app.tasks.celery_app.celery_app", "worker", "--beat", "--loglevel=info"]
+    depends_on:
+      - redis
+      - ml
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: prod
+    container_name: nextjs-frontend
+    ports:
+      - "80:3000"
+    environment:
+      BACKEND_API_URL: http://backend:8000
+    depends_on:
+      - backend
+
+volumes:
+  uploads_data:
+  huggingface_cache:

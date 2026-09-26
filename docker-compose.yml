@@ -1,16 +1,17 @@
 services:
-  db:
-    image: postgres:15-alpine
-    container_name: postgres-db
-    ports:
-      - "5433:5432"
-    environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: procurenext
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:z
+  # Local Postgres is unused; the app connects via DATABASE_URL (Supabase).
+  # db:
+  #   image: postgres:15-alpine
+  #   container_name: postgres-db
+  #   ports:
+  #     - "5433:5432"
+  #   environment:
+  #     POSTGRES_USER: user
+  #     POSTGRES_PASSWORD: password
+  #     POSTGRES_DB: procurenext
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #     - ./init.sql:/docker-entrypoint-initdb.d/init.sql:z
 
   backend:
     build:
@@ -33,7 +34,6 @@ services:
     command: ["uvicorn", "app.main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"]
     depends_on:
       - redis
-      - db
       - ml
 
   redis:
@@ -75,11 +75,13 @@ services:
     command: ["celery", "-A", "app.tasks.celery_app.celery_app", "worker", "--beat", "--loglevel=info"]
     depends_on:
       - redis
-      - db
       - ml
 
   frontend:
-    build: ./frontend # Builds image from Dockerfile
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: dev
     container_name: nextjs-frontend
     ports:
       - "80:3000" # Maps container port 3000 to localhost:3000
@@ -103,5 +105,5 @@ services:
       - backend
     command: npm run dev
 
-volumes:
-  postgres_data:
+# volumes:
+#   postgres_data:
