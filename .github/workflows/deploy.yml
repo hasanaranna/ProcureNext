@@ -24,6 +24,5 @@ jobs:
             cd ~/ProcureNext
             git fetch origin main
             git reset --hard origin/main
-            docker compose build --parallel 1 frontend
             docker compose build --parallel 1
             docker compose up -d --force-recreate
