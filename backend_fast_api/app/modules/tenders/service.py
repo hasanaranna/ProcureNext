@@ -236,6 +236,7 @@ async def create_tender_with_documents(
             tender_data.eligibility_of_tenderer,
             tender_data.visibility_type.value if hasattr(tender_data.visibility_type, "value") else str(tender_data.visibility_type),
             tender_data.budget_min,
+            tender_data.budget_max,
             "Draft" if (tender_data.scheduled_publish_at and tender_data.scheduled_publish_at > datetime.utcnow()) else status,
             tender_data.submission_deadline.replace(tzinfo=None) if tender_data.submission_deadline else None,
             tender_data.tender_public_date.replace(tzinfo=None) if tender_data.tender_public_date else None,
