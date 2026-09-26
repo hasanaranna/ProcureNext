@@ -22,6 +22,7 @@ jobs:
           command_timeout: 20m
           script: |
             cd ~/ProcureNext
-            git pull origin main
-            docker compose build --parallel 1
-            docker compose up -d
+            git fetch origin main
+            git reset --hard origin/main
+            docker compose build --no-cache
+            docker compose up -d --force-recreate
