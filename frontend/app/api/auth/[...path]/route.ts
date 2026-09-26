@@ -5,6 +5,9 @@ const backendBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL ||
   'http://localhost:8000';
 
+// Browsers drop Secure cookies on plain HTTP, so only enable this once the site is served over HTTPS.
+const secureCookies = process.env.COOKIE_SECURE === 'true';
+
 type RouteContext = {
   params: Promise<{
     path: string[];
@@ -84,7 +87,7 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
           name: 'access_token',
           value: data.access_token,
           httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
+          secure: secureCookies,
           sameSite: 'lax',
           path: '/',
           maxAge: 30 * 60, // 30 minutes
@@ -96,7 +99,7 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
           name: 'refresh_token',
           value: data.refresh_token,
           httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
+          secure: secureCookies,
           sameSite: 'lax',
           path: '/',
           maxAge: 7 * 24 * 60 * 60, // 7 days
@@ -116,7 +119,7 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
           name: 'admin_access_token',
           value: data.access_token,
           httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
+          secure: secureCookies,
           sameSite: 'lax',
           path: '/',
           maxAge: 30 * 60, // 30 minutes
@@ -128,7 +131,7 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
           name: 'admin_refresh_token',
           value: data.refresh_token,
           httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
+          secure: secureCookies,
           sameSite: 'lax',
           path: '/',
           maxAge: 7 * 24 * 60 * 60, // 7 days
