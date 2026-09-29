@@ -242,12 +242,6 @@ export default function PublicTendersPage() {
 
                   <div className="flex lg:flex-col items-center justify-end gap-3 flex-shrink-0">
                     <button
-                      onClick={() => router.push(`/public-tenders/${tender.tender_id}`)}
-                      className="w-full lg:w-48 bg-brand-navy text-white hover:bg-slate-900 text-sm font-medium h-9 px-3.5 rounded transition flex items-center justify-center gap-1"
-                    >
-                      View Public Notice →
-                    </button>
-                    <button
                       onClick={() => router.push("/signup-master")}
                       className="w-full lg:w-48 bg-app text-content-secondary border border-subtle rounded text-sm font-medium h-9 px-3.5 transition"
                     >
