@@ -1,7 +1,7 @@
 # ProcureNext Frontend Design Rules
 
 ## Visual Guidelines & Aesthetics
-- Mimic the high-density, formal design language in @documents/design-system/reference-design.html.
+- Mimic the high-density, formal design language in @docs/analysis/design-system/reference-design.html (local, not in git).
 - Styling must feel like Zip HQ, Ramp, or Linear: razor-thin borders (1px #E2E8F0), compact padding, high typography contrast, and 0px-4px radius on functional badges.
 - Avoid generic AI styles: NO large blurred glow effects, NO floating multi-colored gradients, NO rounded pill-heavy SaaS clutter, and NO arbitrary padding (> 24px on data rows).
 - Numbers and financial figures must always use tabular figures: CSS `font-variant-numeric: tabular-nums` or Tailwind `tabular-nums`.

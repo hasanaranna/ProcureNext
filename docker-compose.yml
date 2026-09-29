@@ -11,7 +11,7 @@ services:
   #     POSTGRES_DB: procurenext
   #   volumes:
   #     - postgres_data:/var/lib/postgresql/data
-  #     - ./init.sql:/docker-entrypoint-initdb.d/init.sql:z
+  #     - ./scripts/db/init.sql:/docker-entrypoint-initdb.d/init.sql:z
 
   backend:
     build:

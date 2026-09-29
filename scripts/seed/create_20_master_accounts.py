@@ -21,8 +21,9 @@ BASE_URL = "http://13.212.216.26"
 API_ENDPOINT = f"{BASE_URL}/api/org/orgs"
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-NID_IMAGE_PATH = os.path.join(SCRIPT_DIR, "white-screen-image-1920x1080.png")
-BLANK_PDF_PATH = os.path.join(SCRIPT_DIR, "Blank PDF Document - blank.pdf")
+FIXTURES_DIR = os.path.join(SCRIPT_DIR, "fixtures")
+NID_IMAGE_PATH = os.path.join(FIXTURES_DIR, "white-screen-image-1920x1080.png")
+BLANK_PDF_PATH = os.path.join(FIXTURES_DIR, "Blank PDF Document - blank.pdf")
 
 # Common password for all demo accounts
 COMMON_PASSWORD = "Demo@1234"
