@@ -41,6 +41,7 @@ from app.core.db import (
     create_password_reset_tokens_table,
     create_tender_search_index,
     ensure_exclusive_tender_visibility,
+    ensure_banned_user_status,
 )
 from app.core.logging_config import setup_logging
 from app.middleware.audit_middleware import AuditMiddleware
@@ -85,6 +86,9 @@ async def lifespan(app: FastAPI):
 
     # Ensure the tender_visibility enum includes 'Exclusive' (idempotent)
     await ensure_exclusive_tender_visibility()
+
+    # Ensure the user_status enum includes 'Banned' (idempotent)
+    await ensure_banned_user_status()
 
     yield
     logger.info("ProcureNext backend shutting down.")

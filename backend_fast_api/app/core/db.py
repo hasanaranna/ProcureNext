@@ -234,3 +234,31 @@ async def ensure_exclusive_tender_visibility() -> None:
         logger.error(f"[DB] Failed to add 'Exclusive' to tender_visibility enum: {exc}")
 
 
+async def ensure_banned_user_status() -> None:
+    """
+    Idempotently add 'Banned' to the user_status enum. The admin "Ban" action
+    writes this value, but the enum originally only had 'Active', 'Suspended'
+    and 'Pending', so every ban failed in the database. Purely additive and
+    safe to run on every startup.
+    """
+    database_url = get_database_url()
+    if not database_url:
+        logger.warning("[DB] Skipping user_status enum check: DATABASE_URL not set.")
+        return
+
+    try:
+        connection = await asyncpg.connect(
+            database_url,
+            ssl="require",
+            statement_cache_size=0,
+            timeout=10.0,
+        )
+        try:
+            await connection.execute(
+                "ALTER TYPE user_status ADD VALUE IF NOT EXISTS 'Banned'"
+            )
+            logger.info("[DB] user_status enum 'Banned' value verified/created.")
+        finally:
+            await connection.close()
+    except Exception as exc:
+        logger.error(f"[DB] Failed to add 'Banned' to user_status enum: {exc}")

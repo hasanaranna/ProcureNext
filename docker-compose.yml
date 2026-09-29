@@ -28,6 +28,8 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       ML_SERVICE_URL: http://ml:8001
       ML_SERVICE_TIMEOUT: 120
+      # Base for links in emails; the frontend is published on port 80 below.
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
     volumes:
       - ./backend_fast_api:/app:z
       - ./backend_fast_api/uploads:/app/uploads:z
@@ -69,10 +71,14 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       ML_SERVICE_URL: http://ml:8001
       ML_SERVICE_TIMEOUT: 120
+      # Base for links in emails; the frontend is published on port 80 below.
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
     volumes:
       - ./backend_fast_api:/app:z
       - ./backend_fast_api/uploads:/app/uploads:z
-    command: ["celery", "-A", "app.tasks.celery_app.celery_app", "worker", "--beat", "--loglevel=info"]
+    # Restart the worker on code changes (like uvicorn --reload); otherwise newly
+    # added tasks are dropped as "unregistered" until a manual restart.
+    command: ["watchfiles", "--filter", "python", "celery -A app.tasks.celery_app.celery_app worker --beat --loglevel=info", "/app/app"]
     depends_on:
       - redis
       - ml
@@ -84,7 +90,7 @@ services:
       target: dev
     container_name: nextjs-frontend
     ports:
-      - "80:3000" # Maps container port 3000 to localhost:3000
+      - "80:3000" # Maps container port 3000 to localhost:80
     volumes:
       # Syncs local code with container for hot reload
       - ./frontend/app:/app/app:z
