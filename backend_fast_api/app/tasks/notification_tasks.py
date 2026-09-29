@@ -11,6 +11,7 @@ from app.services.email import (
     send_account_status_email,
     send_bid_received_email,
     send_bid_accepted_email,
+    send_notice_of_assessment_email,
     send_bid_rejected_email,
     send_tender_cancelled_email,
     send_password_reset_email,
@@ -240,6 +241,35 @@ def send_bid_accepted_email_task(
         )
     except Exception as exc:
         logger.error(f"Error sending bid accepted email to {to_email}: {exc}", exc_info=True)
+        try:
+            raise self.retry(exc=exc)
+        except Exception:
+            return False
+
+
+@celery_app.task(
+    name="send_notice_of_assessment_email_task",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+)
+def send_notice_of_assessment_email_task(
+    self,
+    to_email: str,
+    vendor_name: str,
+    notice: dict,
+) -> bool:
+    """Send the formal Notice of Assessment to the winning vendor."""
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    try:
+        return send_notice_of_assessment_email(
+            to_email=to_email,
+            vendor_name=vendor_name,
+            notice=notice,
+            notice_url=f"{frontend_url}/view-my-bids",
+        )
+    except Exception as exc:
+        logger.error(f"Error sending notice of assessment to {to_email}: {exc}", exc_info=True)
         try:
             raise self.retry(exc=exc)
         except Exception:

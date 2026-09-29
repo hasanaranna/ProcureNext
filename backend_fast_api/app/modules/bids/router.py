@@ -17,6 +17,7 @@ from app.modules.bids.evaluation_service import (
     get_run_with_results_for_buyer,
     trigger_evaluation_run,
 )
+from app.modules.bids.notice import fetch_notice
 from app.modules.bids.schemas import (
     BidResponse,
     BidListItem,
@@ -360,6 +361,28 @@ async def accept_bid(
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+@router.get("/{bid_id}/notice-of-assessment")
+async def get_notice_of_assessment(
+    bid_id: int,
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    Notice of Assessment for an accepted bid. Readable by the winning vendor's
+    organisation and by the buyer organisation that issued it.
+    """
+    org_id = current_user.get("organization_id")
+    if not org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+    try:
+        async with get_db_connection() as connection:
+            notice = await fetch_notice(connection, bid_id, requester_org_id=org_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+    if not notice:
+        raise HTTPException(status_code=404, detail="No Notice of Assessment found for this bid.")
+    return notice
+
 
 @router.get("/documents/{bid_doc_id}")
 async def stream_bid_document(

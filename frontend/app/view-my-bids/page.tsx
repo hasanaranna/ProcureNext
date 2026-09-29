@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import ModalShell from "@/components/ModalShell";
 
 interface BidItem {
   bid_id: number;
@@ -12,12 +13,49 @@ interface BidItem {
   submitted_at: string | null;
 }
 
+interface NoticeOfAssessment {
+  reference: string;
+  issued_on: string;
+  tender_id: number;
+  tender_title: string;
+  buyer_org_name: string;
+  buyer_address?: string | null;
+  vendor_org_name: string;
+  vendor_address?: string | null;
+  accepted_amount: string;
+  subject: string;
+  paragraphs: string[];
+  next_steps: string[];
+  closing: string;
+  issued_by?: string | null;
+}
+
 export default function ViewMyBidsPage() {
   const router = useRouter();
   const [bids, setBids] = useState<BidItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [withdrawingId, setWithdrawingId] = useState<number | null>(null);
+  const [notice, setNotice] = useState<NoticeOfAssessment | null>(null);
+  const [noticeLoadingId, setNoticeLoadingId] = useState<number | null>(null);
+  const [noticeError, setNoticeError] = useState<string | null>(null);
+
+  const openNotice = async (bidId: number) => {
+    setNoticeLoadingId(bidId);
+    setNoticeError(null);
+    try {
+      const res = await fetch(`/api/bids/${bidId}/notice-of-assessment`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || "Could not load the Notice of Assessment.");
+      }
+      setNotice(await res.json());
+    } catch (err: any) {
+      setNoticeError(err.message || "Could not load the Notice of Assessment.");
+    } finally {
+      setNoticeLoadingId(null);
+    }
+  };
 
   const fetchBids = async () => {
     try {
@@ -175,6 +213,14 @@ export default function ViewMyBidsPage() {
                   </div>
                   <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
                     {bid.status === 'Accepted' && (
+                      <button
+                        onClick={() => openNotice(bid.bid_id)}
+                        disabled={noticeLoadingId === bid.bid_id}
+                        className="w-full md:w-auto px-4 py-2.5 bg-brand-navy text-white rounded transition-all flex items-center justify-center gap-1.5 text-sm font-medium disabled:opacity-50">
+                        {noticeLoadingId === bid.bid_id ? "Loading..." : "Notice of Assessment"}
+                      </button>
+                    )}
+                    {bid.status === 'Accepted' && (
                       <button 
                         onClick={() => router.push(`/ongoing-tenders/${bid.tender_id}`)}
                         className="w-full md:w-auto px-4 py-2.5 bg-status-approved-text text-white rounded transition-all flex items-center justify-center gap-1.5 text-sm font-medium">
@@ -207,6 +253,57 @@ export default function ViewMyBidsPage() {
         )}
 
       </div>
+
+      <ModalShell isOpen={!!noticeError} onClose={() => setNoticeError(null)}>
+        <div className="p-6">
+          <p className="text-status-rejected-text font-medium mb-4">{noticeError}</p>
+          <button onClick={() => setNoticeError(null)} className="px-4 py-2 bg-app border border-subtle rounded text-sm font-medium">Close</button>
+        </div>
+      </ModalShell>
+
+      <ModalShell isOpen={!!notice} onClose={() => setNotice(null)} maxWidth="max-w-2xl">
+        {notice && (
+          <div className="p-6 sm:p-8 max-h-[85vh] overflow-y-auto">
+            <p className="text-xs font-semibold uppercase tracking-wider text-content-muted mb-1">Notice of Assessment</p>
+            <div className="flex flex-col sm:flex-row sm:justify-between gap-1 text-sm text-content-secondary mb-5 pb-4 border-b border-subtle">
+              <span>Ref: <strong className="text-content-primary">{notice.reference}</strong></span>
+              <span>Issued: <strong className="text-content-primary">{notice.issued_on}</strong></span>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4 mb-5 text-sm">
+              <div>
+                <p className="text-content-muted text-xs mb-0.5">From (Buyer)</p>
+                <p className="font-semibold text-content-primary">{notice.buyer_org_name}</p>
+                {notice.buyer_address && <p className="text-content-secondary">{notice.buyer_address}</p>}
+              </div>
+              <div>
+                <p className="text-content-muted text-xs mb-0.5">To (Seller)</p>
+                <p className="font-semibold text-content-primary">{notice.vendor_org_name}</p>
+                {notice.vendor_address && <p className="text-content-secondary">{notice.vendor_address}</p>}
+              </div>
+            </div>
+            <h3 className="text-base font-bold text-content-primary mb-3">Subject: {notice.subject}</h3>
+            <div className="space-y-3 text-sm leading-relaxed text-content-secondary">
+              {notice.paragraphs.map((p, i) => <p key={i}>{p}</p>)}
+            </div>
+            <div className="my-5 flex items-center justify-between rounded border border-subtle bg-status-approved-bg px-4 py-3">
+              <span className="text-sm text-status-approved-text">Accepted contract price</span>
+              <span className="text-lg font-bold text-status-approved-text tabular-nums">{notice.accepted_amount}</span>
+            </div>
+            <p className="text-sm font-semibold text-content-primary mb-2">Next steps</p>
+            <ol className="list-decimal pl-5 space-y-1.5 text-sm text-content-secondary mb-5">
+              {notice.next_steps.map((step, i) => <li key={i}>{step}</li>)}
+            </ol>
+            <p className="text-xs leading-relaxed text-content-muted mb-6">{notice.closing}</p>
+            <p className="text-sm text-content-secondary">Yours faithfully,</p>
+            {notice.issued_by && <p className="text-sm font-semibold text-content-primary">{notice.issued_by}</p>}
+            <p className="text-sm text-content-secondary mb-6">{notice.buyer_org_name}</p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => window.print()} className="px-4 py-2 bg-app border border-subtle rounded text-sm font-medium">Print</button>
+              <button onClick={() => setNotice(null)} className="px-4 py-2 bg-brand-navy text-white rounded text-sm font-medium">Close</button>
+            </div>
+          </div>
+        )}
+      </ModalShell>
     </main>
   );
 }
