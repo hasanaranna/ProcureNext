@@ -202,3 +202,63 @@ async def create_tender_search_index() -> None:
         logger.error(f"[DB] Failed to create tender search index: {exc}")
 
 
+async def ensure_exclusive_tender_visibility() -> None:
+    """
+    Idempotently add 'Exclusive' to the tender_visibility enum, so the
+    "restricted to your enlisted vendors" tender option is available on any
+    environment (including a freshly-created database), not just the one
+    this was manually applied to. Purely additive - the existing 'Public'
+    and 'Restricted' values are untouched, and this is safe to run on every
+    startup.
+    """
+    database_url = get_database_url()
+    if not database_url:
+        logger.warning("[DB] Skipping tender_visibility enum check: DATABASE_URL not set.")
+        return
+
+    try:
+        connection = await asyncpg.connect(
+            database_url,
+            ssl="require",
+            statement_cache_size=0,
+            timeout=10.0,
+        )
+        try:
+            await connection.execute(
+                "ALTER TYPE tender_visibility ADD VALUE IF NOT EXISTS 'Exclusive'"
+            )
+            logger.info("[DB] tender_visibility enum 'Exclusive' value verified/created.")
+        finally:
+            await connection.close()
+    except Exception as exc:
+        logger.error(f"[DB] Failed to add 'Exclusive' to tender_visibility enum: {exc}")
+
+
+async def ensure_banned_user_status() -> None:
+    """
+    Idempotently add 'Banned' to the user_status enum. The admin "Ban" action
+    writes this value, but the enum originally only had 'Active', 'Suspended'
+    and 'Pending', so every ban failed in the database. Purely additive and
+    safe to run on every startup.
+    """
+    database_url = get_database_url()
+    if not database_url:
+        logger.warning("[DB] Skipping user_status enum check: DATABASE_URL not set.")
+        return
+
+    try:
+        connection = await asyncpg.connect(
+            database_url,
+            ssl="require",
+            statement_cache_size=0,
+            timeout=10.0,
+        )
+        try:
+            await connection.execute(
+                "ALTER TYPE user_status ADD VALUE IF NOT EXISTS 'Banned'"
+            )
+            logger.info("[DB] user_status enum 'Banned' value verified/created.")
+        finally:
+            await connection.close()
+    except Exception as exc:
+        logger.error(f"[DB] Failed to add 'Banned' to user_status enum: {exc}")

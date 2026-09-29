@@ -2,9 +2,15 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
+from fastapi import HTTPException
 from jose import jwt
 
-SECRET_KEY = os.getenv("SECRET_KEY", "your-super-secret-development-key")
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "SECRET_KEY environment variable is not set. Refusing to start with a "
+        "hardcoded default, since that would let anyone forge auth tokens."
+    )
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 REFRESH_TOKEN_EXPIRE_DAYS = 7
@@ -25,7 +31,11 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
         expire = datetime.now(timezone.utc) + expires_delta
     else:
         expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
+    # "type" distinguishes an access token from a refresh token, both of
+    # which are otherwise identical HS256 JWTs signed with the same key —
+    # without it, a refresh token could be replayed as an access token
+    # (or vice versa) anywhere a token is accepted.
+    to_encode.update({"exp": expire, "type": "access"})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
@@ -33,6 +43,19 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
 def create_refresh_token(data: dict) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    to_encode.update({"exp": expire})
+    to_encode.update({"exp": expire, "type": "refresh"})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+
+BLOCKED_ACCOUNT_MESSAGES = {
+    "Suspended": "Your account has been suspended. Please contact platform support.",
+    "Banned": "Your account has been banned. Please contact platform support.",
+}
+
+
+def ensure_account_not_blocked(account_status: str | None) -> None:
+    """Reject a Suspended/Banned account with a 403 whose detail says why."""
+    message = BLOCKED_ACCOUNT_MESSAGES.get(account_status or "")
+    if message:
+        raise HTTPException(status_code=403, detail=message)

@@ -8,6 +8,28 @@ from fastapi import HTTPException, UploadFile
 
 BUCKET_NAME = os.getenv("SUPABASE_STORAGE_BUCKET", "documents")
 
+# Every document upload in this app (NID, trade license, TIN/VAT certs,
+# tender/bid documents, etc.) is expected to be a PDF or an image — see the
+# `accept` attributes on the frontend's file inputs. Enforcing the same
+# allowlist server-side (instead of trusting whatever the client claims)
+# closes a stored-XSS hole: an uploaded .html/.svg file previously got
+# stored and served back with its own content-type, so opening it "inline"
+# would execute attacker-supplied script in the app's origin.
+ALLOWED_UPLOAD_CONTENT_TYPES = {
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+}
+ALLOWED_UPLOAD_EXTENSIONS = {
+    ".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".xls", ".xlsx",
+}
+MAX_UPLOAD_SIZE_BYTES = 15 * 1024 * 1024  # 15 MB
+
 
 def _get_supabase_config() -> tuple[str, str]:
     supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
@@ -42,10 +64,22 @@ async def upload_file(upload: UploadFile, prefix: str) -> str:
     if not upload.filename:
         raise HTTPException(status_code=400, detail="Uploaded file is missing a filename.")
 
+    extension = Path(upload.filename).suffix.lower()
+    content_type = upload.content_type or "application/octet-stream"
+    if extension not in ALLOWED_UPLOAD_EXTENSIONS or content_type not in ALLOWED_UPLOAD_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported file type. Only PDF, JPEG, PNG, and WEBP files are accepted.",
+        )
+
     supabase_url, service_role_key = _get_supabase_config()
     object_path = _build_object_path(prefix, upload.filename)
     file_bytes = await upload.read()
-    content_type = upload.content_type or "application/octet-stream"
+    if len(file_bytes) > MAX_UPLOAD_SIZE_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File exceeds the {MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)}MB upload limit.",
+        )
 
     async with httpx.AsyncClient(timeout=60.0) as client:
         response = await client.post(

@@ -17,6 +17,7 @@ from app.modules.bids.evaluation_service import (
     get_run_with_results_for_buyer,
     trigger_evaluation_run,
 )
+from app.modules.bids.notice import fetch_notice
 from app.modules.bids.schemas import (
     BidResponse,
     BidListItem,
@@ -26,7 +27,6 @@ from app.modules.bids.schemas import (
 from app.modules.bids.service import (
     submit_bid_with_documents,
     get_bid_by_tender_and_vendor,
-    get_bid_document_by_id,
     get_bid_document_details_for_download,
     get_bids_for_buyer_tender,
     get_tender_bid_comparison,
@@ -36,7 +36,12 @@ from app.modules.bids.service import (
     delete_bid,
     delete_bid_document,
 )
-from app.services.supabase_storage import generate_signed_url, download_file_bytes
+from app.services.supabase_storage import (
+    generate_signed_url,
+    download_file_bytes,
+    ALLOWED_UPLOAD_EXTENSIONS,
+    MAX_UPLOAD_SIZE_BYTES,
+)
 from app.utils.filename_utils import sanitize_filename, get_content_disposition
 
 router = APIRouter(prefix="/bids", tags=["Bids"])
@@ -94,11 +99,40 @@ async def submit_bid(
     for i, file_obj in enumerate(actual_files):
         doc_type_name = type_names[i] if i < len(type_names) else ""
         req_doc_id = req_ids[i] if i < len(req_ids) else None
+
+        # This path saves to local disk and hands off to a Celery task that
+        # uploads straight to storage, bypassing upload_file()'s allowlist —
+        # validate here too. These documents get served back inline via
+        # /bids/documents/{doc_id}/{action} with their own stored content
+        # type, so an unrestricted file type here was a stored-XSS vector.
+        extension = os.path.splitext(file_obj.filename)[1].lower()
+        if extension not in ALLOWED_UPLOAD_EXTENSIONS:
+            for f in files_data:
+                if os.path.exists(f["local_path"]):
+                    os.remove(f["local_path"])
+            raise HTTPException(
+                status_code=400,
+                detail="Unsupported file type. Only PDF, JPEG, PNG, and WEBP files are accepted.",
+            )
+
         safe_filename = f"{uuid.uuid4().hex}_{file_obj.filename}"
         local_path = os.path.join(TEMP_UPLOAD_DIR, safe_filename)
 
+        size = 0
         with open(local_path, "wb") as buffer:
-            shutil.copyfileobj(file_obj.file, buffer)
+            for chunk in iter(lambda: file_obj.file.read(1024 * 1024), b""):
+                size += len(chunk)
+                if size > MAX_UPLOAD_SIZE_BYTES:
+                    buffer.close()
+                    os.remove(local_path)
+                    for f in files_data:
+                        if os.path.exists(f["local_path"]):
+                            os.remove(f["local_path"])
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"File exceeds the {MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)}MB upload limit.",
+                    )
+                buffer.write(chunk)
 
         files_data.append({
             "local_path": local_path,
@@ -205,19 +239,21 @@ async def view_bid_document(
 
     try:
         async with get_db_connection() as connection:
+            # Only use the joined lookup, which carries the vendor_org_id/buyer_id
+            # needed to authorize the request. The unscoped get_bid_document_by_id
+            # fallback that used to run here had no ownership columns at all, so
+            # when the join failed to match, the authorization check below was
+            # silently skipped and any authenticated user could fetch the file.
             doc_details = await get_bid_document_details_for_download(connection, doc_id)
             if not doc_details:
-                doc_details = await get_bid_document_by_id(connection, doc_id)
-            if not doc_details:
                 raise HTTPException(status_code=404, detail="Document not found")
-            
+
             # Authorization Check for Org
             vendor_org_id = doc_details.get("vendor_org_id")
             buyer_id = doc_details.get("buyer_id")
-            if vendor_org_id is not None or buyer_id is not None:
-                if user_org_id != vendor_org_id and user_org_id != buyer_id:
-                    raise HTTPException(status_code=403, detail="Not authorized to access this document.")
-                
+            if user_org_id != vendor_org_id and user_org_id != buyer_id:
+                raise HTTPException(status_code=403, detail="Not authorized to access this document.")
+
             # RBAC Check for Role
             allowed_roles = doc_details.get("allowed_roles")
             if allowed_roles and user_role not in allowed_roles:
@@ -325,6 +361,28 @@ async def accept_bid(
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+@router.get("/{bid_id}/notice-of-assessment")
+async def get_notice_of_assessment(
+    bid_id: int,
+    current_user: dict = Depends(get_current_user_org)
+):
+    """
+    Notice of Assessment for an accepted bid. Readable by the winning vendor's
+    organisation and by the buyer organisation that issued it.
+    """
+    org_id = current_user.get("organization_id")
+    if not org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+    try:
+        async with get_db_connection() as connection:
+            notice = await fetch_notice(connection, bid_id, requester_org_id=org_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+    if not notice:
+        raise HTTPException(status_code=404, detail="No Notice of Assessment found for this bid.")
+    return notice
+
 
 @router.get("/documents/{bid_doc_id}")
 async def stream_bid_document(

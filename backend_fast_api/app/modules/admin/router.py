@@ -56,14 +56,26 @@
 #   - Admin resolves a report (take action or dismiss)
 # ============================================================
 
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, Query, status
 from app.core.db import get_db_connection
 from app.modules.auth.schemas import LoginRequest, AdminTokenResponse
 from app.modules.auth.service import authenticate_admin
 from app.modules.auth.dependencies import get_current_admin
-from typing import List
-from app.modules.admin.schemas import PendingMasterAccountsResponse, VerifyOrgRequest
-from app.modules.admin.service import get_pending_master_accounts, verify_organization
+from typing import List, Optional
+from app.modules.admin.schemas import (
+    PendingMasterAccountsResponse,
+    VerifyOrgRequest,
+    PlatformStatsResponse,
+    ModifyUserStatusRequest,
+    AdminUserListResponse,
+)
+from app.modules.admin.service import (
+    get_pending_master_accounts,
+    verify_organization,
+    get_platform_stats,
+    modify_user_status,
+    list_all_users,
+)
 from app.modules.payments.schemas import (
     PricingConfigResponse,
     UpdatePricingRequest,
@@ -142,6 +154,69 @@ async def verify_organization_endpoint(
     try:
         async with get_db_connection() as connection:
             return await verify_organization(connection, organization_id, payload)
+    except HTTPException:
+        raise
+    except asyncpg.PostgresError as exc:
+        print(f"[DB ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Database Error: {str(exc)}") from exc
+    except Exception as exc:
+        print(f"[SYSTEM ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
+@router.get("/admin/users", response_model=AdminUserListResponse)
+async def list_admin_users(
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+    search: Optional[str] = Query(None, max_length=100),
+    admin: dict = Depends(get_current_admin),
+):
+    """
+    List platform users for the admin user-management view, paginated and
+    searchable by name, email or organization.
+    """
+    try:
+        async with get_db_connection() as connection:
+            return await list_all_users(connection, page=page, limit=limit, search=search)
+    except HTTPException:
+        raise
+    except asyncpg.PostgresError as exc:
+        print(f"[DB ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Database Error: {str(exc)}") from exc
+    except Exception as exc:
+        print(f"[SYSTEM ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
+@router.put("/admin/modify-user-status")
+async def modify_user_status_endpoint(
+    payload: ModifyUserStatusRequest,
+    admin: dict = Depends(get_current_admin),
+):
+    """
+    Ban, suspend, or reactivate a user account.
+    """
+    try:
+        async with get_db_connection() as connection:
+            return await modify_user_status(connection, payload, acting_admin_user_id=admin["user_id"])
+    except HTTPException:
+        raise
+    except asyncpg.PostgresError as exc:
+        print(f"[DB ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Database Error: {str(exc)}") from exc
+    except Exception as exc:
+        print(f"[SYSTEM ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
+@router.get("/admin/stats", response_model=PlatformStatsResponse)
+async def get_admin_stats(admin: dict = Depends(get_current_admin)):
+    """
+    Quick platform-wide statistics summary for the admin dashboard overview cards.
+    """
+    try:
+        async with get_db_connection() as connection:
+            return await get_platform_stats(connection)
     except HTTPException:
         raise
     except asyncpg.PostgresError as exc:

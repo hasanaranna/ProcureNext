@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import ModalShell from '@/components/ModalShell';
 import BidEvaluationPanel from '@/components/BidEvaluationPanel';
+import { VISIBILITY_LABEL } from '@/components/TenderCard';
 
 interface BidDocument {
   bid_doc_id: number;
@@ -71,20 +72,6 @@ interface LotPricingItem {
   compliance_remarks?: string | null;
 }
 
-interface VendorRecommendation {
-  vendor_id: number;
-  vendor_name: string;
-  vendor_address?: string | null;
-  vendor_verification_status?: string | null;
-  match_score: number;
-  category_match: boolean;
-  is_enlisted: boolean;
-  avg_seller_rating: number;
-  total_reviews_count: number;
-  certifications: string[];
-  reasons: string[];
-}
-
 interface BidComparisonSummary {
   total_bids: number;
   min_amount: number | null;
@@ -130,6 +117,7 @@ interface Tender {
   title: string;
   description: string;
   status: string;
+  visibility_type?: string | null;
   budget_min: string;
   budget_max: string;
   bid_count?: number;
@@ -142,7 +130,7 @@ export default function ViewMyTenderPage() {
   const params = useParams();
   const tenderId = params.id as string;
 
-  const [activeTab, setActiveTab] = useState<'bids' | 'compare' | 'recommended' | 'evaluation'>('bids');
+  const [activeTab, setActiveTab] = useState<'bids' | 'compare' | 'evaluation'>('bids');
   const [fadeIn, setFadeIn] = useState(true);
   
   const [tender, setTender] = useState<Tender | null>(null);
@@ -164,9 +152,6 @@ export default function ViewMyTenderPage() {
   const [restrictedDocAlert, setRestrictedDocAlert] = useState<{ isOpen: boolean; docName: string }>({ isOpen: false, docName: '' });
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // FR-09: Recommendations state
-  const [recommendations, setRecommendations] = useState<VendorRecommendation[]>([]);
-  const [loadingRecommendations, setLoadingRecommendations] = useState<boolean>(false);
 
   // Comparison Matrix Interactive State
   const [filterMode, setFilterMode] = useState<'all' | 'compliant' | 'enlisted'>('all');
@@ -174,21 +159,6 @@ export default function ViewMyTenderPage() {
   const [pinnedBidIds, setPinnedBidIds] = useState<number[]>([]);
   const [expandedDescriptions, setExpandedDescriptions] = useState<Record<number, boolean>>({});
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-
-  const fetchRecommendations = async () => {
-    try {
-      setLoadingRecommendations(true);
-      const res = await fetch(`/api/tenders/${tenderId}/recommendations`);
-      if (res.ok) {
-        const data = await res.json();
-        setRecommendations(data.recommendations || []);
-      }
-    } catch (err) {
-      console.error('Error loading recommendations:', err);
-    } finally {
-      setLoadingRecommendations(false);
-    }
-  };
 
   useEffect(() => {
     if (!tenderId) return;
@@ -248,8 +218,6 @@ export default function ViewMyTenderPage() {
           setPinnedBidIds(listBids.map((b) => b.bid_id));
         }
 
-        // Fetch AI recommendations in background
-        fetchRecommendations();
       } catch (err: any) {
         setError(err.message || 'An error occurred');
       } finally {
@@ -327,7 +295,7 @@ export default function ViewMyTenderPage() {
     }
   };
 
-  const handleTabSwitch = (tab: 'bids' | 'compare' | 'recommended' | 'evaluation') => {
+  const handleTabSwitch = (tab: 'bids' | 'compare' | 'evaluation') => {
     if (tab === activeTab) return;
     setFadeIn(false);
     setTimeout(() => {
@@ -504,7 +472,8 @@ export default function ViewMyTenderPage() {
     }
   };
 
-  const isTenderClosed = tender?.status === 'Awarded' || tender?.status === 'Closed' || tender?.status === 'Cancelled';
+  // Bids can still be awarded after the deadline closes the tender; only a finished tender blocks acceptance.
+  const isAwardLocked = tender?.status === 'Awarded' || tender?.status === 'Cancelled';
 
   const compliantCount = bids.filter(b => b.mandatory_docs_satisfied && b.compliance_score_pct >= 100).length;
   const enlistedCount = bids.filter(b => b.is_enlisted).length;
@@ -567,6 +536,14 @@ export default function ViewMyTenderPage() {
                     <span className="badge-dot" />
                     {tender?.status}
                   </span>
+                  {tender && (
+                    <span
+                      className="inline-flex items-center text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded border border-white/25 bg-white/10 text-white"
+                      title={(tender.visibility_type || 'Public') === 'Public' ? 'Visible to all sellers' : 'Visible only to your enlisted sellers'}
+                    >
+                      {VISIBILITY_LABEL[tender.visibility_type || 'Public'] || tender.visibility_type}
+                    </span>
+                  )}
                 </div>
                 <p className="text-slate-300 text-xs mt-1">
                   Budget: <strong className="text-white tabular-nums">৳ {tender?.budget_min ? parseFloat(tender.budget_min).toLocaleString() : '0'}</strong> – <strong className="text-white tabular-nums">৳ {tender?.budget_max ? parseFloat(tender.budget_max).toLocaleString() : '0'}</strong>
@@ -760,20 +737,12 @@ export default function ViewMyTenderPage() {
               Compare Bids Matrix
             </button>
             <button
-              onClick={() => handleTabSwitch('recommended')}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition-all ${
-                activeTab === 'recommended' ? 'border-brand-navy text-content-primary' : 'border-transparent text-content-muted hover:text-content-primary'
-              }`}
-            >
-              Recommended Sellers
-            </button>
-            <button
               onClick={() => handleTabSwitch('evaluation')}
               className={`px-4 py-3 text-sm font-medium border-b-2 transition-all ${
                 activeTab === 'evaluation' ? 'border-brand-navy text-content-primary' : 'border-transparent text-content-muted hover:text-content-primary'
               }`}
             >
-              🧠 Smart Evaluation
+              Smart Evaluation
             </button>
         </div>
 
@@ -937,9 +906,9 @@ export default function ViewMyTenderPage() {
                           ) : (
                             <button
                               onClick={() => openAcceptModal(bid)}
-                              disabled={hasAcceptedBid || isTenderClosed}
+                              disabled={hasAcceptedBid || isAwardLocked}
                               className={`text-sm font-medium h-9 px-3.5 rounded transition ${
-                                hasAcceptedBid || isTenderClosed
+                                hasAcceptedBid || isAwardLocked
                                   ? 'bg-slate-200 text-content-muted cursor-not-allowed'
                                   : 'bg-brand-navy text-white hover:bg-slate-900'
                               }`}
@@ -1348,9 +1317,9 @@ export default function ViewMyTenderPage() {
                           ) : (
                             <button
                               onClick={() => openAcceptModal(bid)}
-                              disabled={hasAcceptedBid || isTenderClosed}
+                              disabled={hasAcceptedBid || isAwardLocked}
                               className={`w-full py-2 rounded font-medium text-xs transition flex items-center justify-center gap-1.5 ${
-                                hasAcceptedBid || isTenderClosed
+                                hasAcceptedBid || isAwardLocked
                                   ? 'bg-slate-200 text-content-muted cursor-not-allowed'
                                   : 'bg-brand-navy text-white hover:bg-slate-900'
                               }`}
@@ -1362,126 +1331,6 @@ export default function ViewMyTenderPage() {
                       </div>
                     );
                   })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ============================================================ */}
-          {/* 3. RECOMMENDED SELLERS TAB (FR-09) */}
-          {/* ============================================================ */}
-          {activeTab === 'recommended' && (
-            <div className="mb-6 space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface border border-subtle rounded p-5">
-                <div>
-                  <h3 className="text-base font-bold text-content-primary flex items-center gap-2">
-                    <span>Vendor Matching & AI Recommendations</span>
-                    <span className="badge-status badge-approved">
-                      <span className="badge-dot" />Multi-Factor Engine
-                    </span>
-                  </h3>
-                  <p className="text-xs text-content-muted mt-1">
-                    Ranked candidates evaluated on Category Match (35%), Historical Mutual Rating (30%), Enlistment (20%), and Verified Certifications (15%).
-                  </p>
-                </div>
-                <button
-                  onClick={fetchRecommendations}
-                  disabled={loadingRecommendations}
-                  className="bg-app text-content-primary hover:bg-slate-200 text-sm font-medium h-9 px-3.5 rounded border border-subtle transition flex items-center gap-1.5 flex-shrink-0"
-                >
-                  <svg className={`w-3.5 h-3.5 ${loadingRecommendations ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Refresh Matches
-                </button>
-              </div>
-
-              {loadingRecommendations ? (
-                <div className="py-16 text-center text-content-muted">
-                  <svg className="animate-spin h-8 w-8 text-content-muted mx-auto mb-3" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  <p className="font-semibold text-sm">Evaluating vendor pool and calculating recommendation scores...</p>
-                </div>
-              ) : recommendations.length === 0 ? (
-                <div className="bg-app rounded p-12 text-center border border-subtle">
-                  <svg className="w-12 h-12 text-content-muted mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                  </svg>
-                  <p className="text-content-muted font-medium">No matching vendor recommendations found for this tender criteria.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {recommendations.map((rec, rIdx) => (
-                    <div
-                      key={rec.vendor_id}
-                      className="bg-surface rounded p-5 border border-subtle flex flex-col justify-between transition"
-                    >
-                      <div>
-                        <div className="flex items-start justify-between gap-3 mb-3">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="w-5 h-5 rounded bg-brand-navy text-white flex items-center justify-center text-[10px] font-bold">
-                                #{rIdx + 1}
-                              </span>
-                              <h4 className="text-base font-bold text-content-primary">{rec.vendor_name}</h4>
-                            </div>
-                            {rec.vendor_address && (
-                              <p className="text-xs text-slate-500 mt-1">📍 {rec.vendor_address}</p>
-                            )}
-                          </div>
-                          
-                          <div className="flex flex-col items-end">
-                            <span className="badge-status badge-approved">
-                              <span className="badge-dot" />{rec.match_score}% Match
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Status Badges & Rating */}
-                        <div className="flex flex-wrap items-center gap-2 mb-3">
-                          <span className="badge-status badge-pending">
-                            <span className="badge-dot" />⭐ {rec.avg_seller_rating.toFixed(1)} / 5.0 ({rec.total_reviews_count} reviews)
-                          </span>
-                          {rec.is_enlisted && (
-                            <span className="badge-status badge-draft">
-                              <span className="badge-dot" />Enlisted Partner
-                            </span>
-                          )}
-                          <span className="badge-status badge-approved">
-                            <span className="badge-dot" />{rec.vendor_verification_status || 'Verified Vendor'}
-                          </span>
-                        </div>
-
-                        {/* Match Reasons / Explainability */}
-                        <div className="space-y-1.5 mb-4 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                          <p className="text-content-secondary text-xs font-medium uppercase tracking-wider">Why Recommended:</p>
-                          {rec.reasons.map((reason, rIdx2) => (
-                            <div key={rIdx2} className="flex items-center gap-2 text-xs text-content-secondary">
-                              <span className="text-status-approved-text font-bold">✓</span>
-                              <span>{reason}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="pt-3 border-t border-subtle flex items-center justify-between">
-                        <span className="text-[11px] text-content-muted">
-                          {rec.certifications.length > 0 ? `Certifications: ${rec.certifications.join(', ')}` : 'Platform Verified Vendor'}
-                        </span>
-                        <button
-                          onClick={() => {
-                            setToastMessage(`Invitation sent to ${rec.vendor_name}`);
-                            setTimeout(() => setToastMessage(null), 3000);
-                          }}
-                          className="bg-brand-navy text-white hover:bg-slate-900 text-sm font-medium h-9 px-3.5 rounded transition"
-                        >
-                          Invite to Bid
-                        </button>
-                      </div>
-                    </div>
-                  ))}
                 </div>
               )}
             </div>

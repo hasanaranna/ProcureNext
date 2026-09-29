@@ -41,7 +41,9 @@ def build_visibility_filter(viewer_org_id: int | None, param_idx: int) -> tuple[
     Build the SQL fragment that enforces tender visibility rules.
 
     Public tenders are visible to everyone. Restricted tenders are only visible to
-    vendor organizations that have been invited to that specific tender.
+    vendor organizations that have been invited to that specific tender. Exclusive
+    tenders are only visible to vendor organizations the buyer has enlisted (the
+    enlisted_vendors table).
 
     Args:
         viewer_org_id: The viewing organization's id, or None for an anonymous/public caller.
@@ -55,8 +57,12 @@ def build_visibility_filter(viewer_org_id: int | None, param_idx: int) -> tuple[
         return " AND (t.visibility_type = 'Public' OR t.visibility_type IS NULL)", []
     return (
         f" AND (t.visibility_type = 'Public' OR t.visibility_type IS NULL"
-        f" OR EXISTS (SELECT 1 FROM tender_invitations ti"
-        f" WHERE ti.tender_id = t.tender_id AND ti.vendor_org_id = ${param_idx}))",
+        f" OR (t.visibility_type = 'Restricted' AND EXISTS ("
+        f"     SELECT 1 FROM tender_invitations ti"
+        f"     WHERE ti.tender_id = t.tender_id AND ti.vendor_org_id = ${param_idx}))"
+        f" OR (t.visibility_type = 'Exclusive' AND EXISTS ("
+        f"     SELECT 1 FROM enlisted_vendors ev"
+        f"     WHERE ev.org_id = t.buyer_id AND ev.enlisted_org_id = ${param_idx})))",
         [viewer_org_id],
     )
 
@@ -489,6 +495,7 @@ async def withdraw_tender(
 ) -> dict:
     """Soft-cancel a tender (status -> Cancelled) and notify vendors who bid."""
     from app.modules.notifications.service import create_notification
+    from app.tasks.notification_tasks import send_tender_cancelled_email_task
 
     row = await connection.fetchrow(
         "SELECT tender_id, buyer_id, status, title FROM tenders WHERE tender_id = $1",
@@ -509,12 +516,18 @@ async def withdraw_tender(
 
         bidders = await connection.fetch(
             """
-            SELECT DISTINCT u.user_id, t.title AS tender_title
+            SELECT DISTINCT
+                u.user_id,
+                u.email,
+                u.full_name,
+                t.title AS tender_title,
+                buyer_org.organization_name AS buyer_org_name
             FROM bids b
             JOIN organization_employees oe
               ON b.vendor_org_id = oe.organization_id AND oe.role_in_org = 'Owner'
             JOIN users u ON oe.user_id = u.user_id
             JOIN tenders t ON b.tender_id = t.tender_id
+            JOIN organizations buyer_org ON t.buyer_id = buyer_org.organization_id
             WHERE b.tender_id = $1
               AND b.status NOT IN ('Withdrawn', 'Draft')
             """,
@@ -530,6 +543,12 @@ async def withdraw_tender(
                     message=f"The tender \"{bidder['tender_title']}\" has been cancelled by the buyer.",
                     notification_type="Tender",
                     action_url="/view-my-bids",
+                )
+                send_tender_cancelled_email_task.delay(
+                    to_email=bidder["email"],
+                    vendor_name=bidder["full_name"] or "Vendor",
+                    tender_title=bidder["tender_title"] or "Tender",
+                    buyer_org_name=bidder["buyer_org_name"] or "Buyer",
                 )
             except Exception as exc:
                 logger.warning("Failed to notify bidder %s about cancellation: %s", bidder["user_id"], exc)
@@ -638,6 +657,7 @@ async def get_buyer_tenders(
             t.title,
             t.description,
             t.status,
+            t.visibility_type,
             o.organization_name AS buyer_org_name,
             t.submission_deadline,
             t.created_at
@@ -662,7 +682,7 @@ async def get_all_published_tenders(
     """
     Fetch all published tenders (for seller browsing).
     If enlisted_only=True and vendor_org_id is provided, only return tenders published
-    by buyers that the vendor organization has enlisted (via enlisted_vendors table).
+    by buyers that have enlisted the vendor organization (via enlisted_vendors table).
     """
     if enlisted_only and vendor_org_id is not None:
         query = """
@@ -676,7 +696,7 @@ async def get_all_published_tenders(
                 t.created_at
             FROM tenders t
             JOIN organizations o ON t.buyer_id = o.organization_id
-            JOIN enlisted_vendors ev ON ev.enlisted_org_id = t.buyer_id AND ev.org_id = $1
+            JOIN enlisted_vendors ev ON ev.org_id = t.buyer_id AND ev.enlisted_org_id = $1
             WHERE t.status = 'Published'
         """
         args = [vendor_org_id]
@@ -733,6 +753,7 @@ async def get_tender_detail(
             t.description,
             t.eligibility_of_tenderer,
             t.status,
+            t.visibility_type,
             o.organization_name AS buyer_org_name,
             tc.category_name,
             pn.name::text AS procurement_nature,

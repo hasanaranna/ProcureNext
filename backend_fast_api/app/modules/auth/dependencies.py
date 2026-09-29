@@ -11,7 +11,7 @@ from jose import JWTError, jwt
 # pyrefly: ignore [missing-import]
 import asyncpg
 
-from app.core.security import SECRET_KEY, ALGORITHM
+from app.core.security import SECRET_KEY, ALGORITHM, ensure_account_not_blocked
 from app.core.db import get_db_connection
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
@@ -28,13 +28,17 @@ async def get_current_user_org(token: str = Depends(oauth2_scheme)) -> dict:
         if user_id_str is None:
             raise credentials_exception
         user_id = int(user_id_str)
+        # A refresh token is a valid, correctly-signed JWT too, so without
+        # this check it could be replayed here as if it were an access token.
+        if payload.get("type") == "refresh":
+            raise credentials_exception
     except JWTError:
         raise credentials_exception
 
     async with get_db_connection() as connection:
         user_org = await connection.fetchrow(
             """
-            SELECT u.user_id, u.email, oe.organization_id, oe.role_in_org, oe.org_user_id
+            SELECT u.user_id, u.email, u.status, oe.organization_id, oe.role_in_org, oe.org_user_id
             FROM users u
             JOIN organization_employees oe ON u.user_id = oe.user_id
             WHERE u.user_id = $1
@@ -42,10 +46,15 @@ async def get_current_user_org(token: str = Depends(oauth2_scheme)) -> dict:
             """,
             user_id
         )
-        
+
         if user_org is None:
             raise HTTPException(status_code=403, detail="User does not belong to any organization.")
-            
+
+        # Re-checked on every request (not just at login) so a ban/suspend
+        # takes effect immediately instead of staying valid until the
+        # holder's existing access token naturally expires.
+        ensure_account_not_blocked(user_org["status"])
+
         return dict(user_org.items())
 
 
@@ -61,14 +70,15 @@ async def get_current_admin(token: str = Depends(oauth2_scheme)) -> dict:
         if user_id_str is None:
             raise credentials_exception
         user_id = int(user_id_str)
-        admin_role = payload.get("admin_role")
+        if payload.get("type") == "refresh":
+            raise credentials_exception
     except JWTError:
         raise credentials_exception
 
     async with get_db_connection() as connection:
         admin_row = await connection.fetchrow(
             """
-            SELECT u.user_id, u.email, u.full_name, a.admin_id, a.admin_role
+            SELECT u.user_id, u.email, u.full_name, u.status, a.admin_id, a.admin_role
             FROM users u
             JOIN admins a ON u.user_id = a.user_id
             WHERE u.user_id = $1
@@ -76,10 +86,16 @@ async def get_current_admin(token: str = Depends(oauth2_scheme)) -> dict:
             """,
             user_id,
         )
-        if admin_row is None and not admin_role:
+        # The `admin_role` claim embedded in the JWT is not trusted on its own:
+        # admin status must always be re-verified against the current `admins`
+        # table so that revoking a user's admin privileges takes effect
+        # immediately, instead of staying valid until their existing token expires.
+        if admin_row is None:
             raise HTTPException(status_code=403, detail="Platform administrator privileges required.")
 
-        return dict(admin_row.items()) if admin_row else {"user_id": user_id, "admin_role": admin_role}
+        ensure_account_not_blocked(admin_row["status"])
+
+        return dict(admin_row.items())
 
 
 # Alias for compatibility with audit module and other services

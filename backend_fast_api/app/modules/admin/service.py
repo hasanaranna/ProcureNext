@@ -22,11 +22,19 @@ from app.modules.admin.schemas import (
     PendingDocuments,
     ModifyUserStatusRequest,
     VerifyOrgRequest,
+    PlatformStatsResponse,
+    AdminUserListItem,
+    AdminUserListResponse,
 )
+
+# The only statuses an admin may set via modify_user_status. 'Pending' and
+# 'Rejected' are lifecycle states owned by the registration/verification
+# flow (verify_organization), not the ban/suspend action.
+ADMIN_ASSIGNABLE_USER_STATUSES = {"Active", "Suspended", "Banned"}
 from app.services.supabase_storage import generate_signed_url_optional, delete_files
 
 from fastapi import HTTPException
-from app.tasks.notification_tasks import send_account_status_email_task
+from app.tasks.notification_tasks import send_account_status_email_task, send_account_moderation_email_task
 
 
 async def get_pending_master_accounts(
@@ -140,21 +148,113 @@ async def get_pending_master_accounts(
 async def modify_user_status(
     connection: asyncpg.Connection,
     payload: ModifyUserStatusRequest,
+    acting_admin_user_id: int,
 ) -> dict:
     """
-    Change user status (e.g. Active, Suspended, Pending).
-    Also log the action in a production system.
+    Ban, suspend, or reactivate a user. (Note: the HTTP layer already logs
+    this action via AuditMiddleware, which captures every state-changing
+    admin request automatically.)
     """
-    result = await connection.execute(
+    if payload.new_status not in ADMIN_ASSIGNABLE_USER_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"new_status must be one of {sorted(ADMIN_ASSIGNABLE_USER_STATUSES)}.",
+        )
+
+    if payload.user_id == acting_admin_user_id:
+        raise HTTPException(status_code=400, detail="You cannot change your own account status.")
+
+    target_is_admin = await connection.fetchval(
+        "SELECT 1 FROM admins WHERE user_id = $1", payload.user_id
+    )
+    if target_is_admin:
+        raise HTTPException(status_code=403, detail="Cannot modify the status of a platform admin account.")
+
+    target = await connection.fetchrow(
+        "SELECT email, full_name, status FROM users WHERE user_id = $1", payload.user_id
+    )
+    if target is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    await connection.execute(
         "UPDATE users SET status = $1 WHERE user_id = $2",
         payload.new_status,
         payload.user_id,
     )
 
-    if result == "UPDATE 0":
-        raise HTTPException(status_code=404, detail="User not found")
+    if target["status"] != payload.new_status:
+        try:
+            send_account_moderation_email_task.delay(
+                to_email=target["email"],
+                full_name=target["full_name"] or "User",
+                new_status=payload.new_status,
+                reason=payload.reason,
+            )
+        except Exception as exc:
+            print(f"[NOTIFY WARNING] Failed to queue account moderation email: {exc}", flush=True)
 
     return {"message": f"User status updated to {payload.new_status}"}
+
+
+async def list_all_users(
+    connection: asyncpg.Connection,
+    page: int = 1,
+    limit: int = 10,
+    search: str | None = None,
+) -> AdminUserListResponse:
+    """
+    List platform users for the admin user-management view, newest first, along
+    with their org affiliation (if any) and whether they hold an admin role.
+    Paginated; `search` matches name, email or organization (case-insensitive).
+    """
+    from_sql = """
+        FROM users u
+        LEFT JOIN organization_employees oe ON oe.user_id = u.user_id
+        LEFT JOIN organizations o ON o.organization_id = oe.organization_id
+        LEFT JOIN admins a ON a.user_id = u.user_id
+    """
+    where_sql = ""
+    params: list = []
+    if search and search.strip():
+        params.append(f"%{search.strip()}%")
+        where_sql = "WHERE (u.full_name ILIKE $1 OR u.email ILIKE $1 OR o.organization_name ILIKE $1)"
+
+    total = await connection.fetchval(f"SELECT COUNT(*) {from_sql} {where_sql}", *params)
+
+    rows = await connection.fetch(
+        f"""
+        SELECT
+            u.user_id,
+            u.full_name,
+            u.email,
+            u.status,
+            o.organization_name,
+            oe.role_in_org,
+            (a.admin_id IS NOT NULL) AS is_admin,
+            u.created_at
+        {from_sql}
+        {where_sql}
+        ORDER BY u.created_at DESC, u.user_id DESC
+        LIMIT ${len(params) + 1} OFFSET ${len(params) + 2}
+        """,
+        *params,
+        limit,
+        (page - 1) * limit,
+    )
+    users = [
+        AdminUserListItem(
+            user_id=row["user_id"],
+            full_name=row["full_name"],
+            email=row["email"],
+            status=row["status"],
+            organization_name=row["organization_name"],
+            role_in_org=row["role_in_org"],
+            is_admin=row["is_admin"],
+            created_at=row["created_at"].isoformat() if row["created_at"] else "",
+        )
+        for row in rows
+    ]
+    return AdminUserListResponse(users=users, total=total or 0, page=page, limit=limit)
 
 
 async def verify_organization(
@@ -309,3 +409,41 @@ async def verify_organization(
                     )
 
             return {"message": f"Organization {organization_id} has been {payload.verification_status}."}
+
+
+async def get_platform_stats(connection: asyncpg.Connection) -> PlatformStatsResponse:
+    """
+    Quick platform-wide statistics summary for the admin dashboard.
+    All figures are computed live from current data — no cached/mock values.
+    """
+    row = await connection.fetchrow(
+        """
+        SELECT
+            (SELECT COALESCE(SUM(amount), 0)::bigint FROM credit_transactions WHERE transaction_type = 'Purchase') AS total_tokens_sold,
+            (SELECT COALESCE(SUM(amount), 0)::bigint FROM credit_transactions
+                WHERE transaction_type = 'Purchase' AND created_at >= date_trunc('month', now())) AS tokens_sold_this_month,
+            (SELECT COUNT(*) FROM users u JOIN organization_employees oe ON u.user_id = oe.user_id
+                WHERE oe.role_in_org = 'Owner' AND u.status = 'Active') AS approved_owners,
+            (SELECT COUNT(*) FROM users u JOIN organization_employees oe ON u.user_id = oe.user_id
+                WHERE oe.role_in_org = 'Owner' AND u.status = 'Active'
+                AND u.created_at >= date_trunc('month', now())) AS approved_owners_this_month,
+            (SELECT COUNT(*) FROM users u JOIN organization_employees oe ON u.user_id = oe.user_id
+                WHERE oe.role_in_org = 'Owner' AND u.status = 'Pending') AS pending_approvals,
+            (SELECT COUNT(*) FROM tenders WHERE status = 'Published') AS active_tenders,
+            (SELECT COUNT(*) FROM bids) AS total_bids,
+            (SELECT COUNT(*) FROM bids WHERE submitted_at >= date_trunc('month', now())) AS bids_this_month,
+            (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'Completed') AS total_revenue_bdt
+        """
+    )
+
+    return PlatformStatsResponse(
+        total_tokens_sold=row["total_tokens_sold"],
+        tokens_sold_this_month=row["tokens_sold_this_month"],
+        approved_owners=row["approved_owners"],
+        approved_owners_this_month=row["approved_owners_this_month"],
+        pending_approvals=row["pending_approvals"],
+        active_tenders=row["active_tenders"],
+        total_bids=row["total_bids"],
+        bids_this_month=row["bids_this_month"],
+        total_revenue_bdt=float(row["total_revenue_bdt"]),
+    )

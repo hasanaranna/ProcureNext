@@ -218,11 +218,11 @@ export default function OrganizationProfilePage() {
                   </svg>
                 ) : profile.is_enlisted ? (
                   <>
-                    <span>✓ Enlisted in Your Network</span>
+                    <span>✓ In Your Enlisted Sellers</span>
                   </>
                 ) : (
                   <>
-                    <span>+ Enlist {profile.organization_type}</span>
+                    <span>+ Enlist as Seller</span>
                   </>
                 )}
               </button>

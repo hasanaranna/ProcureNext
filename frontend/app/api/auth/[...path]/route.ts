@@ -32,6 +32,68 @@ async function proxyRequest(request: NextRequest, context: RouteContext) {
     return response;
   }
 
+  // Silently exchange the HttpOnly refresh_token cookie for a fresh
+  // access/refresh pair, called periodically by the client (see
+  // components/SessionRefresher.tsx) so a session doesn't just die once the
+  // short-lived access token cookie expires. The refresh token itself never
+  // reaches client-side JS — it's read from the cookie here, server-side.
+  if (endpoint === 'refresh' && request.method === 'POST') {
+    const adminRefreshToken = request.cookies.get('admin_refresh_token')?.value;
+    const userRefreshToken = request.cookies.get('refresh_token')?.value;
+    const refreshToken = adminRefreshToken || userRefreshToken;
+
+    if (!refreshToken) {
+      return NextResponse.json({ detail: 'No active session to refresh.' }, { status: 401 });
+    }
+
+    try {
+      const upstreamResponse = await fetch(`${backendBaseUrl}/api/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+        cache: 'no-store',
+      });
+
+      if (!upstreamResponse.ok) {
+        const responseBody = await upstreamResponse.arrayBuffer();
+        return new NextResponse(responseBody, {
+          status: upstreamResponse.status,
+          headers: new Headers(upstreamResponse.headers),
+        });
+      }
+
+      const data = await upstreamResponse.json();
+      const response = NextResponse.json({ success: true });
+      const isAdminSession = Boolean(adminRefreshToken);
+
+      response.cookies.set({
+        name: isAdminSession ? 'admin_access_token' : 'access_token',
+        value: data.access_token,
+        httpOnly: true,
+        secure: secureCookies,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 30 * 60,
+      });
+      response.cookies.set({
+        name: isAdminSession ? 'admin_refresh_token' : 'refresh_token',
+        value: data.refresh_token,
+        httpOnly: true,
+        secure: secureCookies,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 7 * 24 * 60 * 60,
+      });
+
+      return response;
+    } catch (error) {
+      return NextResponse.json(
+        { error: { code: 'BAD_GATEWAY', message: 'Unable to reach backend API service.', status: 502 } },
+        { status: 502 },
+      );
+    }
+  }
+
   // Preserve query string
   const url = new URL(request.url);
   const queryString = url.search;

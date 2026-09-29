@@ -150,7 +150,7 @@ export default function BidEvaluationPanel({ tenderId, bidsCount }: { tenderId: 
           ) : run ? (
             '🔄 Re-run Evaluation'
           ) : (
-            '🧠 Evaluate Bids'
+            'Evaluate Bids'
           )}
         </button>
       </div>

@@ -1,4 +1,27 @@
+# ---- Documents: never committed (report, slides, PDFs, archives) ----
+docs/
+*.zip
+__MACOSX/
+
+# ---- Runtime artefacts ----
 backend_fast_api/uploads/*
+backend_fast_api/celerybeat-schedule*
+**/__pycache__/
+.pytest_cache/
+**/.pytest_cache/
+
+# ---- Build output ----
+frontend/.next/
+frontend/node_modules/
+
+# ---- Secrets ----
+.env
+**/.env
+
+# ---- Editor / OS ----
+.vscode/
 .DS_Store
 **/.DS_Store
-frontend/.next/
+
+# ---- Compiler caches ----
+*.tsbuildinfo

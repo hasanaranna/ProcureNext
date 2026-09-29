@@ -2,6 +2,7 @@
 # services/email.py - Transactional Email Service
 # ============================================================
 import os
+import html
 import smtplib
 import logging
 from email.mime.multipart import MIMEMultipart
@@ -20,6 +21,12 @@ SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 MAIL_FROM = os.getenv("MAIL_FROM", "procurenext.contact@gmail.com")
 MAIL_FROM_NAME = os.getenv("MAIL_FROM_NAME", "ProcureNext")
 SMTP_TLS = os.getenv("SMTP_TLS", "True").lower() in ("true", "1", "yes")
+
+
+def frontend_url(path: str = "") -> str:
+    """Absolute link into the frontend for use in emails. Set FRONTEND_URL in deployment."""
+    base = os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+    return f"{base}{path}"
 
 
 def send_smtp_email(
@@ -574,6 +581,148 @@ def send_account_status_email(
 
 
 # ──────────────────────────────────────────────────────────────
+# Account Moderation (Suspended / Banned / Reactivated) – User Notification
+# ──────────────────────────────────────────────────────────────
+
+_MODERATION_COPY = {
+    "Suspended": {
+        "subject": "Your ProcureNext account has been suspended",
+        "heading": "Account Suspended",
+        "emoji": "⏸️",
+        "color": "#f59e0b",
+        "body": (
+            "Your ProcureNext account has been <strong>temporarily suspended</strong> by a platform "
+            "administrator. While suspended, you won't be able to sign in, publish tenders, or submit bids. "
+            "Any bids and tenders you already have remain on record."
+        ),
+        "text_body": (
+            "Your ProcureNext account has been temporarily suspended by a platform administrator. "
+            "While suspended, you won't be able to sign in, publish tenders, or submit bids. "
+            "Any bids and tenders you already have remain on record."
+        ),
+        "closing": "If you believe this was a mistake or want to resolve the issue, simply reply to this email and our team will review your account.",
+    },
+    "Banned": {
+        "subject": "Your ProcureNext account has been banned",
+        "heading": "Account Banned",
+        "emoji": "⛔",
+        "color": "#ef4444",
+        "body": (
+            "Your ProcureNext account has been <strong>banned</strong> by a platform administrator for "
+            "violating the platform's terms of use. You can no longer sign in or take part in any tenders "
+            "or bids on ProcureNext."
+        ),
+        "text_body": (
+            "Your ProcureNext account has been banned by a platform administrator for violating the "
+            "platform's terms of use. You can no longer sign in or take part in any tenders or bids on ProcureNext."
+        ),
+        "closing": "If you believe this decision was made in error, you may reply to this email to request a review.",
+    },
+    "Active": {
+        "subject": "Your ProcureNext account has been reactivated",
+        "heading": "Account Reactivated",
+        "emoji": "✅",
+        "color": "#10b981",
+        "body": (
+            "Good news — your ProcureNext account has been <strong>reactivated</strong> by a platform "
+            "administrator. You now have full access again and can sign in, publish tenders, and submit bids as usual."
+        ),
+        "text_body": (
+            "Good news - your ProcureNext account has been reactivated by a platform administrator. "
+            "You now have full access again and can sign in, publish tenders, and submit bids as usual."
+        ),
+        "closing": "Thank you for your patience. We're glad to have you back.",
+    },
+}
+
+
+def build_account_moderation_html(
+    full_name: str, new_status: str, login_url: str, reason: str | None = None
+) -> str:
+    copy = _MODERATION_COPY[new_status]
+    reason_block = ""
+    if reason:
+        reason_block = f"""
+    <div style="background-color:#f8fafc;border-left:4px solid {copy['color']};padding:16px;border-radius:6px;margin-bottom:24px;">
+      <p style="margin:0;font-size:14px;color:#334155;line-height:1.5;">
+        <strong>Reason provided:</strong> {html.escape(reason)}
+      </p>
+    </div>"""
+
+    cta = ""
+    if new_status == "Active":
+        cta = f"""
+    <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 auto 28px auto;">
+      <tr><td align="center" style="border-radius:12px;background:linear-gradient(135deg,#10b981 0%,#059669 100%);">
+        <a href="{login_url}" target="_blank" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:12px;">Log In Now &rarr;</a>
+      </td></tr>
+    </table>"""
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{copy['heading']}</title></head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f1f5f9;padding:40px 16px;">
+<tr><td align="center">
+<table role="presentation" width="100%" style="max-width:580px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 25px -5px rgba(0,0,0,0.08);border:1px solid #e2e8f0;" cellspacing="0" cellpadding="0">
+  <tr><td style="background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);padding:36px 32px;text-align:center;">
+    <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:800;">Procure<span style="color:#38bdf8;">Next</span></h1>
+    <p style="margin:6px 0 0 0;color:#94a3b8;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;">Account Notification</p>
+  </td></tr>
+  <tr><td style="padding:36px 32px;">
+    <div style="text-align:center;margin-bottom:24px;">
+      <span style="display:inline-block;width:56px;height:56px;border-radius:50%;background:{copy['color']};line-height:56px;font-size:28px;text-align:center;">{copy['emoji']}</span>
+    </div>
+    <h2 style="margin:0 0 16px 0;color:#0f172a;font-size:20px;font-weight:700;text-align:center;">{copy['heading']}</h2>
+    <p style="margin:0 0 18px 0;font-size:15px;line-height:1.6;color:#475569;">Hello <strong>{html.escape(full_name)}</strong>,</p>
+    <p style="margin:0 0 24px 0;font-size:15px;line-height:1.6;color:#475569;">{copy['body']}</p>
+    {reason_block}
+    {cta}
+    <p style="margin:0;font-size:14px;line-height:1.6;color:#64748b;">{copy['closing']}</p>
+  </td></tr>
+  <tr><td style="background-color:#f8fafc;padding:24px 32px;text-align:center;border-top:1px solid #e2e8f0;">
+    <p style="margin:0;font-size:11px;color:#94a3b8;">&copy; 2026 ProcureNext. All rights reserved.</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>"""
+
+
+def build_account_moderation_text(
+    full_name: str, new_status: str, login_url: str, reason: str | None = None
+) -> str:
+    copy = _MODERATION_COPY[new_status]
+    reason_line = f"\nReason provided: {reason}\n" if reason else ""
+    login_line = f"\nLog in at: {login_url}\n" if new_status == "Active" else ""
+    return f"""ProcureNext - {copy['heading']}
+
+Hello {full_name},
+
+{copy['text_body']}
+{reason_line}{login_line}
+{copy['closing']}
+
+-- ProcureNext Team
+"""
+
+
+def send_account_moderation_email(
+    to_email: str,
+    full_name: str,
+    new_status: str,
+    login_url: str,
+    reason: str | None = None,
+) -> bool:
+    return send_smtp_email(
+        to_email=to_email,
+        subject=_MODERATION_COPY[new_status]["subject"],
+        html_body=build_account_moderation_html(full_name, new_status, login_url, reason),
+        text_body=build_account_moderation_text(full_name, new_status, login_url, reason),
+    )
+
+
+# ──────────────────────────────────────────────────────────────
 # Bid Received – Buyer Notification
 # ──────────────────────────────────────────────────────────────
 
@@ -723,6 +872,115 @@ def send_bid_accepted_email(
 
 
 # ──────────────────────────────────────────────────────────────
+# Notice of Assessment – Winning Vendor
+# ──────────────────────────────────────────────────────────────
+
+def build_notice_of_assessment_html(vendor_name: str, notice: dict, notice_url: str) -> str:
+    esc = html.escape
+    paragraphs = "".join(
+        f'<p style="margin:0 0 14px 0;font-size:14px;line-height:1.7;color:#334155;">{esc(p)}</p>'
+        for p in notice["paragraphs"]
+    )
+    steps = "".join(
+        f'<li style="margin:0 0 8px 0;">{esc(step)}</li>' for step in notice["next_steps"]
+    )
+    issued_by = (
+        f'<p style="margin:0;font-size:14px;color:#0f172a;font-weight:600;">{esc(notice["issued_by"])}</p>'
+        if notice.get("issued_by") else ""
+    )
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notice of Assessment</title></head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f1f5f9;padding:40px 16px;">
+<tr><td align="center">
+<table role="presentation" width="100%" style="max-width:620px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 25px -5px rgba(0,0,0,0.08);border:1px solid #e2e8f0;" cellspacing="0" cellpadding="0">
+  <tr><td style="background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);padding:32px;text-align:center;">
+    <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:800;">Procure<span style="color:#38bdf8;">Next</span></h1>
+    <p style="margin:6px 0 0 0;color:#94a3b8;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;">Notice of Assessment</p>
+  </td></tr>
+  <tr><td style="padding:32px;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom:24px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;">
+      <tr><td style="padding:14px 18px;font-size:13px;color:#64748b;">Reference</td><td style="padding:14px 18px;font-size:13px;color:#0f172a;font-weight:600;text-align:right;">{esc(notice["reference"])}</td></tr>
+      <tr><td style="padding:0 18px 14px 18px;font-size:13px;color:#64748b;">Date of issue</td><td style="padding:0 18px 14px 18px;font-size:13px;color:#0f172a;font-weight:600;text-align:right;">{esc(notice["issued_on"])}</td></tr>
+    </table>
+    <p style="margin:0 0 4px 0;font-size:13px;color:#64748b;">From</p>
+    <p style="margin:0 0 14px 0;font-size:14px;color:#0f172a;font-weight:600;">{esc(notice["buyer_org_name"])}</p>
+    <p style="margin:0 0 4px 0;font-size:13px;color:#64748b;">To</p>
+    <p style="margin:0 0 20px 0;font-size:14px;color:#0f172a;font-weight:600;">{esc(notice["vendor_org_name"])}</p>
+    <h2 style="margin:0 0 18px 0;color:#0f172a;font-size:18px;font-weight:700;">Subject: {esc(notice["subject"])}</h2>
+    <p style="margin:0 0 14px 0;font-size:14px;line-height:1.7;color:#334155;">Dear <strong>{esc(vendor_name)}</strong>,</p>
+    {paragraphs}
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:22px 0;border:1px solid #a7f3d0;background:#ecfdf5;border-radius:10px;">
+      <tr><td style="padding:16px 18px;font-size:13px;color:#047857;">Accepted contract price</td>
+          <td style="padding:16px 18px;font-size:18px;color:#065f46;font-weight:800;text-align:right;">{esc(notice["accepted_amount"])}</td></tr>
+    </table>
+    <p style="margin:0 0 8px 0;font-size:14px;font-weight:700;color:#0f172a;">Next steps</p>
+    <ol style="margin:0 0 20px 0;padding-left:20px;font-size:14px;line-height:1.6;color:#334155;">{steps}</ol>
+    <p style="margin:0 0 24px 0;font-size:13px;line-height:1.7;color:#64748b;">{esc(notice["closing"])}</p>
+    <p style="margin:0 0 2px 0;font-size:14px;color:#334155;">Yours faithfully,</p>
+    {issued_by}
+    <p style="margin:0 0 28px 0;font-size:14px;color:#334155;">{esc(notice["buyer_org_name"])}</p>
+    <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 auto;">
+      <tr><td align="center" style="border-radius:12px;background:linear-gradient(135deg,#10b981 0%,#059669 100%);">
+        <a href="{notice_url}" target="_blank" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:12px;">View Notice on ProcureNext &rarr;</a>
+      </td></tr>
+    </table>
+  </td></tr>
+  <tr><td style="background-color:#f8fafc;padding:24px 32px;text-align:center;border-top:1px solid #e2e8f0;">
+    <p style="margin:0;font-size:11px;color:#94a3b8;">&copy; 2026 ProcureNext. All rights reserved.</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>"""
+
+
+def build_notice_of_assessment_text(vendor_name: str, notice: dict, notice_url: str) -> str:
+    steps = "\n".join(f"  {i}. {step}" for i, step in enumerate(notice["next_steps"], 1))
+    signature = f"{notice['issued_by']}\n" if notice.get("issued_by") else ""
+    return f"""NOTICE OF ASSESSMENT
+Reference: {notice["reference"]}
+Date of issue: {notice["issued_on"]}
+
+From: {notice["buyer_org_name"]}
+To:   {notice["vendor_org_name"]}
+
+Subject: {notice["subject"]}
+
+Dear {vendor_name},
+
+{chr(10).join(chr(10).join([p, ""]) for p in notice["paragraphs"]).rstrip()}
+
+Accepted contract price: {notice["accepted_amount"]}
+
+Next steps:
+{steps}
+
+{notice["closing"]}
+
+Yours faithfully,
+{signature}{notice["buyer_org_name"]}
+
+View this notice on ProcureNext: {notice_url}
+"""
+
+
+def send_notice_of_assessment_email(
+    to_email: str,
+    vendor_name: str,
+    notice: dict,
+    notice_url: str,
+) -> bool:
+    return send_smtp_email(
+        to_email=to_email,
+        subject=f"Notice of Assessment {notice['reference']} – {notice['tender_title']}",
+        html_body=build_notice_of_assessment_html(vendor_name, notice, notice_url),
+        text_body=build_notice_of_assessment_text(vendor_name, notice, notice_url),
+    )
+
+
+# ──────────────────────────────────────────────────────────────
 # Bid Rejected – Losing Vendor Notification
 # ──────────────────────────────────────────────────────────────
 
@@ -791,6 +1049,91 @@ def send_bid_rejected_email(
 
 
 # ──────────────────────────────────────────────────────────────
+# Tender Cancelled – Bidder Notification
+# ──────────────────────────────────────────────────────────────
+
+def build_tender_cancelled_html(
+    vendor_name: str,
+    tender_title: str,
+    buyer_org_name: str,
+    my_bids_url: str,
+) -> str:
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tender Cancelled</title></head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f1f5f9;padding:40px 16px;">
+<tr><td align="center">
+<table role="presentation" width="100%" style="max-width:580px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 25px -5px rgba(0,0,0,0.08);border:1px solid #e2e8f0;" cellspacing="0" cellpadding="0">
+  <tr><td style="background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);padding:36px 32px;text-align:center;">
+    <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:800;">Procure<span style="color:#38bdf8;">Next</span></h1>
+    <p style="margin:6px 0 0 0;color:#94a3b8;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;">Tender Notification</p>
+  </td></tr>
+  <tr><td style="padding:36px 32px;">
+    <div style="text-align:center;margin-bottom:24px;">
+      <span style="display:inline-block;width:56px;height:56px;border-radius:50%;background:#f59e0b;line-height:56px;font-size:28px;text-align:center;">🚫</span>
+    </div>
+    <h2 style="margin:0 0 16px 0;color:#0f172a;font-size:20px;font-weight:700;text-align:center;">This Tender Has Been Cancelled</h2>
+    <p style="margin:0 0 18px 0;font-size:15px;line-height:1.6;color:#475569;">Hello <strong>{vendor_name}</strong>,</p>
+    <p style="margin:0 0 24px 0;font-size:15px;line-height:1.6;color:#475569;">
+      <strong>{buyer_org_name}</strong> has cancelled the tender <strong>"{tender_title}"</strong>, which you had
+      submitted a bid on. No further action is needed from you, and no bid fees or bid securities will be
+      forfeited as a result of this cancellation.
+    </p>
+    <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 auto 28px auto;">
+      <tr><td align="center" style="border-radius:12px;background:linear-gradient(135deg,#0284c7 0%,#0369a1 100%);">
+        <a href="{my_bids_url}" target="_blank" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:12px;">View My Bids &rarr;</a>
+      </td></tr>
+    </table>
+    <p style="margin:0;font-size:14px;line-height:1.6;color:#64748b;">
+      We encourage you to continue exploring other open tenders on ProcureNext.
+    </p>
+  </td></tr>
+  <tr><td style="background-color:#f8fafc;padding:24px 32px;text-align:center;border-top:1px solid #e2e8f0;">
+    <p style="margin:0;font-size:11px;color:#94a3b8;">&copy; 2026 ProcureNext. All rights reserved.</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>"""
+
+
+def build_tender_cancelled_text(
+    vendor_name: str, tender_title: str, buyer_org_name: str, my_bids_url: str
+) -> str:
+    return f"""ProcureNext - Tender Cancelled
+
+Hello {vendor_name},
+
+{buyer_org_name} has cancelled the tender "{tender_title}", which you had submitted a bid on.
+No further action is needed from you, and no bid fees or bid securities will be forfeited as a
+result of this cancellation.
+
+View your bids at: {my_bids_url}
+
+We encourage you to continue exploring other open tenders on ProcureNext.
+
+-- ProcureNext Team
+"""
+
+
+def send_tender_cancelled_email(
+    to_email: str,
+    vendor_name: str,
+    tender_title: str,
+    buyer_org_name: str,
+    my_bids_url: str,
+) -> bool:
+    subject = f"Tender cancelled: \"{tender_title}\""
+    return send_smtp_email(
+        to_email=to_email,
+        subject=subject,
+        html_body=build_tender_cancelled_html(vendor_name, tender_title, buyer_org_name, my_bids_url),
+        text_body=build_tender_cancelled_text(vendor_name, tender_title, buyer_org_name, my_bids_url),
+    )
+
+
+# ──────────────────────────────────────────────────────────────
 # InterCompany Channel Created – Owner Notification
 # ──────────────────────────────────────────────────────────────
 
@@ -827,7 +1170,7 @@ def build_intercompany_created_html(
     </p>
     <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 auto 28px auto;">
       <tr><td align="center" style="border-radius:12px;background:linear-gradient(135deg,#0284c7 0%,#0369a1 100%);">
-        <a href="https://procurenext.app/messages" target="_blank" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:12px;">Open Channel &rarr;</a>
+        <a href="{frontend_url('/home')}" target="_blank" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:12px;">Open Channel &rarr;</a>
       </td></tr>
     </table>
   </td></tr>
@@ -854,7 +1197,7 @@ between your organisation and {other_org_name}.
 You can now communicate directly through ProcureNext Messaging.
 You may also add members from your own organisation to this channel.
 
-Open the channel at: https://procurenext.app/messages
+Open the channel at: {frontend_url('/home')}
 
 -- ProcureNext Team
 """
@@ -908,7 +1251,7 @@ def build_intercompany_member_added_html(
     </p>
     <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 auto 28px auto;">
       <tr><td align="center" style="border-radius:12px;background:linear-gradient(135deg,#0284c7 0%,#0369a1 100%);">
-        <a href="https://procurenext.app/messages" target="_blank" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:12px;">Open Channel &rarr;</a>
+        <a href="{frontend_url('/home')}" target="_blank" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:12px;">Open Channel &rarr;</a>
       </td></tr>
     </table>
   </td></tr>
@@ -932,7 +1275,7 @@ Hello {user_name},
 {owner_name} has added you to the inter-company collaboration channel
 for the tender "{tender_title}" on ProcureNext.
 
-Open the channel at: https://procurenext.app/messages
+Open the channel at: {frontend_url('/home')}
 
 -- ProcureNext Team
 """

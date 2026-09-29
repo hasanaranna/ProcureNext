@@ -3,16 +3,19 @@
 # ============================================================
 
 import asyncpg
+from fastapi import HTTPException
 from app.tasks.document_tasks import upload_bid_documents_to_supabase
 from app.modules.payments.service import deduct_tokens_for_bid_submission
 from app.modules.notifications.service import create_notification
 from app.tasks.notification_tasks import (
     send_bid_received_email_task,
     send_bid_accepted_email_task,
+    send_notice_of_assessment_email_task,
     send_bid_rejected_email_task,
     send_intercompany_created_email_task,
 )
 from app.modules.messaging.service import create_intercompany_thread
+from app.modules.bids.notice import fetch_notice
 
 
 async def submit_bid_with_documents(
@@ -30,9 +33,42 @@ async def submit_bid_with_documents(
     Mirrors the tender publishing flow exactly.
     """
 
-    # Fetch tender title for transaction description
-    tender_row = await connection.fetchrow("SELECT title FROM tenders WHERE tender_id = $1", tender_id)
-    tender_title = tender_row["title"] if tender_row else None
+    tender_row = await connection.fetchrow(
+        "SELECT title, buyer_id, visibility_type FROM tenders WHERE tender_id = $1",
+        tender_id,
+    )
+    if tender_row is None:
+        raise HTTPException(status_code=404, detail="Tender not found.")
+    tender_title = tender_row["title"]
+
+    # Restricted/Exclusive tenders are only open to a specific set of
+    # vendors — the visibility filter already keeps these out of a
+    # non-eligible vendor's browse/search results, but this is the actual
+    # enforcement: without it, an ineligible vendor who obtains the
+    # tender_id another way (a shared link, an old bookmark, guessing
+    # sequential ids) could still bid on it.
+    if tender_row["visibility_type"] == "Exclusive":
+        is_enlisted = await connection.fetchval(
+            "SELECT 1 FROM enlisted_vendors WHERE org_id = $1 AND enlisted_org_id = $2",
+            tender_row["buyer_id"],
+            vendor_org_id,
+        )
+        if not is_enlisted:
+            raise HTTPException(
+                status_code=403,
+                detail="This tender is restricted to the buyer's enlisted vendors.",
+            )
+    elif tender_row["visibility_type"] == "Restricted":
+        is_invited = await connection.fetchval(
+            "SELECT 1 FROM tender_invitations WHERE tender_id = $1 AND vendor_org_id = $2",
+            tender_id,
+            vendor_org_id,
+        )
+        if not is_invited:
+            raise HTTPException(
+                status_code=403,
+                detail="This tender is restricted to invited vendors.",
+            )
 
     query = """
         INSERT INTO bids (
@@ -269,8 +305,10 @@ async def accept_bid_for_tender(
         if row["buyer_id"] != buyer_org_id:
             raise ValueError("You do not have permission to accept this bid.")
             
-        if row["tender_status"] in ('Awarded', 'Cancelled', 'Closed'):
-            raise ValueError(f"Cannot accept bid, tender is already {row['tender_status']}.")
+        # A buyer awards after bidding closes, so Closed tenders must stay acceptable;
+        # only a finished (Awarded/Cancelled) or unpublished (Draft) tender is off-limits.
+        if row["tender_status"] not in ('Published', 'Closed'):
+            raise ValueError(f"Cannot accept bid, tender is {row['tender_status']}.")
             
         if row["bid_status"] not in ('Draft', 'Submitted', 'UnderEvaluation'):
             raise ValueError(f"Cannot accept bid with status {row['bid_status']}.")
@@ -406,20 +444,28 @@ async def accept_bid_for_tender(
                 await create_notification(
                     connection,
                     user_id=vendor_info["user_id"],
-                    title="Bid Accepted!",
-                    message=f"Your bid on \"{vendor_info['tender_title']}\" has been accepted by {vendor_info['buyer_org_name']}.",
+                    title="Notice of Assessment Issued",
+                    message=f"Your bid on \"{vendor_info['tender_title']}\" has been accepted by {vendor_info['buyer_org_name']}. Open My Bids to read your Notice of Assessment.",
                     notification_type="Award",
-                    action_url=f"/ongoing-tenders",
+                    action_url="/view-my-bids",
                 )
 
-                # Send email via Celery
-                send_bid_accepted_email_task.delay(
-                    to_email=vendor_info["email"],
-                    vendor_name=vendor_info["full_name"] or "Vendor",
-                    tender_title=vendor_info["tender_title"] or "Tender",
-                    buyer_org_name=vendor_info["buyer_org_name"] or "Buyer",
-                    tender_id=tender_id,
-                )
+                # Send the formal Notice of Assessment via Celery
+                notice = await fetch_notice(connection, bid_id)
+                if notice:
+                    send_notice_of_assessment_email_task.delay(
+                        to_email=vendor_info["email"],
+                        vendor_name=vendor_info["full_name"] or "Vendor",
+                        notice=notice,
+                    )
+                else:
+                    send_bid_accepted_email_task.delay(
+                        to_email=vendor_info["email"],
+                        vendor_name=vendor_info["full_name"] or "Vendor",
+                        tender_title=vendor_info["tender_title"] or "Tender",
+                        buyer_org_name=vendor_info["buyer_org_name"] or "Buyer",
+                        tender_id=tender_id,
+                    )
         except Exception as notify_exc:
             print(f"[NOTIFY WARNING] Failed to send bid accepted notification: {notify_exc}", flush=True)
 

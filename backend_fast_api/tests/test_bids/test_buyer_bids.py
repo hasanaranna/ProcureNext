@@ -101,3 +101,50 @@ class TestBuyerBids:
         
         assert resp.status_code == 400
         assert "already Awarded" in resp.json()["detail"]
+
+
+# ===========================================================================
+# accept_bid_for_tender: which tender states allow an award
+# ===========================================================================
+
+class _Stop(Exception):
+    """Raised by the mock connection once the accept UPDATE is reached."""
+
+
+def _accept_conn(tender_status: str):
+    from unittest.mock import AsyncMock, MagicMock
+
+    conn = MagicMock()
+    tx = MagicMock()
+    tx.__aenter__ = AsyncMock(return_value=None)
+    tx.__aexit__ = AsyncMock(return_value=False)
+    conn.transaction.return_value = tx
+
+    verify_row = {"tender_id": 7, "buyer_id": 1, "tender_status": tender_status, "bid_status": "Submitted"}
+
+    async def fetchrow(query, *args):
+        if "UPDATE bids SET status = 'Accepted'" in query:
+            raise _Stop()
+        return verify_row
+
+    conn.fetchrow = AsyncMock(side_effect=fetchrow)
+    conn.execute = AsyncMock()
+    return conn
+
+
+class TestAcceptBidTenderStatus:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("tender_status", ["Published", "Closed"])
+    async def test_bid_can_be_accepted_while_open_or_after_deadline(self, tender_status):
+        from app.modules.bids.service import accept_bid_for_tender
+
+        with pytest.raises(_Stop):
+            await accept_bid_for_tender(_accept_conn(tender_status), bid_id=44, buyer_org_id=1, user_id=5)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("tender_status", ["Awarded", "Cancelled", "Draft"])
+    async def test_bid_cannot_be_accepted_on_finished_or_unpublished_tender(self, tender_status):
+        from app.modules.bids.service import accept_bid_for_tender
+
+        with pytest.raises(ValueError, match=f"tender is {tender_status}"):
+            await accept_bid_for_tender(_accept_conn(tender_status), bid_id=44, buyer_org_id=1, user_id=5)

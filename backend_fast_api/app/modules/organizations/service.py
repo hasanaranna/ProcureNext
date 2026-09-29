@@ -6,6 +6,7 @@ from fastapi import HTTPException
 
 from app.core.security import hash_password
 from app.modules.organizations.schemas import OrgCreateRequest, OrgCreateResponse, OrganizationSummary, UserSummary
+from app.services.email import frontend_url
 
 
 async def _generate_unique_join_code(connection: asyncpg.Connection) -> str:
@@ -318,8 +319,7 @@ async def create_or_update_invitation(
     inviter_name = org_info["inviter_name"] if org_info else None
 
     # Construct the full invitation link
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
-    invite_link = f"{frontend_url}/signup-user?token={token}"
+    invite_link = frontend_url(f"/signup-user?token={token}")
 
     # Asynchronously dispatch email via Celery task (with fallback to direct async threadpool)
     try:
@@ -507,7 +507,8 @@ async def enlist_organization(
     org_user_id: int
 ) -> dict:
     """
-    Add target organization to caller organization's enlisted vendors / buyers list.
+    Add target organization to the caller (buyer) organization's enlisted sellers list.
+    Enlistment is one-directional: only buyers enlist sellers.
     """
     if current_org_id == target_org_id:
         raise HTTPException(status_code=400, detail="An organization cannot enlist itself.")
@@ -553,10 +554,10 @@ async def get_enlisted_organizations(
     current_org_id: int
 ) -> list[dict]:
     """
-    Retrieve all organizations enlisted by the caller's organization.
+    Retrieve all seller organizations enlisted by the caller's (buyer) organization.
     """
     query = """
-        SELECT 
+        SELECT
             o.organization_id,
             o.organization_name,
             o.organization_type,
@@ -568,6 +569,33 @@ async def get_enlisted_organizations(
         FROM enlisted_vendors ev
         JOIN organizations o ON ev.enlisted_org_id = o.organization_id
         WHERE ev.org_id = $1
+        ORDER BY ev.enlisted_at DESC;
+    """
+    rows = await connection.fetch(query, current_org_id)
+    return [dict(row.items()) for row in rows]
+
+
+async def get_enlisting_buyers(
+    connection: asyncpg.Connection,
+    current_org_id: int
+) -> list[dict]:
+    """
+    Retrieve all buyer organizations that have enlisted the caller's organization
+    as a seller (the reverse direction of get_enlisted_organizations).
+    """
+    query = """
+        SELECT
+            o.organization_id,
+            o.organization_name,
+            o.organization_type,
+            o.address,
+            o.website,
+            o.description,
+            o.verification_status,
+            ev.enlisted_at
+        FROM enlisted_vendors ev
+        JOIN organizations o ON ev.org_id = o.organization_id
+        WHERE ev.enlisted_org_id = $1
         ORDER BY ev.enlisted_at DESC;
     """
     rows = await connection.fetch(query, current_org_id)

@@ -182,7 +182,11 @@ class TestVisibilityRules:
 
 
 class TestEnlistedFilter:
-    """enlisted_only restricts results to buyers the vendor has enlisted."""
+    """
+    enlisted_only restricts results to buyers that have enlisted the viewer.
+    Enlistment is one-directional (buyer enlists seller):
+    enlisted_vendors.org_id = buyer, enlisted_org_id = seller.
+    """
 
     @pytest.mark.asyncio
     @patch("app.modules.search.router.get_db_connection")
@@ -202,15 +206,24 @@ class TestEnlistedFilter:
 
         assert resp.status_code == 200
         sql = _executed_sql(mock_conn)
-        assert "enlisted_vendors" in sql
-        assert "ev.enlisted_org_id = t.buyer_id" in sql
+        assert "JOIN enlisted_vendors ev ON ev.org_id = t.buyer_id AND ev.enlisted_org_id = $" in sql
+        # Regression: the old, reversed direction showed a seller tenders from
+        # orgs *they* had enlisted, so enlisted sellers never saw the buyer's tenders.
+        assert "ev.enlisted_org_id = t.buyer_id" not in sql
+        assert mock_user_org["organization_id"] in _bound_params(mock_conn)
 
     @pytest.mark.asyncio
     @patch("app.modules.search.router.get_db_connection")
     @patch("app.modules.search.service.vectorize_text")
-    async def test_default_does_not_filter_by_enlistment(
+    async def test_default_does_not_join_enlisted_buyers(
         self, mock_vectorize, mock_db, client, mock_user_org, sample_tender_list, auth_headers
     ):
+        """
+        Without enlisted_only, results must not be restricted to tenders from
+        buyers that enlisted the viewer (no JOIN on enlisted_vendors). The
+        visibility filter's Exclusive check still references enlisted_vendors
+        via an EXISTS subquery — see test_default_still_honors_exclusive_visibility.
+        """
         app.dependency_overrides[get_current_user_org] = lambda: mock_user_org
         mock_conn = AsyncMock()
         mock_conn.fetch.return_value = sample_tender_list
@@ -220,4 +233,28 @@ class TestEnlistedFilter:
         resp = await client.get("/search/tenders?q=supplies", headers=auth_headers)
 
         assert resp.status_code == 200
-        assert "enlisted_vendors" not in _executed_sql(mock_conn)
+        assert "JOIN enlisted_vendors" not in _executed_sql(mock_conn)
+
+    @pytest.mark.asyncio
+    @patch("app.modules.search.router.get_db_connection")
+    @patch("app.modules.search.service.vectorize_text")
+    async def test_default_still_honors_exclusive_visibility(
+        self, mock_vectorize, mock_db, client, mock_user_org, sample_tender_list, auth_headers
+    ):
+        """
+        Regression test: an Exclusive tender (visibility_type='Exclusive') must
+        only be visible to vendors the buyer has enlisted, in every listing path
+        (not just when enlisted_only=true is explicitly requested).
+        """
+        app.dependency_overrides[get_current_user_org] = lambda: mock_user_org
+        mock_conn = AsyncMock()
+        mock_conn.fetch.return_value = sample_tender_list
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+        mock_vectorize.return_value = [0.1] * 384
+
+        resp = await client.get("/search/tenders?q=supplies", headers=auth_headers)
+
+        assert resp.status_code == 200
+        sql = _executed_sql(mock_conn)
+        assert "t.visibility_type = 'Exclusive'" in sql
+        assert "ev.org_id = t.buyer_id AND ev.enlisted_org_id" in sql

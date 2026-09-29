@@ -59,9 +59,12 @@ def _build_tender_scope(
     idx = start_idx
 
     if enlisted_only and viewer_org_id is not None:
+        # Only buyers enlist sellers (enlisted_vendors.org_id = buyer,
+        # enlisted_org_id = seller), so "enlisted" for a seller means tenders
+        # from buyers that have enlisted the viewer.
         join_sql += (
             f" JOIN enlisted_vendors ev"
-            f" ON ev.enlisted_org_id = t.buyer_id AND ev.org_id = ${idx}"
+            f" ON ev.org_id = t.buyer_id AND ev.enlisted_org_id = ${idx}"
         )
         params.append(viewer_org_id)
         idx += 1

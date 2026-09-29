@@ -30,12 +30,16 @@
 
 
 # ============================================================
+from datetime import datetime, timezone
+
 import pytest
 from unittest.mock import AsyncMock, patch
 from contextlib import asynccontextmanager
 from fastapi import HTTPException
+from jose import jwt
 
 from app.main import app
+from app.core.security import SECRET_KEY, ALGORITHM
 from app.modules.auth.dependencies import get_current_admin
 
 
@@ -355,3 +359,325 @@ class TestNonAdminRejected:
     async def test_pending_accounts_returns_401_for_unauthenticated_caller(self, client):
         resp = await client.get("/api/auth/admin/pending-accounts")
         assert resp.status_code == 401
+
+
+# ===========================================================================
+# GET /api/auth/admin/stats — get_platform_stats
+# ===========================================================================
+
+class TestPlatformStats:
+    @pytest.mark.asyncio
+    @patch("app.modules.admin.router.get_db_connection")
+    @patch("app.modules.admin.router.get_platform_stats")
+    async def test_get_stats_returns_200_with_metrics(self, mock_stats, mock_db, client):
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+        mock_stats.return_value = {
+            "total_tokens_sold": 48320,
+            "tokens_sold_this_month": 1240,
+            "approved_owners": 312,
+            "approved_owners_this_month": 14,
+            "pending_approvals": 5,
+            "active_tenders": 87,
+            "total_bids": 2641,
+            "bids_this_month": 318,
+            "total_revenue_bdt": 2416000.0,
+        }
+
+        resp = await client.get("/api/auth/admin/stats")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["active_tenders"] == 87
+        assert body["total_revenue_bdt"] == 2416000.0
+        mock_stats.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_get_stats_returns_401_for_unauthenticated_caller(self, client):
+        app.dependency_overrides.pop(get_current_admin, None)
+        resp = await client.get("/api/auth/admin/stats")
+        assert resp.status_code == 401
+
+
+# ===========================================================================
+# get_current_admin — regression test for stale/forged admin_role JWT claim
+# ===========================================================================
+# A JWT can keep a truthy `admin_role` claim from before a user's admin
+# privileges were revoked in the `admins` table. Admin status must be
+# re-verified against the DB on every request rather than trusted from the
+# token alone, otherwise a revoked admin (or a token with a forged claim)
+# would still pass as an admin until the token expires.
+
+class TestAdminRoleClaimNotTrustedOverDb:
+    @pytest.mark.asyncio
+    @patch("app.modules.auth.dependencies.get_db_connection")
+    async def test_admin_role_claim_without_db_row_is_rejected(self, mock_db, client):
+        app.dependency_overrides.pop(get_current_admin, None)
+
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+        mock_conn.fetchrow.return_value = None  # no matching row in `admins`
+
+        token = jwt.encode(
+            {
+                "sub": "99",
+                "admin_role": "SuperAdmin",  # stale/forged claim
+                "exp": datetime(2099, 1, 1, tzinfo=timezone.utc),
+            },
+            SECRET_KEY,
+            algorithm=ALGORITHM,
+        )
+
+        resp = await client.get(
+            "/api/auth/admin/pending-accounts",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert resp.status_code == 403
+
+
+# ===========================================================================
+# GET /api/auth/admin/users, PUT /api/auth/admin/modify-user-status
+# ===========================================================================
+
+class TestUserManagement:
+    @pytest.mark.asyncio
+    @patch("app.modules.admin.router.get_db_connection")
+    @patch("app.modules.admin.router.list_all_users")
+    async def test_list_users_returns_200(self, mock_list_users, mock_db, client):
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+        mock_list_users.return_value = {
+            "users": [
+                {
+                    "user_id": 1,
+                    "full_name": "Vendor One",
+                    "email": "vendor1@test.com",
+                    "status": "Active",
+                    "organization_name": "Vendor Org",
+                    "role_in_org": "Owner",
+                    "is_admin": False,
+                    "created_at": "2026-01-01T00:00:00",
+                }
+            ],
+            "total": 1,
+        }
+
+        resp = await client.get("/api/auth/admin/users")
+
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 1
+
+    @pytest.mark.asyncio
+    @patch("app.modules.admin.router.get_db_connection")
+    @patch("app.modules.admin.router.list_all_users")
+    async def test_list_users_passes_pagination_and_search(self, mock_list_users, mock_db, client):
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+        mock_list_users.return_value = {"users": [], "total": 0, "page": 3, "limit": 10}
+
+        resp = await client.get("/api/auth/admin/users", params={"page": 3, "search": "acme"})
+
+        assert resp.status_code == 200
+        mock_list_users.assert_awaited_once_with(mock_conn, page=3, limit=10, search="acme")
+
+    @pytest.mark.asyncio
+    async def test_list_users_rejects_invalid_page(self, client):
+        resp = await client.get("/api/auth/admin/users", params={"page": 0})
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_list_all_users_applies_search_offset_and_total(self):
+        from datetime import datetime
+        from app.modules.admin.service import list_all_users
+
+        conn = AsyncMock()
+        conn.fetchval.return_value = 23
+        conn.fetch.return_value = [{
+            "user_id": 7, "full_name": "Acme Owner", "email": "owner@acme.com",
+            "status": "Active", "organization_name": "Acme", "role_in_org": "Owner",
+            "is_admin": False, "created_at": datetime(2026, 1, 1),
+        }]
+
+        result = await list_all_users(conn, page=3, limit=10, search="  acme ")
+
+        count_sql, count_pattern = conn.fetchval.await_args.args
+        assert "ILIKE $1" in count_sql and count_pattern == "%acme%"
+        list_args = conn.fetch.await_args.args
+        assert "LIMIT $2 OFFSET $3" in list_args[0]
+        assert list_args[1:] == ("%acme%", 10, 20)
+        assert result.total == 23 and result.page == 3 and len(result.users) == 1
+
+    @pytest.mark.asyncio
+    async def test_list_all_users_without_search_has_no_filter(self):
+        from app.modules.admin.service import list_all_users
+
+        conn = AsyncMock()
+        conn.fetchval.return_value = 0
+        conn.fetch.return_value = []
+
+        result = await list_all_users(conn)
+
+        assert "WHERE" not in conn.fetchval.await_args.args[0]
+        assert conn.fetch.await_args.args[1:] == (10, 0)
+        assert result.total == 0 and result.users == []
+
+    @pytest.mark.asyncio
+    async def test_list_users_returns_401_for_unauthenticated_caller(self, client):
+        app.dependency_overrides.pop(get_current_admin, None)
+        resp = await client.get("/api/auth/admin/users")
+        assert resp.status_code == 401
+
+    @pytest.mark.asyncio
+    @patch("app.modules.admin.router.get_db_connection")
+    @patch("app.modules.admin.router.modify_user_status")
+    async def test_modify_user_status_returns_200(self, mock_modify, mock_db, client):
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+        mock_modify.return_value = {"message": "User status updated to Suspended"}
+
+        resp = await client.put(
+            "/api/auth/admin/modify-user-status",
+            json={"user_id": 5, "new_status": "Suspended", "reason": "Fraud report"},
+        )
+
+        assert resp.status_code == 200
+        mock_modify.assert_called_once()
+        args = mock_modify.call_args.args
+        kwargs = mock_modify.call_args.kwargs
+        assert args[1].user_id == 5
+        assert args[1].new_status == "Suspended"
+        assert kwargs["acting_admin_user_id"] == 99  # from mock_admin_user fixture
+
+    @pytest.mark.asyncio
+    async def test_modify_user_status_returns_401_for_unauthenticated_caller(self, client):
+        app.dependency_overrides.pop(get_current_admin, None)
+        resp = await client.put(
+            "/api/auth/admin/modify-user-status",
+            json={"user_id": 5, "new_status": "Suspended"},
+        )
+        assert resp.status_code == 401
+
+
+class TestModifyUserStatusService:
+    """Direct tests of the service function's own validation rules."""
+
+    @pytest.mark.asyncio
+    async def test_rejects_disallowed_status_value(self):
+        from app.modules.admin.service import modify_user_status
+        from app.modules.admin.schemas import ModifyUserStatusRequest
+
+        conn = AsyncMock()
+        with pytest.raises(HTTPException) as exc:
+            await modify_user_status(
+                conn,
+                ModifyUserStatusRequest(user_id=5, new_status="NotARealStatus"),
+                acting_admin_user_id=99,
+            )
+        assert exc.value.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_rejects_self_modification(self):
+        from app.modules.admin.service import modify_user_status
+        from app.modules.admin.schemas import ModifyUserStatusRequest
+
+        conn = AsyncMock()
+        with pytest.raises(HTTPException) as exc:
+            await modify_user_status(
+                conn,
+                ModifyUserStatusRequest(user_id=99, new_status="Suspended"),
+                acting_admin_user_id=99,
+            )
+        assert exc.value.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_rejects_modifying_another_admin(self):
+        from app.modules.admin.service import modify_user_status
+        from app.modules.admin.schemas import ModifyUserStatusRequest
+
+        conn = AsyncMock()
+        conn.fetchval.return_value = 1  # target_id IS in `admins`
+
+        with pytest.raises(HTTPException) as exc:
+            await modify_user_status(
+                conn,
+                ModifyUserStatusRequest(user_id=5, new_status="Suspended"),
+                acting_admin_user_id=99,
+            )
+        assert exc.value.status_code == 403
+
+    @pytest.mark.asyncio
+    @patch("app.modules.admin.service.send_account_moderation_email_task")
+    async def test_suspend_emails_the_user(self, mock_email_task):
+        from app.modules.admin.service import modify_user_status
+        from app.modules.admin.schemas import ModifyUserStatusRequest
+
+        conn = AsyncMock()
+        conn.fetchval.return_value = None  # not an admin
+        conn.fetchrow.return_value = {"email": "seller@test.com", "full_name": "Seller One", "status": "Active"}
+
+        await modify_user_status(
+            conn,
+            ModifyUserStatusRequest(user_id=5, new_status="Suspended", reason="Fraud report"),
+            acting_admin_user_id=99,
+        )
+
+        mock_email_task.delay.assert_called_once_with(
+            to_email="seller@test.com",
+            full_name="Seller One",
+            new_status="Suspended",
+            reason="Fraud report",
+        )
+
+    @pytest.mark.asyncio
+    @patch("app.modules.admin.service.send_account_moderation_email_task")
+    async def test_unchanged_status_sends_no_email(self, mock_email_task):
+        from app.modules.admin.service import modify_user_status
+        from app.modules.admin.schemas import ModifyUserStatusRequest
+
+        conn = AsyncMock()
+        conn.fetchval.return_value = None
+        conn.fetchrow.return_value = {"email": "seller@test.com", "full_name": "Seller One", "status": "Active"}
+
+        await modify_user_status(
+            conn, ModifyUserStatusRequest(user_id=5, new_status="Active"), acting_admin_user_id=99
+        )
+
+        mock_email_task.delay.assert_not_called()
+
+
+class TestModerationEmailContent:
+    @pytest.mark.parametrize("status,phrase", [
+        ("Suspended", "temporarily suspended"),
+        ("Banned", "banned"),
+        ("Active", "reactivated"),
+    ])
+    def test_each_status_renders(self, status, phrase):
+        from app.services.email import build_account_moderation_html, build_account_moderation_text
+
+        html_body = build_account_moderation_html("Seller One", status, "http://x/login", reason="<b>x</b>")
+        text_body = build_account_moderation_text("Seller One", status, "http://x/login", reason="x")
+
+        assert phrase in html_body
+        assert phrase in text_body
+        assert "&lt;b&gt;x&lt;/b&gt;" in html_body  # admin-supplied reason is escaped
+        assert ("Log In Now" in html_body) == (status == "Active")
+
+
+class TestPlatformStatsQuery:
+    @pytest.mark.asyncio
+    async def test_query_uses_real_bid_timestamp_column(self):
+        """bids has no created_at column (it's submitted_at) — this broke the live dashboard."""
+        from app.modules.admin.service import get_platform_stats
+
+        conn = AsyncMock()
+        conn.fetchrow.return_value = {
+            "total_tokens_sold": 1, "tokens_sold_this_month": 1, "approved_owners": 1,
+            "approved_owners_this_month": 1, "pending_approvals": 0, "active_tenders": 1,
+            "total_bids": 1, "bids_this_month": 1, "total_revenue_bdt": 1,
+        }
+        await get_platform_stats(conn)
+
+        sql = conn.fetchrow.call_args[0][0]
+        assert "FROM bids WHERE submitted_at" in sql
+        assert "FROM bids WHERE created_at" not in sql

@@ -50,9 +50,11 @@ export default function AdminLoginPage() {
         // Use hard redirect to force middleware to re-evaluate the new cookie
         window.location.href = '/admin-home';
       } else {
-        const err = await res.json();
+        // FastAPI errors arrive as { detail }, proxy errors as { error: { message } }
+        const err = await res.json().catch(() => ({}));
         setError(
-          err.error?.message ||
+          (typeof err.detail === 'string' ? err.detail : undefined) ||
+            err.error?.message ||
             'Login failed. Please check your credentials or verify you have admin privileges.'
         );
       }

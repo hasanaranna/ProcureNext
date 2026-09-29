@@ -6,22 +6,81 @@ import PendingRequestDetailModal, {
   RegistrationDetail,
 } from "@/components/PendingRequestDetailModal";
 import { getAdminUser, clearAdminSession } from "@/lib/auth";
+import AdminAuditTrail from "@/components/AdminAuditTrail";
 
 
-const stats = [
-  { label: "Total Tokens Sold", value: "48,320", sub: "+1,240 this month",
-    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) },
-  { label: "Approved Owners", value: "312", sub: "+14 this month",
-    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) },
-  { label: "Pending Approvals", value: "5", sub: "Awaiting review",
-    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) },
-  { label: "Active Tenders", value: "87", sub: "Across all companies",
-    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>) },
-  { label: "Total Bids Placed", value: "2,641", sub: "+318 this month",
-    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" /></svg>) },
-  { label: "Revenue (BDT)", value: "৳ 24,16,000", sub: "From token purchases",
-    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>) },
-];
+interface AdminUserListItem {
+  user_id: number;
+  full_name: string;
+  email: string;
+  status: string;
+  organization_name: string | null;
+  role_in_org: string | null;
+  is_admin: boolean;
+  created_at: string;
+}
+
+interface PlatformStats {
+  total_tokens_sold: number;
+  tokens_sold_this_month: number;
+  approved_owners: number;
+  approved_owners_this_month: number;
+  pending_approvals: number;
+  active_tenders: number;
+  total_bids: number;
+  bids_this_month: number;
+  total_revenue_bdt: number;
+}
+
+// Formats a number using the en-IN grouping (lakh/crore) convention used
+// elsewhere on this page for BDT amounts, e.g. 2416000 -> "24,16,000".
+const USERS_PER_PAGE = 10;
+
+function formatIndianGrouping(value: number): string {
+  return new Intl.NumberFormat("en-IN").format(Math.round(value));
+}
+
+function buildStatCards(stats: PlatformStats | null) {
+  const na = "—";
+  return [
+    {
+      label: "Total Tokens Sold",
+      value: stats ? formatIndianGrouping(stats.total_tokens_sold) : na,
+      sub: stats ? `+${formatIndianGrouping(stats.tokens_sold_this_month)} this month` : "Loading…",
+      icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>),
+    },
+    {
+      label: "Approved Owners",
+      value: stats ? formatIndianGrouping(stats.approved_owners) : na,
+      sub: stats ? `+${formatIndianGrouping(stats.approved_owners_this_month)} this month` : "Loading…",
+      icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>),
+    },
+    {
+      label: "Pending Approvals",
+      value: stats ? formatIndianGrouping(stats.pending_approvals) : na,
+      sub: "Awaiting review",
+      icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>),
+    },
+    {
+      label: "Active Tenders",
+      value: stats ? formatIndianGrouping(stats.active_tenders) : na,
+      sub: "Across all companies",
+      icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>),
+    },
+    {
+      label: "Total Bids Placed",
+      value: stats ? formatIndianGrouping(stats.total_bids) : na,
+      sub: stats ? `+${formatIndianGrouping(stats.bids_this_month)} this month` : "Loading…",
+      icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" /></svg>),
+    },
+    {
+      label: "Revenue (BDT)",
+      value: stats ? `৳ ${formatIndianGrouping(stats.total_revenue_bdt)}` : na,
+      sub: "From token purchases",
+      icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>),
+    },
+  ];
+}
 
 export default function AdminHomePage() {
   const router = useRouter();
@@ -34,11 +93,23 @@ export default function AdminHomePage() {
   const [selectedRegistration, setSelectedRegistration] =
     useState<RegistrationDetail | null>(null);
   const [adminName, setAdminName] = useState<string>("System Administrator");
+  const [currentAdminUserId, setCurrentAdminUserId] = useState<number | null>(null);
+  const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
+  const [users, setUsers] = useState<AdminUserListItem[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [userActionBusyId, setUserActionBusyId] = useState<number | null>(null);
+  const [userPage, setUserPage] = useState(1);
+  const [userTotal, setUserTotal] = useState(0);
+  const [userSearchInput, setUserSearchInput] = useState("");
+  const [userSearch, setUserSearch] = useState("");
 
   useEffect(() => {
     const adminUser = getAdminUser();
     if (adminUser?.full_name) {
       setAdminName(adminUser.full_name);
+    }
+    if (adminUser?.user_id) {
+      setCurrentAdminUserId(adminUser.user_id);
     }
   }, []);
 
@@ -134,7 +205,98 @@ export default function AdminHomePage() {
       }
     };
     fetchPackages();
+
+    const fetchStats = async () => {
+      try {
+        const token = localStorage.getItem("admin_access_token") || localStorage.getItem("access_token");
+        const res = await fetch('/api/auth/admin/stats', {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setPlatformStats(data);
+        }
+      } catch (err) {
+        console.error("Failed to load platform stats:", err);
+      }
+    };
+    fetchStats();
   }, []);
+
+  const stats = buildStatCards(platformStats);
+
+  // Debounce the search box; a new search always starts from the first page.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setUserPage(1);
+      setUserSearch(userSearchInput.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [userSearchInput]);
+
+  useEffect(() => {
+    let ignore = false;
+    const fetchUsers = async () => {
+      setLoadingUsers(true);
+      try {
+        const token = localStorage.getItem("admin_access_token") || localStorage.getItem("access_token");
+        const params = new URLSearchParams({ page: String(userPage), limit: String(USERS_PER_PAGE) });
+        if (userSearch) params.set("search", userSearch);
+        const res = await fetch(`/api/auth/admin/users?${params}`, {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        if (res.ok && !ignore) {
+          const data = await res.json();
+          setUsers(data.users || []);
+          setUserTotal(data.total || 0);
+        }
+      } catch (err) {
+        console.error("Failed to load users:", err);
+      } finally {
+        if (!ignore) setLoadingUsers(false);
+      }
+    };
+    fetchUsers();
+    return () => {
+      ignore = true;
+    };
+  }, [userPage, userSearch]);
+
+  const userPageCount = Math.max(1, Math.ceil(userTotal / USERS_PER_PAGE));
+
+  const handleUserStatusChange = async (user: AdminUserListItem, newStatus: "Active" | "Suspended" | "Banned") => {
+    const verb = newStatus === "Active" ? "reactivate" : newStatus.toLowerCase();
+    if (!confirm(`Are you sure you want to ${verb} ${user.full_name}?`)) return;
+
+    const reason = newStatus === "Active" ? undefined : (prompt(`Reason for ${verb === "ban" ? "banning" : "suspending"} ${user.full_name} (optional):`) || undefined);
+
+    setUserActionBusyId(user.user_id);
+    try {
+      const token = localStorage.getItem("admin_access_token") || localStorage.getItem("access_token");
+      const res = await fetch('/api/auth/admin/modify-user-status', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ user_id: user.user_id, new_status: newStatus, reason }),
+      });
+      if (res.ok) {
+        setUsers((prev) => prev.map((u) => (u.user_id === user.user_id ? { ...u, status: newStatus } : u)));
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.detail || `Failed to ${verb} user.`);
+      }
+    } catch (err) {
+      alert(`Network error while trying to ${verb} user.`);
+    } finally {
+      setUserActionBusyId(null);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -576,6 +738,140 @@ export default function AdminHomePage() {
           onDecline={handleReject}
           registration={selectedRegistration}
         />
+
+        {/* Manage Users */}
+        <section className="bg-surface rounded border border-subtle overflow-hidden">
+          <div className="px-5 py-4 border-b border-subtle flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-content-primary">Manage Users</h2>
+              <p className="text-xs text-content-secondary mt-0.5">Suspend or ban an account that violates platform policy, or reactivate one.</p>
+            </div>
+            <input
+              type="search"
+              value={userSearchInput}
+              onChange={(e) => setUserSearchInput(e.target.value)}
+              placeholder="Search name, email or organization"
+              aria-label="Search users"
+              className="h-9 px-3 border border-subtle rounded bg-surface text-sm text-content-primary sm:w-72 focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+            />
+          </div>
+
+          <div className="overflow-x-auto">
+            {loadingUsers ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <svg className="animate-spin h-6 w-6 text-content-muted mb-3" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                <p className="text-sm text-content-muted">Loading users…</p>
+              </div>
+            ) : users.length === 0 ? (
+              <div className="py-10 text-center">
+                <p className="text-sm text-content-muted">{userSearch ? `No users match "${userSearch}".` : "No users found."}</p>
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-app text-content-secondary uppercase text-xs tracking-wider">
+                    <th className="px-5 py-2.5 text-left font-medium">Name</th>
+                    <th className="px-5 py-2.5 text-left font-medium">Email</th>
+                    <th className="px-5 py-2.5 text-left font-medium">Organization</th>
+                    <th className="px-5 py-2.5 text-left font-medium">Status</th>
+                    <th className="px-5 py-2.5 text-left font-medium"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-subtle">
+                  {users.map((u) => {
+                    const isSelf = u.user_id === currentAdminUserId;
+                    const busy = userActionBusyId === u.user_id;
+                    const badgeClass =
+                      u.status === "Active" ? "badge-approved" :
+                      u.status === "Pending" ? "badge-pending" :
+                      u.status === "Banned" ? "badge-rejected" :
+                      "badge-draft";
+                    return (
+                      <tr key={u.user_id} className="hover:bg-app transition">
+                        <td className="px-5 py-3 font-medium text-content-primary">
+                          {u.full_name}{u.is_admin && <span className="ml-1.5 text-[10px] text-content-muted">(Admin)</span>}
+                        </td>
+                        <td className="px-5 py-3 text-content-secondary">{u.email}</td>
+                        <td className="px-5 py-3 text-content-secondary">{u.organization_name || "—"}</td>
+                        <td className="px-5 py-3">
+                          <span className={`badge-status ${badgeClass}`}><span className="badge-dot" />{u.status}</span>
+                        </td>
+                        <td className="px-5 py-3">
+                          {u.is_admin ? (
+                            <span className="text-xs text-content-muted">Not applicable</span>
+                          ) : isSelf ? (
+                            <span className="text-xs text-content-muted">This is you</span>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              {u.status !== "Active" && (
+                                <button
+                                  disabled={busy}
+                                  onClick={() => handleUserStatusChange(u, "Active")}
+                                  className="px-3 py-1.5 rounded text-xs font-medium text-status-approved-text bg-status-approved-bg hover:opacity-80 transition disabled:opacity-50"
+                                >
+                                  Reactivate
+                                </button>
+                              )}
+                              {u.status !== "Suspended" && (
+                                <button
+                                  disabled={busy}
+                                  onClick={() => handleUserStatusChange(u, "Suspended")}
+                                  className="px-3 py-1.5 rounded text-xs font-medium text-content-secondary bg-app hover:bg-subtle border border-subtle transition disabled:opacity-50"
+                                >
+                                  Suspend
+                                </button>
+                              )}
+                              {u.status !== "Banned" && (
+                                <button
+                                  disabled={busy}
+                                  onClick={() => handleUserStatusChange(u, "Banned")}
+                                  className="px-3 py-1.5 rounded text-xs font-medium text-status-rejected-text bg-status-rejected-bg hover:opacity-80 transition disabled:opacity-50"
+                                >
+                                  Ban
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <div className="px-5 py-3 border-t border-subtle flex items-center justify-between text-xs text-content-secondary">
+            <span className="tabular-nums">
+              {userTotal === 0
+                ? "0 users"
+                : `Showing ${(userPage - 1) * USERS_PER_PAGE + 1}–${Math.min(userPage * USERS_PER_PAGE, userTotal)} of ${userTotal.toLocaleString()} users`}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setUserPage((p) => Math.max(1, p - 1))}
+                disabled={userPage <= 1 || loadingUsers}
+                className="px-3 py-1.5 rounded border border-subtle bg-app hover:bg-subtle disabled:opacity-40 cursor-pointer"
+              >
+                Previous
+              </button>
+              <span className="tabular-nums">Page {userPage} of {userPageCount}</span>
+              <button
+                onClick={() => setUserPage((p) => Math.min(userPageCount, p + 1))}
+                disabled={userPage >= userPageCount || loadingUsers}
+                className="px-3 py-1.5 rounded border border-subtle bg-app hover:bg-subtle disabled:opacity-40 cursor-pointer"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Audit Trail */}
+        <AdminAuditTrail />
 
         {/* Token & Rate Settings */}
         <section className="bg-surface rounded border border-subtle overflow-hidden">

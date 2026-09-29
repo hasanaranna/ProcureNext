@@ -118,6 +118,7 @@ from app.modules.tenders.service import (
     get_vendor_recommendations_for_tender,
 )
 from app.services.ml_client import parse_and_embed_tender_pdf
+from app.services.supabase_storage import ALLOWED_UPLOAD_EXTENSIONS, MAX_UPLOAD_SIZE_BYTES
 from app.tasks.celery_app import celery_app
 from app.tasks.ml_tasks import create_tender_from_pdf_task
 
@@ -146,10 +147,32 @@ def _parse_tender_form_payload(tender_data: str, file_names: str, files: List[Up
         if not file_obj.filename:
             continue
         custom_name = custom_names[i]
+
+        # This path saves to local disk and hands off to a Celery task that
+        # uploads straight to storage, bypassing upload_file()'s allowlist —
+        # validate here too so an arbitrary file type can't be stored under
+        # tenders/{id} and later served back to bidders as a tender document.
+        extension = os.path.splitext(file_obj.filename)[1].lower()
+        if extension not in ALLOWED_UPLOAD_EXTENSIONS:
+            raise HTTPException(
+                status_code=400,
+                detail="Unsupported file type. Only PDF, JPEG, PNG, and WEBP files are accepted.",
+            )
+
         safe_filename = f"{uuid.uuid4().hex}_{file_obj.filename}"
         local_path = os.path.join(TEMP_UPLOAD_DIR, safe_filename)
+        size = 0
         with open(local_path, "wb") as buffer:
-            shutil.copyfileobj(file_obj.file, buffer)
+            for chunk in iter(lambda: file_obj.file.read(1024 * 1024), b""):
+                size += len(chunk)
+                if size > MAX_UPLOAD_SIZE_BYTES:
+                    buffer.close()
+                    os.remove(local_path)
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"File exceeds the {MAX_UPLOAD_SIZE_BYTES // (1024 * 1024)}MB upload limit.",
+                    )
+                buffer.write(chunk)
         files_data.append({"local_path": local_path, "custom_name": custom_name})
 
     return tender_req, files_data
@@ -439,8 +462,37 @@ async def get_tender_details(
             tender = await get_tender_detail(connection, tender_id)
             if tender is None:
                 raise HTTPException(status_code=404, detail="Tender not found")
-                
+
             buyer_id = tender.get("buyer_id")
+            user_org_id = current_user.get("organization_id")
+            visibility_type = tender.get("visibility_type")
+            visibility_type = getattr(visibility_type, "value", visibility_type)
+
+            if user_org_id != buyer_id:
+                # Draft (unpublished) tenders are only visible to the buyer org.
+                if tender.get("status") != "Published":
+                    raise HTTPException(status_code=404, detail="Tender not found")
+
+                # A Published tender still isn't necessarily open to everyone —
+                # Restricted/Exclusive visibility must be enforced here too, not
+                # just in the browse/search listings, since a vendor can reach
+                # this endpoint directly with the tender_id (e.g. via the
+                # bid-for-tender page) without ever going through a listing.
+                if visibility_type == "Restricted":
+                    invited = await connection.fetchval(
+                        "SELECT 1 FROM tender_invitations WHERE tender_id = $1 AND vendor_org_id = $2",
+                        tender_id, user_org_id,
+                    )
+                    if not invited:
+                        raise HTTPException(status_code=404, detail="Tender not found")
+                elif visibility_type == "Exclusive":
+                    enlisted = await connection.fetchval(
+                        "SELECT 1 FROM enlisted_vendors WHERE org_id = $1 AND enlisted_org_id = $2",
+                        buyer_id, user_org_id,
+                    )
+                    if not enlisted:
+                        raise HTTPException(status_code=404, detail="Tender not found")
+
             org_row = None
             if buyer_id:
                 org_row = await connection.fetchrow(
@@ -448,19 +500,20 @@ async def get_tender_details(
                     buyer_id
                 )
             primary_contact = org_row["primary_contact"] if org_row else None
-            
+
             user_id = current_user.get("user_id")
             org_user_id = current_user.get("org_user_id")
             role_in_org = current_user.get("role_in_org")
-            
+
             can_manage = False
-            if org_user_id and org_user_id == tender.get("created_by"):
-                can_manage = True
-            elif user_id == primary_contact or role_in_org == "Owner":
-                can_manage = True
-                
+            if user_org_id == buyer_id:
+                if org_user_id and org_user_id == tender.get("created_by"):
+                    can_manage = True
+                elif user_id == primary_contact or role_in_org == "Owner":
+                    can_manage = True
+
             tender["can_manage_document_access"] = can_manage
-            
+
             return tender
     except HTTPException:
         raise
@@ -499,17 +552,31 @@ async def view_tender_document(
 ):
     """
     Generate a signed URL for a tender document and return it.
+    Access is restricted to the buyer org that owns the tender; other orgs
+    may only view documents once the tender has been published.
     """
     from app.services.supabase_storage import generate_signed_url
+
+    user_org_id = current_user.get("organization_id")
+    if not user_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
 
     try:
         async with get_db_connection() as connection:
             row = await connection.fetchrow(
-                "SELECT file_name, file_path FROM tender_documents WHERE tender_doc_id = $1",
+                """
+                SELECT td.file_name, td.file_path, t.buyer_id, t.status
+                FROM tender_documents td
+                JOIN tenders t ON td.tender_id = t.tender_id
+                WHERE td.tender_doc_id = $1
+                """,
                 doc_id
             )
             if row is None:
                 raise HTTPException(status_code=404, detail="Document not found")
+
+            if row["buyer_id"] != user_org_id and row["status"] != "Published":
+                raise HTTPException(status_code=403, detail="Not authorized to access this document.")
 
             file_path = row["file_path"]
             if not file_path:

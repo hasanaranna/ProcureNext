@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import SessionRefresher from '@/components/SessionRefresher';
 
 export const metadata: Metadata = {
   title: 'ProcureNext — Enterprise Procurement Platform',
@@ -19,6 +20,7 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className="bg-app text-content-primary antialiased font-sans">
+        <SessionRefresher />
         {children}
       </body>
     </html>

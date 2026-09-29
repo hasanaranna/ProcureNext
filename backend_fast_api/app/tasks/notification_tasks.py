@@ -1,17 +1,20 @@
 # ============================================================
 # tasks/notification_tasks.py - Async Notification Tasks
 # ============================================================
-import os
 import logging
 from app.tasks.celery_app import celery_app
 from app.services.email import (
+    frontend_url,
     send_employee_invitation_email,
     send_smtp_email,
     send_pending_account_admin_email,
     send_account_status_email,
+    send_account_moderation_email,
     send_bid_received_email,
     send_bid_accepted_email,
+    send_notice_of_assessment_email,
     send_bid_rejected_email,
+    send_tender_cancelled_email,
     send_password_reset_email,
     send_intercompany_created_email,
     send_intercompany_member_added_email,
@@ -125,8 +128,7 @@ def send_pending_account_admin_alert_task(
     org_type: str,
 ) -> bool:
     """Notify all platform admins about a new pending master account."""
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-    admin_panel_url = f"{frontend_url}/admin-home"
+    admin_panel_url = frontend_url("/admin-home")
     success = True
     for email in admin_emails:
         try:
@@ -160,8 +162,7 @@ def send_account_status_email_task(
     review_notes: str | None = None,
 ) -> bool:
     """Send account approved/rejected email to the user."""
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-    login_url = f"{frontend_url}/login"
+    login_url = frontend_url("/login")
     try:
         return send_account_status_email(
             to_email=to_email,
@@ -173,6 +174,37 @@ def send_account_status_email_task(
         )
     except Exception as exc:
         logger.error(f"Error sending account status email to {to_email}: {exc}", exc_info=True)
+        try:
+            raise self.retry(exc=exc)
+        except Exception:
+            return False
+
+
+@celery_app.task(
+    name="send_account_moderation_email_task",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+)
+def send_account_moderation_email_task(
+    self,
+    to_email: str,
+    full_name: str,
+    new_status: str,
+    reason: str | None = None,
+) -> bool:
+    """Tell a user their account was suspended, banned, or reactivated by an admin."""
+    login_url = frontend_url("/login")
+    try:
+        return send_account_moderation_email(
+            to_email=to_email,
+            full_name=full_name,
+            new_status=new_status,
+            login_url=login_url,
+            reason=reason,
+        )
+    except Exception as exc:
+        logger.error(f"Error sending account moderation email to {to_email}: {exc}", exc_info=True)
         try:
             raise self.retry(exc=exc)
         except Exception:
@@ -194,8 +226,7 @@ def send_bid_received_email_task(
     tender_id: int,
 ) -> bool:
     """Send 'bid received' email to the buyer."""
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-    tender_url = f"{frontend_url}/view-my-tender/{tender_id}"
+    tender_url = frontend_url("/view-my-tender/{tender_id}")
     try:
         return send_bid_received_email(
             to_email=to_email,
@@ -227,8 +258,7 @@ def send_bid_accepted_email_task(
     tender_id: int,
 ) -> bool:
     """Send 'bid accepted' email to the winning vendor."""
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-    tender_url = f"{frontend_url}/ongoing-tenders"
+    tender_url = frontend_url("/ongoing-tenders")
     try:
         return send_bid_accepted_email(
             to_email=to_email,
@@ -239,6 +269,34 @@ def send_bid_accepted_email_task(
         )
     except Exception as exc:
         logger.error(f"Error sending bid accepted email to {to_email}: {exc}", exc_info=True)
+        try:
+            raise self.retry(exc=exc)
+        except Exception:
+            return False
+
+
+@celery_app.task(
+    name="send_notice_of_assessment_email_task",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+)
+def send_notice_of_assessment_email_task(
+    self,
+    to_email: str,
+    vendor_name: str,
+    notice: dict,
+) -> bool:
+    """Send the formal Notice of Assessment to the winning vendor."""
+    try:
+        return send_notice_of_assessment_email(
+            to_email=to_email,
+            vendor_name=vendor_name,
+            notice=notice,
+            notice_url=frontend_url("/view-my-bids"),
+        )
+    except Exception as exc:
+        logger.error(f"Error sending notice of assessment to {to_email}: {exc}", exc_info=True)
         try:
             raise self.retry(exc=exc)
         except Exception:
@@ -268,6 +326,37 @@ def send_bid_rejected_email_task(
         )
     except Exception as exc:
         logger.error(f"Error sending bid rejected email to {to_email}: {exc}", exc_info=True)
+        try:
+            raise self.retry(exc=exc)
+        except Exception:
+            return False
+
+
+@celery_app.task(
+    name="send_tender_cancelled_email_task",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+)
+def send_tender_cancelled_email_task(
+    self,
+    to_email: str,
+    vendor_name: str,
+    tender_title: str,
+    buyer_org_name: str,
+) -> bool:
+    """Notify a bidder by email that the tender they bid on was cancelled."""
+    my_bids_url = frontend_url("/view-my-bids")
+    try:
+        return send_tender_cancelled_email(
+            to_email=to_email,
+            vendor_name=vendor_name,
+            tender_title=tender_title,
+            buyer_org_name=buyer_org_name,
+            my_bids_url=my_bids_url,
+        )
+    except Exception as exc:
+        logger.error(f"Error sending tender cancelled email to {to_email}: {exc}", exc_info=True)
         try:
             raise self.retry(exc=exc)
         except Exception:

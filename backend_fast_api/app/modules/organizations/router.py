@@ -91,6 +91,7 @@ from app.modules.organizations.service import (
     enlist_organization,
     delist_organization,
     get_enlisted_organizations,
+    get_enlisting_buyers,
     get_organization_profile
 )
 from app.services.supabase_storage import (
@@ -395,13 +396,33 @@ async def list_enlisted(
         raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
 
 
+@router.get("/enlisted-by", response_model=list[EnlistedOrgItem])
+async def list_enlisted_by(
+    current_user: dict = Depends(get_current_user_org)
+) -> list[dict]:
+    """
+    List all buyer organizations that have enlisted the caller's organization as a seller.
+    """
+    current_org_id = current_user.get("organization_id")
+    if not current_org_id:
+        raise HTTPException(status_code=403, detail="User does not belong to any organization.")
+
+    try:
+        async with get_db_connection() as connection:
+            return await get_enlisting_buyers(connection, current_org_id)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
 @router.post("/enlist/{target_org_id}")
 async def enlist_org_endpoint(
     target_org_id: int,
     current_user: dict = Depends(get_current_user_org)
 ) -> dict:
     """
-    Enlist target organization as a vendor or buyer counterpart.
+    Enlist target organization as one of the caller's (buyer's) enlisted sellers.
     """
     current_org_id = current_user.get("organization_id")
     org_user_id = current_user.get("org_user_id")

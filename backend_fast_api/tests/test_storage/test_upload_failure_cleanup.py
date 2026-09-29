@@ -177,6 +177,39 @@ class TestTenderPublishFailureCleanup:
         )
         assert resp.status_code == 500
 
+    @pytest.mark.asyncio
+    async def test_publish_tender_rejects_disallowed_file_type(self, client, auth_headers):
+        """
+        Regression test: this endpoint saves files to local disk and hands
+        off to a Celery task that uploads straight to storage, bypassing
+        upload_file()'s allowlist — an .svg here would previously be stored
+        and later served back to bidders via a signed URL. Must be rejected
+        before ever touching disk.
+        """
+        app.dependency_overrides[get_current_user_org] = lambda: {"organization_id": 1, "org_user_id": 1}
+
+        tender_data = {
+            "title": "Malicious Upload Tender",
+            "description": "Desc",
+            "visibility_type": "Public",
+        }
+        form_data = {
+            "tender_data": json.dumps(tender_data),
+            "file_names": json.dumps(["evil.svg"]),
+        }
+        files = [
+            ("files", ("evil.svg", b"<svg onload=alert(1)>", "image/svg+xml")),
+        ]
+
+        resp = await client.post(
+            "/tenders/buyer/publish-with-documents",
+            headers=auth_headers,
+            data=form_data,
+            files=files,
+        )
+        assert resp.status_code == 400
+        assert "Unsupported file type" in resp.json()["detail"]
+
 
 # ============================================================
 # 4. Bid Submit Failure -> Local Temp File Cleanup

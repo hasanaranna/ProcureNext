@@ -78,7 +78,51 @@ class TestPublishTender:
         assert kwargs["buyer_id"] == 10
         assert kwargs["user_id"] == 2
 
+    @pytest.mark.asyncio
+    @patch("app.modules.tenders.router.get_db_connection")
+    @patch("app.modules.tenders.router.publish_tender_with_documents")
+    async def test_publish_tender_accepts_exclusive_visibility(self, mock_publish, mock_db, client, auth_headers):
+        """
+        Regression test: the frontend's "Enlisted Only" tender option sends
+        visibility_type: "Exclusive". TenderVisibility previously only defined
+        Public/Restricted, so this request failed with 400 "Invalid JSON data"
+        before ever reaching the service layer — a buyer could not create an
+        enlisted-vendor-restricted tender at all.
+        """
+        app.dependency_overrides[get_current_user_org] = lambda: {"organization_id": 10, "org_user_id": 2}
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
 
+        from datetime import datetime, timezone
+        mock_publish.return_value = {
+            "tender_id": 2,
+            "buyer_id": 10,
+            "created_by": 2,
+            "title": "Exclusive Tender",
+            "description": "Description",
+            "status": "Published",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+
+        tender_data = {
+            "title": "Exclusive Tender",
+            "description": "Description",
+            "visibility_type": "Exclusive",
+            "submission_deadline": "2026-12-31T23:59:59Z"
+        }
+        form_data = {
+            "tender_data": json.dumps(tender_data),
+            "file_names": json.dumps(["doc1.pdf"]),
+        }
+
+        resp = await client.post(
+            "/tenders/buyer/publish-with-documents",
+            headers=auth_headers,
+            data=form_data,
+            files=[("files", ("doc1.pdf", b"dummy content", "application/pdf"))],
+        )
+
+        assert resp.status_code == 201
 
 
 # ---------------------------------------------------------------------------
@@ -328,6 +372,117 @@ class TestTenderDetail:
 
         assert resp.status_code == 401
 
+    @pytest.mark.asyncio
+    @patch("app.modules.tenders.router.get_db_connection")
+    @patch("app.modules.tenders.router.get_tender_detail")
+    async def test_draft_tender_hidden_from_other_org(
+        self, mock_get_detail, mock_db, client, mock_user_org, sample_tender_row, auth_headers
+    ):
+        """
+        Regression test: a Draft (unpublished) tender belonging to another
+        org must not be visible via this endpoint just because the caller
+        is logged in — previously there was no status/ownership check at all.
+        """
+        app.dependency_overrides[get_current_user_org] = lambda: mock_user_org  # organization_id=10
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+
+        detail = {**sample_tender_row, "status": "Draft", "buyer_id": 999, "documents": []}
+        mock_get_detail.return_value = detail
+
+        resp = await client.get("/tenders/1/detail", headers=auth_headers)
+
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    @patch("app.modules.tenders.router.get_db_connection")
+    @patch("app.modules.tenders.router.get_tender_detail")
+    async def test_draft_tender_visible_to_buyer_org(
+        self, mock_get_detail, mock_db, client, mock_user_org, sample_tender_row, auth_headers
+    ):
+        """The buyer org that owns a Draft tender must still be able to view it."""
+        app.dependency_overrides[get_current_user_org] = lambda: mock_user_org  # organization_id=10
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+        mock_conn.fetchrow.return_value = None  # organizations.primary_contact lookup
+
+        detail = {**sample_tender_row, "status": "Draft", "buyer_id": 10, "documents": []}
+        mock_get_detail.return_value = detail
+
+        resp = await client.get("/tenders/1/detail", headers=auth_headers)
+
+        assert resp.status_code == 200
+
+    @pytest.mark.asyncio
+    @patch("app.modules.tenders.router.get_db_connection")
+    @patch("app.modules.tenders.router.get_tender_detail")
+    async def test_published_exclusive_tender_hidden_from_non_enlisted_org(
+        self, mock_get_detail, mock_db, client, mock_user_org, sample_tender_row, auth_headers
+    ):
+        """
+        Regression test: a Published-but-Exclusive tender must still enforce
+        the enlisted-vendors restriction on the detail endpoint itself, not
+        just in browse/search listings — a vendor can reach this endpoint
+        directly with the tender_id (e.g. via the bid-for-tender page).
+        """
+        app.dependency_overrides[get_current_user_org] = lambda: mock_user_org  # organization_id=10
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+        mock_conn.fetchval.return_value = None  # not enlisted
+
+        detail = {
+            **sample_tender_row, "status": "Published", "visibility_type": "Exclusive",
+            "buyer_id": 999, "documents": [],
+        }
+        mock_get_detail.return_value = detail
+
+        resp = await client.get("/tenders/1/detail", headers=auth_headers)
+
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    @patch("app.modules.tenders.router.get_db_connection")
+    @patch("app.modules.tenders.router.get_tender_detail")
+    async def test_published_exclusive_tender_visible_to_enlisted_org(
+        self, mock_get_detail, mock_db, client, mock_user_org, sample_tender_row, auth_headers
+    ):
+        app.dependency_overrides[get_current_user_org] = lambda: mock_user_org  # organization_id=10
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+        mock_conn.fetchval.return_value = 1  # enlisted
+        mock_conn.fetchrow.return_value = None  # organizations.primary_contact lookup
+
+        detail = {
+            **sample_tender_row, "status": "Published", "visibility_type": "Exclusive",
+            "buyer_id": 999, "documents": [],
+        }
+        mock_get_detail.return_value = detail
+
+        resp = await client.get("/tenders/1/detail", headers=auth_headers)
+
+        assert resp.status_code == 200
+
+    @pytest.mark.asyncio
+    @patch("app.modules.tenders.router.get_db_connection")
+    @patch("app.modules.tenders.router.get_tender_detail")
+    async def test_published_restricted_tender_hidden_from_uninvited_org(
+        self, mock_get_detail, mock_db, client, mock_user_org, sample_tender_row, auth_headers
+    ):
+        app.dependency_overrides[get_current_user_org] = lambda: mock_user_org  # organization_id=10
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+        mock_conn.fetchval.return_value = None  # not invited
+
+        detail = {
+            **sample_tender_row, "status": "Published", "visibility_type": "Restricted",
+            "buyer_id": 999, "documents": [],
+        }
+        mock_get_detail.return_value = detail
+
+        resp = await client.get("/tenders/1/detail", headers=auth_headers)
+
+        assert resp.status_code == 404
+
 
 # ============================================================
 # GET /tenders/documents/{doc_id}/view
@@ -347,11 +502,13 @@ class TestDocumentView:
         mock_conn = AsyncMock()
         mock_db.side_effect = _mock_db_ctx(mock_conn)
 
-        # Mock DB fetchrow to return a document row
+        # Mock DB fetchrow to return a document row for a tender owned by the caller's org
         mock_row = MagicMock()
         mock_row.__getitem__ = lambda self, key: {
             "file_name": "requirements.pdf",
             "file_path": "tenders/1/abc123_requirements.pdf",
+            "buyer_id": 10,
+            "status": "Draft",
         }[key]
         mock_conn.fetchrow.return_value = mock_row
         mock_signed_url.return_value = "https://supabase.co/storage/v1/object/sign/documents/tenders/1/abc123_requirements.pdf?token=xyz"
@@ -394,6 +551,8 @@ class TestDocumentView:
         mock_row.__getitem__ = lambda self, key: {
             "file_name": "orphan.pdf",
             "file_path": None,
+            "buyer_id": 10,
+            "status": "Draft",
         }[key]
         mock_conn.fetchrow.return_value = mock_row
 
@@ -408,3 +567,54 @@ class TestDocumentView:
         resp = await client.get("/tenders/documents/1/view")
 
         assert resp.status_code == 401
+
+    @pytest.mark.asyncio
+    @patch("app.modules.tenders.router.get_db_connection")
+    async def test_draft_tender_document_rejected_for_other_org(
+        self, mock_db, client, mock_user_org, auth_headers
+    ):
+        """
+        Regression test: a user outside the buyer org must not be able to
+        fetch another org's unpublished (Draft) tender documents by ID.
+        """
+        app.dependency_overrides[get_current_user_org] = lambda: mock_user_org  # organization_id=10
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+
+        mock_row = MagicMock()
+        mock_row.__getitem__ = lambda self, key: {
+            "file_name": "confidential-boq.pdf",
+            "file_path": "tenders/99/xyz_confidential-boq.pdf",
+            "buyer_id": 999,  # different org than the caller
+            "status": "Draft",
+        }[key]
+        mock_conn.fetchrow.return_value = mock_row
+
+        resp = await client.get("/tenders/documents/1/view", headers=auth_headers)
+
+        assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    @patch("app.modules.tenders.router.get_db_connection")
+    @patch("app.services.supabase_storage.generate_signed_url")
+    async def test_published_tender_document_accessible_to_other_org(
+        self, mock_signed_url, mock_db, client, mock_user_org, auth_headers
+    ):
+        """Once a tender is Published, its documents are viewable by any authenticated org (e.g. a bidder)."""
+        app.dependency_overrides[get_current_user_org] = lambda: mock_user_org  # organization_id=10
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+
+        mock_row = MagicMock()
+        mock_row.__getitem__ = lambda self, key: {
+            "file_name": "notice.pdf",
+            "file_path": "tenders/99/xyz_notice.pdf",
+            "buyer_id": 999,  # different org than the caller
+            "status": "Published",
+        }[key]
+        mock_conn.fetchrow.return_value = mock_row
+        mock_signed_url.return_value = "https://supabase.co/storage/v1/object/sign/documents/tenders/99/xyz_notice.pdf?token=xyz"
+
+        resp = await client.get("/tenders/documents/1/view", headers=auth_headers)
+
+        assert resp.status_code == 200

@@ -97,6 +97,37 @@ class TestBidSubmission:
         assert call_kwargs["files_data"][0]["doc_type_name"] == "TIN"
 
     @pytest.mark.asyncio
+    async def test_submit_bid_rejects_disallowed_file_type(
+        self, client, mock_user_org, auth_headers
+    ):
+        """
+        Regression test: an .html upload must be rejected before it's saved
+        to disk for the Celery upload task, since these documents are later
+        served back inline with their own stored content-type (stored-XSS risk
+        if an arbitrary file type were accepted).
+        """
+        app.dependency_overrides[get_current_user_org] = lambda: mock_user_org
+
+        bid_data = {"tender_id": 100, "financial_amount": 50000.00}
+        files = [
+            ("files", ("evil.html", b"<script>alert(document.cookie)</script>", "text/html")),
+        ]
+        data = {
+            "bid_data": json.dumps(bid_data),
+            "doc_type_names": json.dumps(["TIN"]),
+        }
+
+        resp = await client.post(
+            "/bids/vendor/submit-with-documents",
+            headers=auth_headers,
+            data=data,
+            files=files,
+        )
+
+        assert resp.status_code == 400
+        assert "Unsupported file type" in resp.json()["detail"]
+
+    @pytest.mark.asyncio
     async def test_submit_bid_invalid_bid_data_json(self, client, auth_headers):
         """Should return 400 when bid_data JSON is invalid."""
         app.dependency_overrides[get_current_user_org] = lambda: {"organization_id": 1}
@@ -255,9 +286,8 @@ class TestBidSubmission:
     @pytest.mark.asyncio
     @patch("app.modules.bids.router.get_db_connection")
     @patch("app.modules.bids.router.get_bid_document_details_for_download")
-    @patch("app.modules.bids.router.get_bid_document_by_id")
     async def test_view_bid_document_not_found(
-        self, mock_get_by_id, mock_get_doc, mock_db, client, auth_headers
+        self, mock_get_doc, mock_db, client, auth_headers
     ):
         """Should return 404 if bid document does not exist."""
         app.dependency_overrides[get_current_user_org] = lambda: {"organization_id": 1, "role_in_org": "Owner"}
@@ -265,8 +295,33 @@ class TestBidSubmission:
         mock_db.side_effect = _mock_db_ctx(mock_conn)
 
         mock_get_doc.return_value = None
-        mock_get_by_id.return_value = None
 
         resp = await client.get("/bids/documents/999/view", headers=auth_headers)
         assert resp.status_code == 404
         assert "Document not found" in resp.json()["detail"]
+
+    @pytest.mark.asyncio
+    @patch("app.modules.bids.router.get_db_connection")
+    @patch("app.modules.bids.router.get_bid_document_details_for_download")
+    async def test_view_bid_document_rejects_other_org(
+        self, mock_get_doc, mock_db, client, auth_headers
+    ):
+        """
+        Regression test: a document lookup must always come from the joined
+        query (which carries vendor_org_id/buyer_id) so a caller outside both
+        orgs is rejected, instead of silently passing through an unscoped
+        fallback with no ownership columns to check against.
+        """
+        app.dependency_overrides[get_current_user_org] = lambda: {"organization_id": 999, "role_in_org": "Owner"}
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+
+        mock_get_doc.return_value = {
+            "file_path": "bids/1/file.pdf",
+            "vendor_org_id": 1,
+            "buyer_id": 2,
+            "allowed_roles": ["Owner"],
+        }
+
+        resp = await client.get("/bids/documents/1/view", headers=auth_headers)
+        assert resp.status_code == 403

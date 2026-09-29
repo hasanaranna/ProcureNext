@@ -13,6 +13,7 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       ML_SERVICE_URL: http://ml:8001
       ML_SERVICE_TIMEOUT: 120
+      FRONTEND_URL: ${FRONTEND_URL:-http://13.212.216.26}
     volumes:
       - uploads_data:/app/uploads
     depends_on:
@@ -46,6 +47,7 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       ML_SERVICE_URL: http://ml:8001
       ML_SERVICE_TIMEOUT: 120
+      FRONTEND_URL: ${FRONTEND_URL:-http://13.212.216.26}
     volumes:
       - uploads_data:/app/uploads
     command: ["celery", "-A", "app.tasks.celery_app.celery_app", "worker", "--beat", "--loglevel=info"]
