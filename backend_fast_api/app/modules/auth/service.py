@@ -28,9 +28,24 @@
 import asyncpg
 from datetime import date
 from fastapi import HTTPException, UploadFile
+from jose import JWTError, jwt
 
-from app.core.security import create_access_token, create_refresh_token, verify_password, hash_password
-from app.modules.auth.schemas import LoginRequest, TokenResponse, UserResponse, AdminTokenResponse, AdminUserResponse
+from app.core.security import (
+    create_access_token,
+    create_refresh_token,
+    verify_password,
+    hash_password,
+    SECRET_KEY,
+    ALGORITHM,
+)
+from app.modules.auth.schemas import (
+    LoginRequest,
+    TokenResponse,
+    UserResponse,
+    AdminTokenResponse,
+    AdminUserResponse,
+    RefreshTokenResponse,
+)
 from app.services.supabase_storage import build_registration_prefix, upload_optional_file, delete_files
 
 
@@ -55,6 +70,9 @@ async def authenticate_user(connection: asyncpg.Connection, payload: LoginReques
 
     if not verify_password(payload.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid email or password.")
+
+    if user["status"] in ("Suspended", "Banned"):
+        raise HTTPException(status_code=403, detail="This account has been suspended. Contact platform support.")
 
     # Update last login timestamp
     await connection.execute(
@@ -233,6 +251,9 @@ async def authenticate_admin(connection: asyncpg.Connection, payload: LoginReque
     if not verify_password(payload.password, row["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials or insufficient privileges.")
 
+    if row["status"] in ("Suspended", "Banned"):
+        raise HTTPException(status_code=403, detail="This account has been suspended. Contact platform support.")
+
     # Stamp last login time on the underlying user record
     await connection.execute(
         "UPDATE users SET last_login_at = NOW() WHERE user_id = $1",
@@ -262,6 +283,57 @@ async def authenticate_admin(connection: asyncpg.Connection, payload: LoginReque
         access_token=access_token,
         refresh_token=refresh_token,
         user=admin_user,
+    )
+
+
+async def refresh_access_token(connection: asyncpg.Connection, refresh_token: str) -> RefreshTokenResponse:
+    """
+    Exchange a valid, unexpired refresh token for a new access/refresh pair,
+    so a signed-in user isn't force-logged-out every ACCESS_TOKEN_EXPIRE_MINUTES.
+    Re-reads the user's current status and admin role from the DB rather than
+    trusting whatever the old token claimed, for the same reason get_current_admin
+    re-verifies admin status from the DB instead of the token.
+    """
+    credentials_exception = HTTPException(status_code=401, detail="Invalid or expired refresh token.")
+
+    try:
+        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        raise credentials_exception
+
+    if payload.get("type") != "refresh":
+        raise credentials_exception
+
+    user_id_str = payload.get("sub")
+    if user_id_str is None:
+        raise credentials_exception
+    try:
+        user_id = int(user_id_str)
+    except ValueError:
+        raise credentials_exception
+
+    user = await connection.fetchrow(
+        "SELECT user_id, email, status FROM users WHERE user_id = $1",
+        user_id,
+    )
+    if user is None:
+        raise credentials_exception
+
+    if user["status"] in ("Suspended", "Banned"):
+        raise HTTPException(status_code=403, detail="This account has been suspended. Contact platform support.")
+
+    admin_row = await connection.fetchrow(
+        "SELECT admin_role FROM admins WHERE user_id = $1", user_id
+    )
+
+    token_data = {"sub": str(user["user_id"]), "email": user["email"]}
+    if admin_row:
+        token_data["admin_role"] = admin_row["admin_role"]
+
+    return RefreshTokenResponse(
+        access_token=create_access_token(token_data),
+        refresh_token=create_refresh_token(token_data),
+        is_admin=bool(admin_row),
     )
 
 

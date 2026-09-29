@@ -8,6 +8,17 @@ import PendingRequestDetailModal, {
 import { getAdminUser, clearAdminSession } from "@/lib/auth";
 
 
+interface AdminUserListItem {
+  user_id: number;
+  full_name: string;
+  email: string;
+  status: string;
+  organization_name: string | null;
+  role_in_org: string | null;
+  is_admin: boolean;
+  created_at: string;
+}
+
 interface PlatformStats {
   total_tokens_sold: number;
   tokens_sold_this_month: number;
@@ -79,12 +90,19 @@ export default function AdminHomePage() {
   const [selectedRegistration, setSelectedRegistration] =
     useState<RegistrationDetail | null>(null);
   const [adminName, setAdminName] = useState<string>("System Administrator");
+  const [currentAdminUserId, setCurrentAdminUserId] = useState<number | null>(null);
   const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
+  const [users, setUsers] = useState<AdminUserListItem[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [userActionBusyId, setUserActionBusyId] = useState<number | null>(null);
 
   useEffect(() => {
     const adminUser = getAdminUser();
     if (adminUser?.full_name) {
       setAdminName(adminUser.full_name);
+    }
+    if (adminUser?.user_id) {
+      setCurrentAdminUserId(adminUser.user_id);
     }
   }, []);
 
@@ -198,9 +216,61 @@ export default function AdminHomePage() {
       }
     };
     fetchStats();
+
+    fetchUsers();
   }, []);
 
   const stats = buildStatCards(platformStats);
+
+  const fetchUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const token = localStorage.getItem("admin_access_token") || localStorage.getItem("access_token");
+      const res = await fetch('/api/auth/admin/users', {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUsers(data.users || []);
+      }
+    } catch (err) {
+      console.error("Failed to load users:", err);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const handleUserStatusChange = async (user: AdminUserListItem, newStatus: "Active" | "Suspended" | "Banned") => {
+    const verb = newStatus === "Active" ? "reactivate" : newStatus.toLowerCase();
+    if (!confirm(`Are you sure you want to ${verb} ${user.full_name}?`)) return;
+
+    const reason = newStatus === "Active" ? undefined : (prompt(`Reason for ${verb === "ban" ? "banning" : "suspending"} ${user.full_name} (optional):`) || undefined);
+
+    setUserActionBusyId(user.user_id);
+    try {
+      const token = localStorage.getItem("admin_access_token") || localStorage.getItem("access_token");
+      const res = await fetch('/api/auth/admin/modify-user-status', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ user_id: user.user_id, new_status: newStatus, reason }),
+      });
+      if (res.ok) {
+        setUsers((prev) => prev.map((u) => (u.user_id === user.user_id ? { ...u, status: newStatus } : u)));
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        alert(errData.detail || `Failed to ${verb} user.`);
+      }
+    } catch (err) {
+      alert(`Network error while trying to ${verb} user.`);
+    } finally {
+      setUserActionBusyId(null);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -642,6 +712,102 @@ export default function AdminHomePage() {
           onDecline={handleReject}
           registration={selectedRegistration}
         />
+
+        {/* Manage Users */}
+        <section className="bg-surface rounded border border-subtle overflow-hidden">
+          <div className="px-5 py-4 border-b border-subtle">
+            <h2 className="text-sm font-semibold text-content-primary">Manage Users</h2>
+            <p className="text-xs text-content-secondary mt-0.5">Suspend or ban an account that violates platform policy, or reactivate one.</p>
+          </div>
+
+          <div className="overflow-x-auto">
+            {loadingUsers ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <svg className="animate-spin h-6 w-6 text-content-muted mb-3" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                <p className="text-sm text-content-muted">Loading users…</p>
+              </div>
+            ) : users.length === 0 ? (
+              <div className="py-10 text-center">
+                <p className="text-sm text-content-muted">No users found.</p>
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-app text-content-secondary uppercase text-xs tracking-wider">
+                    <th className="px-5 py-2.5 text-left font-medium">Name</th>
+                    <th className="px-5 py-2.5 text-left font-medium">Email</th>
+                    <th className="px-5 py-2.5 text-left font-medium">Organization</th>
+                    <th className="px-5 py-2.5 text-left font-medium">Status</th>
+                    <th className="px-5 py-2.5 text-left font-medium"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-subtle">
+                  {users.map((u) => {
+                    const isSelf = u.user_id === currentAdminUserId;
+                    const busy = userActionBusyId === u.user_id;
+                    const badgeClass =
+                      u.status === "Active" ? "badge-approved" :
+                      u.status === "Pending" ? "badge-pending" :
+                      u.status === "Banned" ? "badge-rejected" :
+                      "badge-draft";
+                    return (
+                      <tr key={u.user_id} className="hover:bg-app transition">
+                        <td className="px-5 py-3 font-medium text-content-primary">
+                          {u.full_name}{u.is_admin && <span className="ml-1.5 text-[10px] text-content-muted">(Admin)</span>}
+                        </td>
+                        <td className="px-5 py-3 text-content-secondary">{u.email}</td>
+                        <td className="px-5 py-3 text-content-secondary">{u.organization_name || "—"}</td>
+                        <td className="px-5 py-3">
+                          <span className={`badge-status ${badgeClass}`}><span className="badge-dot" />{u.status}</span>
+                        </td>
+                        <td className="px-5 py-3">
+                          {u.is_admin ? (
+                            <span className="text-xs text-content-muted">Not applicable</span>
+                          ) : isSelf ? (
+                            <span className="text-xs text-content-muted">This is you</span>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              {u.status !== "Active" && (
+                                <button
+                                  disabled={busy}
+                                  onClick={() => handleUserStatusChange(u, "Active")}
+                                  className="px-3 py-1.5 rounded text-xs font-medium text-status-approved-text bg-status-approved-bg hover:opacity-80 transition disabled:opacity-50"
+                                >
+                                  Reactivate
+                                </button>
+                              )}
+                              {u.status !== "Suspended" && (
+                                <button
+                                  disabled={busy}
+                                  onClick={() => handleUserStatusChange(u, "Suspended")}
+                                  className="px-3 py-1.5 rounded text-xs font-medium text-content-secondary bg-app hover:bg-subtle border border-subtle transition disabled:opacity-50"
+                                >
+                                  Suspend
+                                </button>
+                              )}
+                              {u.status !== "Banned" && (
+                                <button
+                                  disabled={busy}
+                                  onClick={() => handleUserStatusChange(u, "Banned")}
+                                  className="px-3 py-1.5 rounded text-xs font-medium text-status-rejected-text bg-status-rejected-bg hover:opacity-80 transition disabled:opacity-50"
+                                >
+                                  Ban
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </section>
 
         {/* Token & Rate Settings */}
         <section className="bg-surface rounded border border-subtle overflow-hidden">

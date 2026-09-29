@@ -23,7 +23,14 @@ from app.modules.admin.schemas import (
     ModifyUserStatusRequest,
     VerifyOrgRequest,
     PlatformStatsResponse,
+    AdminUserListItem,
+    AdminUserListResponse,
 )
+
+# The only statuses an admin may set via modify_user_status. 'Pending' and
+# 'Rejected' are lifecycle states owned by the registration/verification
+# flow (verify_organization), not the ban/suspend action.
+ADMIN_ASSIGNABLE_USER_STATUSES = {"Active", "Suspended", "Banned"}
 from app.services.supabase_storage import generate_signed_url_optional, delete_files
 
 from fastapi import HTTPException
@@ -141,11 +148,28 @@ async def get_pending_master_accounts(
 async def modify_user_status(
     connection: asyncpg.Connection,
     payload: ModifyUserStatusRequest,
+    acting_admin_user_id: int,
 ) -> dict:
     """
-    Change user status (e.g. Active, Suspended, Pending).
-    Also log the action in a production system.
+    Ban, suspend, or reactivate a user. (Note: the HTTP layer already logs
+    this action via AuditMiddleware, which captures every state-changing
+    admin request automatically.)
     """
+    if payload.new_status not in ADMIN_ASSIGNABLE_USER_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"new_status must be one of {sorted(ADMIN_ASSIGNABLE_USER_STATUSES)}.",
+        )
+
+    if payload.user_id == acting_admin_user_id:
+        raise HTTPException(status_code=400, detail="You cannot change your own account status.")
+
+    target_is_admin = await connection.fetchval(
+        "SELECT 1 FROM admins WHERE user_id = $1", payload.user_id
+    )
+    if target_is_admin:
+        raise HTTPException(status_code=403, detail="Cannot modify the status of a platform admin account.")
+
     result = await connection.execute(
         "UPDATE users SET status = $1 WHERE user_id = $2",
         payload.new_status,
@@ -156,6 +180,45 @@ async def modify_user_status(
         raise HTTPException(status_code=404, detail="User not found")
 
     return {"message": f"User status updated to {payload.new_status}"}
+
+
+async def list_all_users(connection: asyncpg.Connection) -> AdminUserListResponse:
+    """
+    List every platform user for the admin user-management view, along with
+    their org affiliation (if any) and whether they hold an admin role.
+    """
+    rows = await connection.fetch(
+        """
+        SELECT
+            u.user_id,
+            u.full_name,
+            u.email,
+            u.status,
+            o.organization_name,
+            oe.role_in_org,
+            (a.admin_id IS NOT NULL) AS is_admin,
+            u.created_at
+        FROM users u
+        LEFT JOIN organization_employees oe ON oe.user_id = u.user_id
+        LEFT JOIN organizations o ON o.organization_id = oe.organization_id
+        LEFT JOIN admins a ON a.user_id = u.user_id
+        ORDER BY u.created_at DESC
+        """
+    )
+    users = [
+        AdminUserListItem(
+            user_id=row["user_id"],
+            full_name=row["full_name"],
+            email=row["email"],
+            status=row["status"],
+            organization_name=row["organization_name"],
+            role_in_org=row["role_in_org"],
+            is_admin=row["is_admin"],
+            created_at=row["created_at"].isoformat() if row["created_at"] else "",
+        )
+        for row in rows
+    ]
+    return AdminUserListResponse(users=users, total=len(users))
 
 
 async def verify_organization(

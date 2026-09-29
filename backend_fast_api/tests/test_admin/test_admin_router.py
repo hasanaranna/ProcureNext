@@ -434,3 +434,120 @@ class TestAdminRoleClaimNotTrustedOverDb:
         )
 
         assert resp.status_code == 403
+
+
+# ===========================================================================
+# GET /api/auth/admin/users, PUT /api/auth/admin/modify-user-status
+# ===========================================================================
+
+class TestUserManagement:
+    @pytest.mark.asyncio
+    @patch("app.modules.admin.router.get_db_connection")
+    @patch("app.modules.admin.router.list_all_users")
+    async def test_list_users_returns_200(self, mock_list_users, mock_db, client):
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+        mock_list_users.return_value = {
+            "users": [
+                {
+                    "user_id": 1,
+                    "full_name": "Vendor One",
+                    "email": "vendor1@test.com",
+                    "status": "Active",
+                    "organization_name": "Vendor Org",
+                    "role_in_org": "Owner",
+                    "is_admin": False,
+                    "created_at": "2026-01-01T00:00:00",
+                }
+            ],
+            "total": 1,
+        }
+
+        resp = await client.get("/api/auth/admin/users")
+
+        assert resp.status_code == 200
+        assert resp.json()["total"] == 1
+
+    @pytest.mark.asyncio
+    async def test_list_users_returns_401_for_unauthenticated_caller(self, client):
+        app.dependency_overrides.pop(get_current_admin, None)
+        resp = await client.get("/api/auth/admin/users")
+        assert resp.status_code == 401
+
+    @pytest.mark.asyncio
+    @patch("app.modules.admin.router.get_db_connection")
+    @patch("app.modules.admin.router.modify_user_status")
+    async def test_modify_user_status_returns_200(self, mock_modify, mock_db, client):
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+        mock_modify.return_value = {"message": "User status updated to Suspended"}
+
+        resp = await client.put(
+            "/api/auth/admin/modify-user-status",
+            json={"user_id": 5, "new_status": "Suspended", "reason": "Fraud report"},
+        )
+
+        assert resp.status_code == 200
+        mock_modify.assert_called_once()
+        args = mock_modify.call_args.args
+        kwargs = mock_modify.call_args.kwargs
+        assert args[1].user_id == 5
+        assert args[1].new_status == "Suspended"
+        assert kwargs["acting_admin_user_id"] == 99  # from mock_admin_user fixture
+
+    @pytest.mark.asyncio
+    async def test_modify_user_status_returns_401_for_unauthenticated_caller(self, client):
+        app.dependency_overrides.pop(get_current_admin, None)
+        resp = await client.put(
+            "/api/auth/admin/modify-user-status",
+            json={"user_id": 5, "new_status": "Suspended"},
+        )
+        assert resp.status_code == 401
+
+
+class TestModifyUserStatusService:
+    """Direct tests of the service function's own validation rules."""
+
+    @pytest.mark.asyncio
+    async def test_rejects_disallowed_status_value(self):
+        from app.modules.admin.service import modify_user_status
+        from app.modules.admin.schemas import ModifyUserStatusRequest
+
+        conn = AsyncMock()
+        with pytest.raises(HTTPException) as exc:
+            await modify_user_status(
+                conn,
+                ModifyUserStatusRequest(user_id=5, new_status="NotARealStatus"),
+                acting_admin_user_id=99,
+            )
+        assert exc.value.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_rejects_self_modification(self):
+        from app.modules.admin.service import modify_user_status
+        from app.modules.admin.schemas import ModifyUserStatusRequest
+
+        conn = AsyncMock()
+        with pytest.raises(HTTPException) as exc:
+            await modify_user_status(
+                conn,
+                ModifyUserStatusRequest(user_id=99, new_status="Suspended"),
+                acting_admin_user_id=99,
+            )
+        assert exc.value.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_rejects_modifying_another_admin(self):
+        from app.modules.admin.service import modify_user_status
+        from app.modules.admin.schemas import ModifyUserStatusRequest
+
+        conn = AsyncMock()
+        conn.fetchval.return_value = 1  # target_id IS in `admins`
+
+        with pytest.raises(HTTPException) as exc:
+            await modify_user_status(
+                conn,
+                ModifyUserStatusRequest(user_id=5, new_status="Suspended"),
+                acting_admin_user_id=99,
+            )
+        assert exc.value.status_code == 403

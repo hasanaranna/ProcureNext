@@ -328,6 +328,47 @@ class TestTenderDetail:
 
         assert resp.status_code == 401
 
+    @pytest.mark.asyncio
+    @patch("app.modules.tenders.router.get_db_connection")
+    @patch("app.modules.tenders.router.get_tender_detail")
+    async def test_draft_tender_hidden_from_other_org(
+        self, mock_get_detail, mock_db, client, mock_user_org, sample_tender_row, auth_headers
+    ):
+        """
+        Regression test: a Draft (unpublished) tender belonging to another
+        org must not be visible via this endpoint just because the caller
+        is logged in — previously there was no status/ownership check at all.
+        """
+        app.dependency_overrides[get_current_user_org] = lambda: mock_user_org  # organization_id=10
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+
+        detail = {**sample_tender_row, "status": "Draft", "buyer_id": 999, "documents": []}
+        mock_get_detail.return_value = detail
+
+        resp = await client.get("/tenders/1/detail", headers=auth_headers)
+
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    @patch("app.modules.tenders.router.get_db_connection")
+    @patch("app.modules.tenders.router.get_tender_detail")
+    async def test_draft_tender_visible_to_buyer_org(
+        self, mock_get_detail, mock_db, client, mock_user_org, sample_tender_row, auth_headers
+    ):
+        """The buyer org that owns a Draft tender must still be able to view it."""
+        app.dependency_overrides[get_current_user_org] = lambda: mock_user_org  # organization_id=10
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+        mock_conn.fetchrow.return_value = None  # organizations.primary_contact lookup
+
+        detail = {**sample_tender_row, "status": "Draft", "buyer_id": 10, "documents": []}
+        mock_get_detail.return_value = detail
+
+        resp = await client.get("/tenders/1/detail", headers=auth_headers)
+
+        assert resp.status_code == 200
+
 
 # ============================================================
 # GET /tenders/documents/{doc_id}/view

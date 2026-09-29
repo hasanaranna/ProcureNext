@@ -63,6 +63,8 @@ from app.modules.auth.schemas import (
     PasswordResetVerifyResponse,
     PasswordResetConfirmRequest,
     MessageResponse,
+    RefreshTokenRequest,
+    RefreshTokenResponse,
 )
 from app.modules.auth.service import (
     authenticate_user,
@@ -70,6 +72,7 @@ from app.modules.auth.service import (
     request_password_reset,
     verify_password_reset_token,
     confirm_password_reset,
+    refresh_access_token,
 )
 # pyrefly: ignore [missing-import]
 import asyncpg
@@ -81,6 +84,21 @@ async def login(payload: LoginRequest):
     try:
         async with get_db_connection() as connection:
             return await authenticate_user(connection, payload)
+    except HTTPException:
+        raise
+    except asyncpg.PostgresError as exc:
+        print(f"[DB ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Database Error: {str(exc)}") from exc
+    except Exception as exc:
+        print(f"[SYSTEM ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
+@router.post("/refresh", response_model=RefreshTokenResponse)
+async def refresh(payload: RefreshTokenRequest):
+    try:
+        async with get_db_connection() as connection:
+            return await refresh_access_token(connection, payload.refresh_token)
     except HTTPException:
         raise
     except asyncpg.PostgresError as exc:

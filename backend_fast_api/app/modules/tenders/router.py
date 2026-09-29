@@ -462,8 +462,16 @@ async def get_tender_details(
             tender = await get_tender_detail(connection, tender_id)
             if tender is None:
                 raise HTTPException(status_code=404, detail="Tender not found")
-                
+
             buyer_id = tender.get("buyer_id")
+            user_org_id = current_user.get("organization_id")
+
+            # Draft (unpublished) tenders are only visible to the buyer org
+            # that owns them. Once Published, any authenticated org may view
+            # them (vendors need this to browse and decide whether to bid).
+            if tender.get("status") != "Published" and user_org_id != buyer_id:
+                raise HTTPException(status_code=404, detail="Tender not found")
+
             org_row = None
             if buyer_id:
                 org_row = await connection.fetchrow(
@@ -471,19 +479,20 @@ async def get_tender_details(
                     buyer_id
                 )
             primary_contact = org_row["primary_contact"] if org_row else None
-            
+
             user_id = current_user.get("user_id")
             org_user_id = current_user.get("org_user_id")
             role_in_org = current_user.get("role_in_org")
-            
+
             can_manage = False
-            if org_user_id and org_user_id == tender.get("created_by"):
-                can_manage = True
-            elif user_id == primary_contact or role_in_org == "Owner":
-                can_manage = True
-                
+            if user_org_id == buyer_id:
+                if org_user_id and org_user_id == tender.get("created_by"):
+                    can_manage = True
+                elif user_id == primary_contact or role_in_org == "Owner":
+                    can_manage = True
+
             tender["can_manage_document_access"] = can_manage
-            
+
             return tender
     except HTTPException:
         raise

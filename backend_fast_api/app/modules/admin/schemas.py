@@ -54,6 +54,22 @@ class PendingMasterAccountsResponse(BaseModel):
     total: int
 
 
+class AdminUserListItem(BaseModel):
+    user_id: int
+    full_name: str
+    email: str
+    status: str
+    organization_name: str | None = None
+    role_in_org: str | None = None
+    is_admin: bool
+    created_at: str
+
+
+class AdminUserListResponse(BaseModel):
+    users: list[AdminUserListItem]
+    total: int
+
+
 class PlatformStatsResponse(BaseModel):
     total_tokens_sold: int
     tokens_sold_this_month: int
