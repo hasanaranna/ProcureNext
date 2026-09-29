@@ -242,20 +242,36 @@ class TestUpdateTenderService:
 
 class TestWithdrawTenderService:
     @pytest.mark.asyncio
+    @patch("app.tasks.notification_tasks.send_tender_cancelled_email_task")
     @patch("app.modules.notifications.service.create_notification", new_callable=AsyncMock)
-    async def test_withdraw_published_notifies_bidders(self, mock_notify):
+    async def test_withdraw_published_notifies_bidders(self, mock_notify, mock_email_task):
         mock_conn = AsyncMock()
         _fake_transaction(mock_conn)
         mock_conn.fetchrow.side_effect = [
             _sample_tender_row(status="Published"),
             {"tender_id": 5, "status": "Cancelled", "title": "Test Tender"},
         ]
-        mock_conn.fetch.return_value = [{"user_id": 42, "tender_title": "Test Tender"}]
+        mock_conn.fetch.return_value = [{
+            "user_id": 42,
+            "email": "vendor@test.com",
+            "full_name": "Vendor Contact",
+            "tender_title": "Test Tender",
+            "buyer_org_name": "Acme Corp",
+        }]
 
         result = await withdraw_tender(mock_conn, tender_id=5, buyer_org_id=10)
 
         assert result["status"] == "Cancelled"
         mock_notify.assert_awaited_once()
+
+        # Regression test: cancelling a tender must email every bidder, not
+        # just create an in-app notification.
+        mock_email_task.delay.assert_called_once_with(
+            to_email="vendor@test.com",
+            vendor_name="Vendor Contact",
+            tender_title="Test Tender",
+            buyer_org_name="Acme Corp",
+        )
 
     @pytest.mark.asyncio
     async def test_withdraw_awarded_rejected(self):

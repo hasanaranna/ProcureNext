@@ -495,6 +495,7 @@ async def withdraw_tender(
 ) -> dict:
     """Soft-cancel a tender (status -> Cancelled) and notify vendors who bid."""
     from app.modules.notifications.service import create_notification
+    from app.tasks.notification_tasks import send_tender_cancelled_email_task
 
     row = await connection.fetchrow(
         "SELECT tender_id, buyer_id, status, title FROM tenders WHERE tender_id = $1",
@@ -515,12 +516,18 @@ async def withdraw_tender(
 
         bidders = await connection.fetch(
             """
-            SELECT DISTINCT u.user_id, t.title AS tender_title
+            SELECT DISTINCT
+                u.user_id,
+                u.email,
+                u.full_name,
+                t.title AS tender_title,
+                buyer_org.organization_name AS buyer_org_name
             FROM bids b
             JOIN organization_employees oe
               ON b.vendor_org_id = oe.organization_id AND oe.role_in_org = 'Owner'
             JOIN users u ON oe.user_id = u.user_id
             JOIN tenders t ON b.tender_id = t.tender_id
+            JOIN organizations buyer_org ON t.buyer_id = buyer_org.organization_id
             WHERE b.tender_id = $1
               AND b.status NOT IN ('Withdrawn', 'Draft')
             """,
@@ -536,6 +543,12 @@ async def withdraw_tender(
                     message=f"The tender \"{bidder['tender_title']}\" has been cancelled by the buyer.",
                     notification_type="Tender",
                     action_url="/view-my-bids",
+                )
+                send_tender_cancelled_email_task.delay(
+                    to_email=bidder["email"],
+                    vendor_name=bidder["full_name"] or "Vendor",
+                    tender_title=bidder["tender_title"] or "Tender",
+                    buyer_org_name=bidder["buyer_org_name"] or "Buyer",
                 )
             except Exception as exc:
                 logger.warning("Failed to notify bidder %s about cancellation: %s", bidder["user_id"], exc)

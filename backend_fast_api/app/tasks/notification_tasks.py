@@ -12,6 +12,7 @@ from app.services.email import (
     send_bid_received_email,
     send_bid_accepted_email,
     send_bid_rejected_email,
+    send_tender_cancelled_email,
     send_password_reset_email,
     send_intercompany_created_email,
     send_intercompany_member_added_email,
@@ -268,6 +269,38 @@ def send_bid_rejected_email_task(
         )
     except Exception as exc:
         logger.error(f"Error sending bid rejected email to {to_email}: {exc}", exc_info=True)
+        try:
+            raise self.retry(exc=exc)
+        except Exception:
+            return False
+
+
+@celery_app.task(
+    name="send_tender_cancelled_email_task",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+)
+def send_tender_cancelled_email_task(
+    self,
+    to_email: str,
+    vendor_name: str,
+    tender_title: str,
+    buyer_org_name: str,
+) -> bool:
+    """Notify a bidder by email that the tender they bid on was cancelled."""
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    my_bids_url = f"{frontend_url}/view-my-bids"
+    try:
+        return send_tender_cancelled_email(
+            to_email=to_email,
+            vendor_name=vendor_name,
+            tender_title=tender_title,
+            buyer_org_name=buyer_org_name,
+            my_bids_url=my_bids_url,
+        )
+    except Exception as exc:
+        logger.error(f"Error sending tender cancelled email to {to_email}: {exc}", exc_info=True)
         try:
             raise self.retry(exc=exc)
         except Exception:

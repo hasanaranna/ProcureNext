@@ -791,6 +791,91 @@ def send_bid_rejected_email(
 
 
 # ──────────────────────────────────────────────────────────────
+# Tender Cancelled – Bidder Notification
+# ──────────────────────────────────────────────────────────────
+
+def build_tender_cancelled_html(
+    vendor_name: str,
+    tender_title: str,
+    buyer_org_name: str,
+    my_bids_url: str,
+) -> str:
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tender Cancelled</title></head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f1f5f9;padding:40px 16px;">
+<tr><td align="center">
+<table role="presentation" width="100%" style="max-width:580px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 25px -5px rgba(0,0,0,0.08);border:1px solid #e2e8f0;" cellspacing="0" cellpadding="0">
+  <tr><td style="background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);padding:36px 32px;text-align:center;">
+    <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:800;">Procure<span style="color:#38bdf8;">Next</span></h1>
+    <p style="margin:6px 0 0 0;color:#94a3b8;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;">Tender Notification</p>
+  </td></tr>
+  <tr><td style="padding:36px 32px;">
+    <div style="text-align:center;margin-bottom:24px;">
+      <span style="display:inline-block;width:56px;height:56px;border-radius:50%;background:#f59e0b;line-height:56px;font-size:28px;text-align:center;">🚫</span>
+    </div>
+    <h2 style="margin:0 0 16px 0;color:#0f172a;font-size:20px;font-weight:700;text-align:center;">This Tender Has Been Cancelled</h2>
+    <p style="margin:0 0 18px 0;font-size:15px;line-height:1.6;color:#475569;">Hello <strong>{vendor_name}</strong>,</p>
+    <p style="margin:0 0 24px 0;font-size:15px;line-height:1.6;color:#475569;">
+      <strong>{buyer_org_name}</strong> has cancelled the tender <strong>"{tender_title}"</strong>, which you had
+      submitted a bid on. No further action is needed from you, and no bid fees or bid securities will be
+      forfeited as a result of this cancellation.
+    </p>
+    <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 auto 28px auto;">
+      <tr><td align="center" style="border-radius:12px;background:linear-gradient(135deg,#0284c7 0%,#0369a1 100%);">
+        <a href="{my_bids_url}" target="_blank" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:12px;">View My Bids &rarr;</a>
+      </td></tr>
+    </table>
+    <p style="margin:0;font-size:14px;line-height:1.6;color:#64748b;">
+      We encourage you to continue exploring other open tenders on ProcureNext.
+    </p>
+  </td></tr>
+  <tr><td style="background-color:#f8fafc;padding:24px 32px;text-align:center;border-top:1px solid #e2e8f0;">
+    <p style="margin:0;font-size:11px;color:#94a3b8;">&copy; 2026 ProcureNext. All rights reserved.</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>"""
+
+
+def build_tender_cancelled_text(
+    vendor_name: str, tender_title: str, buyer_org_name: str, my_bids_url: str
+) -> str:
+    return f"""ProcureNext - Tender Cancelled
+
+Hello {vendor_name},
+
+{buyer_org_name} has cancelled the tender "{tender_title}", which you had submitted a bid on.
+No further action is needed from you, and no bid fees or bid securities will be forfeited as a
+result of this cancellation.
+
+View your bids at: {my_bids_url}
+
+We encourage you to continue exploring other open tenders on ProcureNext.
+
+-- ProcureNext Team
+"""
+
+
+def send_tender_cancelled_email(
+    to_email: str,
+    vendor_name: str,
+    tender_title: str,
+    buyer_org_name: str,
+    my_bids_url: str,
+) -> bool:
+    subject = f"Tender cancelled: \"{tender_title}\""
+    return send_smtp_email(
+        to_email=to_email,
+        subject=subject,
+        html_body=build_tender_cancelled_html(vendor_name, tender_title, buyer_org_name, my_bids_url),
+        text_body=build_tender_cancelled_text(vendor_name, tender_title, buyer_org_name, my_bids_url),
+    )
+
+
+# ──────────────────────────────────────────────────────────────
 # InterCompany Channel Created – Owner Notification
 # ──────────────────────────────────────────────────────────────
 
