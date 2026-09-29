@@ -58,8 +58,10 @@ export default function LoginPage() {
         // Use hard redirect to force RootLayout to re-evaluate cookies
         window.location.href = '/home';
       } else {
-        const err = await res.json();
-        setError(err.error?.message || 'Login failed. Please check your credentials.');
+        // FastAPI errors arrive as { detail }, proxy errors as { error: { message } }
+        const err = await res.json().catch(() => ({}));
+        const detail = typeof err.detail === 'string' ? err.detail : undefined;
+        setError(detail || err.error?.message || 'Login failed. Please check your credentials.');
       }
     } catch {
       setError('Network error. Unable to connect to the server.');

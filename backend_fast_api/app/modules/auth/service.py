@@ -37,6 +37,7 @@ from app.core.security import (
     hash_password,
     SECRET_KEY,
     ALGORITHM,
+    ensure_account_not_blocked,
 )
 from app.modules.auth.schemas import (
     LoginRequest,
@@ -72,8 +73,7 @@ async def authenticate_user(connection: asyncpg.Connection, payload: LoginReques
     if not verify_password(payload.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid email or password.")
 
-    if user["status"] in ("Suspended", "Banned"):
-        raise HTTPException(status_code=403, detail="This account has been suspended. Contact platform support.")
+    ensure_account_not_blocked(user["status"])
 
     # Update last login timestamp
     await connection.execute(
@@ -252,8 +252,7 @@ async def authenticate_admin(connection: asyncpg.Connection, payload: LoginReque
     if not verify_password(payload.password, row["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials or insufficient privileges.")
 
-    if row["status"] in ("Suspended", "Banned"):
-        raise HTTPException(status_code=403, detail="This account has been suspended. Contact platform support.")
+    ensure_account_not_blocked(row["status"])
 
     # Stamp last login time on the underlying user record
     await connection.execute(
@@ -320,8 +319,7 @@ async def refresh_access_token(connection: asyncpg.Connection, refresh_token: st
     if user is None:
         raise credentials_exception
 
-    if user["status"] in ("Suspended", "Banned"):
-        raise HTTPException(status_code=403, detail="This account has been suspended. Contact platform support.")
+    ensure_account_not_blocked(user["status"])
 
     admin_row = await connection.fetchrow(
         "SELECT admin_role FROM admins WHERE user_id = $1", user_id

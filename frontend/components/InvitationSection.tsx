@@ -21,6 +21,7 @@ export default function InvitationSection() {
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [invitationToken, setInvitationToken] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [sending, setSending] = useState(false);
 
   const fetchInvitations = useCallback(async () => {
     try {
@@ -44,8 +45,10 @@ export default function InvitationSection() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) return;
+    // Guard against double-clicks firing duplicate invitations/emails
+    if (!email.trim() || sending) return;
     setError('');
+    setSending(true);
 
     try {
       const res = await fetch('/api/org/invitations', {
@@ -71,6 +74,8 @@ export default function InvitationSection() {
       }
     } catch {
       setError('Network error. Please try again.');
+    } finally {
+      setSending(false);
     }
   };
 
@@ -160,9 +165,9 @@ export default function InvitationSection() {
                 </div>
               )}
 
-              <button type="submit"
-                className="w-full bg-brand-navy text-white hover:bg-slate-900 text-sm font-medium h-9 px-3.5 rounded transition">
-                Send Invitation
+              <button type="submit" disabled={sending || !email.trim()}
+                className="w-full bg-brand-navy text-white hover:bg-slate-900 text-sm font-medium h-9 px-3.5 rounded transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-navy">
+                {sending ? 'Sending...' : 'Send Invitation'}
               </button>
 
               {submitted && (
