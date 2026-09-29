@@ -6,6 +6,7 @@ from fastapi import HTTPException
 
 from app.core.security import hash_password
 from app.modules.organizations.schemas import OrgCreateRequest, OrgCreateResponse, OrganizationSummary, UserSummary
+from app.services.email import frontend_url
 
 
 async def _generate_unique_join_code(connection: asyncpg.Connection) -> str:
@@ -318,8 +319,7 @@ async def create_or_update_invitation(
     inviter_name = org_info["inviter_name"] if org_info else None
 
     # Construct the full invitation link
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
-    invite_link = f"{frontend_url}/signup-user?token={token}"
+    invite_link = frontend_url(f"/signup-user?token={token}")
 
     # Asynchronously dispatch email via Celery task (with fallback to direct async threadpool)
     try:

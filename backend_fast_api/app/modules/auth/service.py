@@ -47,6 +47,7 @@ from app.modules.auth.schemas import (
     RefreshTokenResponse,
 )
 from app.services.supabase_storage import build_registration_prefix, upload_optional_file, delete_files
+from app.services.email import frontend_url
 
 
 async def authenticate_user(connection: asyncpg.Connection, payload: LoginRequest) -> TokenResponse:
@@ -380,8 +381,7 @@ async def request_password_reset(connection: asyncpg.Connection, email: str) -> 
     )
 
     # Construct the reset password link
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
-    reset_link = f"{frontend_url}/reset-password?token={token}"
+    reset_link = frontend_url(f"/reset-password?token={token}")
 
     # Asynchronously dispatch email via Celery task (with background thread fallback)
     try:

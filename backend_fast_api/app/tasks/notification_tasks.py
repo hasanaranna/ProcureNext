@@ -1,10 +1,10 @@
 # ============================================================
 # tasks/notification_tasks.py - Async Notification Tasks
 # ============================================================
-import os
 import logging
 from app.tasks.celery_app import celery_app
 from app.services.email import (
+    frontend_url,
     send_employee_invitation_email,
     send_smtp_email,
     send_pending_account_admin_email,
@@ -126,8 +126,7 @@ def send_pending_account_admin_alert_task(
     org_type: str,
 ) -> bool:
     """Notify all platform admins about a new pending master account."""
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-    admin_panel_url = f"{frontend_url}/admin-home"
+    admin_panel_url = frontend_url("/admin-home")
     success = True
     for email in admin_emails:
         try:
@@ -161,8 +160,7 @@ def send_account_status_email_task(
     review_notes: str | None = None,
 ) -> bool:
     """Send account approved/rejected email to the user."""
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-    login_url = f"{frontend_url}/login"
+    login_url = frontend_url("/login")
     try:
         return send_account_status_email(
             to_email=to_email,
@@ -195,8 +193,7 @@ def send_bid_received_email_task(
     tender_id: int,
 ) -> bool:
     """Send 'bid received' email to the buyer."""
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-    tender_url = f"{frontend_url}/view-my-tender/{tender_id}"
+    tender_url = frontend_url("/view-my-tender/{tender_id}")
     try:
         return send_bid_received_email(
             to_email=to_email,
@@ -228,8 +225,7 @@ def send_bid_accepted_email_task(
     tender_id: int,
 ) -> bool:
     """Send 'bid accepted' email to the winning vendor."""
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-    tender_url = f"{frontend_url}/ongoing-tenders"
+    tender_url = frontend_url("/ongoing-tenders")
     try:
         return send_bid_accepted_email(
             to_email=to_email,
@@ -289,8 +285,7 @@ def send_tender_cancelled_email_task(
     buyer_org_name: str,
 ) -> bool:
     """Notify a bidder by email that the tender they bid on was cancelled."""
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-    my_bids_url = f"{frontend_url}/view-my-bids"
+    my_bids_url = frontend_url("/view-my-bids")
     try:
         return send_tender_cancelled_email(
             to_email=to_email,

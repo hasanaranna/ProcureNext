@@ -22,6 +22,12 @@ MAIL_FROM_NAME = os.getenv("MAIL_FROM_NAME", "ProcureNext")
 SMTP_TLS = os.getenv("SMTP_TLS", "True").lower() in ("true", "1", "yes")
 
 
+def frontend_url(path: str = "") -> str:
+    """Absolute link into the frontend for use in emails. Set FRONTEND_URL in deployment."""
+    base = os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+    return f"{base}{path}"
+
+
 def send_smtp_email(
     to_email: str,
     subject: str,
@@ -912,7 +918,7 @@ def build_intercompany_created_html(
     </p>
     <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 auto 28px auto;">
       <tr><td align="center" style="border-radius:12px;background:linear-gradient(135deg,#0284c7 0%,#0369a1 100%);">
-        <a href="https://procurenext.app/messages" target="_blank" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:12px;">Open Channel &rarr;</a>
+        <a href="{frontend_url('/home')}" target="_blank" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:12px;">Open Channel &rarr;</a>
       </td></tr>
     </table>
   </td></tr>
@@ -939,7 +945,7 @@ between your organisation and {other_org_name}.
 You can now communicate directly through ProcureNext Messaging.
 You may also add members from your own organisation to this channel.
 
-Open the channel at: https://procurenext.app/messages
+Open the channel at: {frontend_url('/home')}
 
 -- ProcureNext Team
 """
@@ -993,7 +999,7 @@ def build_intercompany_member_added_html(
     </p>
     <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 auto 28px auto;">
       <tr><td align="center" style="border-radius:12px;background:linear-gradient(135deg,#0284c7 0%,#0369a1 100%);">
-        <a href="https://procurenext.app/messages" target="_blank" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:12px;">Open Channel &rarr;</a>
+        <a href="{frontend_url('/home')}" target="_blank" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:12px;">Open Channel &rarr;</a>
       </td></tr>
     </table>
   </td></tr>
@@ -1017,7 +1023,7 @@ Hello {user_name},
 {owner_name} has added you to the inter-company collaboration channel
 for the tender "{tender_title}" on ProcureNext.
 
-Open the channel at: https://procurenext.app/messages
+Open the channel at: {frontend_url('/home')}
 
 -- ProcureNext Team
 """
