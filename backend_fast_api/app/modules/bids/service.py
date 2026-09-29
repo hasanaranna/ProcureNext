@@ -305,8 +305,10 @@ async def accept_bid_for_tender(
         if row["buyer_id"] != buyer_org_id:
             raise ValueError("You do not have permission to accept this bid.")
             
-        if row["tender_status"] in ('Awarded', 'Cancelled', 'Closed'):
-            raise ValueError(f"Cannot accept bid, tender is already {row['tender_status']}.")
+        # A buyer awards after bidding closes, so Closed tenders must stay acceptable;
+        # only a finished (Awarded/Cancelled) or unpublished (Draft) tender is off-limits.
+        if row["tender_status"] not in ('Published', 'Closed'):
+            raise ValueError(f"Cannot accept bid, tender is {row['tender_status']}.")
             
         if row["bid_status"] not in ('Draft', 'Submitted', 'UnderEvaluation'):
             raise ValueError(f"Cannot accept bid with status {row['bid_status']}.")

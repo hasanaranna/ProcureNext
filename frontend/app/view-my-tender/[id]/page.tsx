@@ -472,7 +472,8 @@ export default function ViewMyTenderPage() {
     }
   };
 
-  const isTenderClosed = tender?.status === 'Awarded' || tender?.status === 'Closed' || tender?.status === 'Cancelled';
+  // Bids can still be awarded after the deadline closes the tender; only a finished tender blocks acceptance.
+  const isAwardLocked = tender?.status === 'Awarded' || tender?.status === 'Cancelled';
 
   const compliantCount = bids.filter(b => b.mandatory_docs_satisfied && b.compliance_score_pct >= 100).length;
   const enlistedCount = bids.filter(b => b.is_enlisted).length;
@@ -905,9 +906,9 @@ export default function ViewMyTenderPage() {
                           ) : (
                             <button
                               onClick={() => openAcceptModal(bid)}
-                              disabled={hasAcceptedBid || isTenderClosed}
+                              disabled={hasAcceptedBid || isAwardLocked}
                               className={`text-sm font-medium h-9 px-3.5 rounded transition ${
-                                hasAcceptedBid || isTenderClosed
+                                hasAcceptedBid || isAwardLocked
                                   ? 'bg-slate-200 text-content-muted cursor-not-allowed'
                                   : 'bg-brand-navy text-white hover:bg-slate-900'
                               }`}
@@ -1316,9 +1317,9 @@ export default function ViewMyTenderPage() {
                           ) : (
                             <button
                               onClick={() => openAcceptModal(bid)}
-                              disabled={hasAcceptedBid || isTenderClosed}
+                              disabled={hasAcceptedBid || isAwardLocked}
                               className={`w-full py-2 rounded font-medium text-xs transition flex items-center justify-center gap-1.5 ${
-                                hasAcceptedBid || isTenderClosed
+                                hasAcceptedBid || isAwardLocked
                                   ? 'bg-slate-200 text-content-muted cursor-not-allowed'
                                   : 'bg-brand-navy text-white hover:bg-slate-900'
                               }`}
