@@ -6,6 +6,7 @@ import PendingRequestDetailModal, {
   RegistrationDetail,
 } from "@/components/PendingRequestDetailModal";
 import { getAdminUser, clearAdminSession } from "@/lib/auth";
+import AdminAuditTrail from "@/components/AdminAuditTrail";
 
 
 interface AdminUserListItem {
@@ -808,6 +809,9 @@ export default function AdminHomePage() {
             )}
           </div>
         </section>
+
+        {/* Audit Trail */}
+        <AdminAuditTrail />
 
         {/* Token & Rate Settings */}
         <section className="bg-surface rounded border border-subtle overflow-hidden">
