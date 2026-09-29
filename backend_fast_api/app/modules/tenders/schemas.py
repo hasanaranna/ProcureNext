@@ -165,6 +165,7 @@ class TenderListItem(BaseModel):
     title: str
     description: str
     status: TenderStatus
+    visibility_type: Optional[str] = None
     buyer_org_name: str
     submission_deadline: Optional[datetime] = None
     created_at: datetime
@@ -199,6 +200,7 @@ class TenderDetailResponse(BaseModel):
     title: str
     description: str
     status: TenderStatus
+    visibility_type: Optional[str] = None
     buyer_org_name: str
     category_name: Optional[str] = None
     procurement_nature: Optional[str] = None

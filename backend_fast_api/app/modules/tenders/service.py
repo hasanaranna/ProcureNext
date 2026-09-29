@@ -657,6 +657,7 @@ async def get_buyer_tenders(
             t.title,
             t.description,
             t.status,
+            t.visibility_type,
             o.organization_name AS buyer_org_name,
             t.submission_deadline,
             t.created_at

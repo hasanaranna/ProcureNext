@@ -9,6 +9,7 @@ from app.services.email import (
     send_smtp_email,
     send_pending_account_admin_email,
     send_account_status_email,
+    send_account_moderation_email,
     send_bid_received_email,
     send_bid_accepted_email,
     send_notice_of_assessment_email,
@@ -173,6 +174,37 @@ def send_account_status_email_task(
         )
     except Exception as exc:
         logger.error(f"Error sending account status email to {to_email}: {exc}", exc_info=True)
+        try:
+            raise self.retry(exc=exc)
+        except Exception:
+            return False
+
+
+@celery_app.task(
+    name="send_account_moderation_email_task",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+)
+def send_account_moderation_email_task(
+    self,
+    to_email: str,
+    full_name: str,
+    new_status: str,
+    reason: str | None = None,
+) -> bool:
+    """Tell a user their account was suspended, banned, or reactivated by an admin."""
+    login_url = frontend_url("/login")
+    try:
+        return send_account_moderation_email(
+            to_email=to_email,
+            full_name=full_name,
+            new_status=new_status,
+            login_url=login_url,
+            reason=reason,
+        )
+    except Exception as exc:
+        logger.error(f"Error sending account moderation email to {to_email}: {exc}", exc_info=True)
         try:
             raise self.retry(exc=exc)
         except Exception:

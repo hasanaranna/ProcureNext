@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import ModalShell from '@/components/ModalShell';
 import BidEvaluationPanel from '@/components/BidEvaluationPanel';
+import { VISIBILITY_LABEL } from '@/components/TenderCard';
 
 interface BidDocument {
   bid_doc_id: number;
@@ -116,6 +117,7 @@ interface Tender {
   title: string;
   description: string;
   status: string;
+  visibility_type?: string | null;
   budget_min: string;
   budget_max: string;
   bid_count?: number;
@@ -533,6 +535,14 @@ export default function ViewMyTenderPage() {
                     <span className="badge-dot" />
                     {tender?.status}
                   </span>
+                  {tender && (
+                    <span
+                      className="inline-flex items-center text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded border border-white/25 bg-white/10 text-white"
+                      title={(tender.visibility_type || 'Public') === 'Public' ? 'Visible to all sellers' : 'Visible only to your enlisted sellers'}
+                    >
+                      {VISIBILITY_LABEL[tender.visibility_type || 'Public'] || tender.visibility_type}
+                    </span>
+                  )}
                 </div>
                 <p className="text-slate-300 text-xs mt-1">
                   Budget: <strong className="text-white tabular-nums">৳ {tender?.budget_min ? parseFloat(tender.budget_min).toLocaleString() : '0'}</strong> – <strong className="text-white tabular-nums">৳ {tender?.budget_max ? parseFloat(tender.budget_max).toLocaleString() : '0'}</strong>

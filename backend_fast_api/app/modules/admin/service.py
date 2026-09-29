@@ -34,7 +34,7 @@ ADMIN_ASSIGNABLE_USER_STATUSES = {"Active", "Suspended", "Banned"}
 from app.services.supabase_storage import generate_signed_url_optional, delete_files
 
 from fastapi import HTTPException
-from app.tasks.notification_tasks import send_account_status_email_task
+from app.tasks.notification_tasks import send_account_status_email_task, send_account_moderation_email_task
 
 
 async def get_pending_master_accounts(
@@ -170,14 +170,28 @@ async def modify_user_status(
     if target_is_admin:
         raise HTTPException(status_code=403, detail="Cannot modify the status of a platform admin account.")
 
-    result = await connection.execute(
+    target = await connection.fetchrow(
+        "SELECT email, full_name, status FROM users WHERE user_id = $1", payload.user_id
+    )
+    if target is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    await connection.execute(
         "UPDATE users SET status = $1 WHERE user_id = $2",
         payload.new_status,
         payload.user_id,
     )
 
-    if result == "UPDATE 0":
-        raise HTTPException(status_code=404, detail="User not found")
+    if target["status"] != payload.new_status:
+        try:
+            send_account_moderation_email_task.delay(
+                to_email=target["email"],
+                full_name=target["full_name"] or "User",
+                new_status=payload.new_status,
+                reason=payload.reason,
+            )
+        except Exception as exc:
+            print(f"[NOTIFY WARNING] Failed to queue account moderation email: {exc}", flush=True)
 
     return {"message": f"User status updated to {payload.new_status}"}
 
@@ -405,8 +419,8 @@ async def get_platform_stats(connection: asyncpg.Connection) -> PlatformStatsRes
     row = await connection.fetchrow(
         """
         SELECT
-            (SELECT COALESCE(SUM(amount), 0) FROM credit_transactions WHERE transaction_type = 'Purchase') AS total_tokens_sold,
-            (SELECT COALESCE(SUM(amount), 0) FROM credit_transactions
+            (SELECT COALESCE(SUM(amount), 0)::bigint FROM credit_transactions WHERE transaction_type = 'Purchase') AS total_tokens_sold,
+            (SELECT COALESCE(SUM(amount), 0)::bigint FROM credit_transactions
                 WHERE transaction_type = 'Purchase' AND created_at >= date_trunc('month', now())) AS tokens_sold_this_month,
             (SELECT COUNT(*) FROM users u JOIN organization_employees oe ON u.user_id = oe.user_id
                 WHERE oe.role_in_org = 'Owner' AND u.status = 'Active') AS approved_owners,
@@ -417,7 +431,7 @@ async def get_platform_stats(connection: asyncpg.Connection) -> PlatformStatsRes
                 WHERE oe.role_in_org = 'Owner' AND u.status = 'Pending') AS pending_approvals,
             (SELECT COUNT(*) FROM tenders WHERE status = 'Published') AS active_tenders,
             (SELECT COUNT(*) FROM bids) AS total_bids,
-            (SELECT COUNT(*) FROM bids WHERE created_at >= date_trunc('month', now())) AS bids_this_month,
+            (SELECT COUNT(*) FROM bids WHERE submitted_at >= date_trunc('month', now())) AS bids_this_month,
             (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'Completed') AS total_revenue_bdt
         """
     )

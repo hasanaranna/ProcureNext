@@ -17,6 +17,14 @@ interface OrganizationItem {
   is_enlisted: boolean;
 }
 
+interface EnlistedSeller {
+  organization_id: number;
+  organization_name: string;
+  address: string | null;
+  verification_status: string;
+  enlisted_at: string | null;
+}
+
 export default function OrganizationsDirectoryPage() {
   const router = useRouter();
   const [organizations, setOrganizations] = useState<OrganizationItem[]>([]);
@@ -27,6 +35,48 @@ export default function OrganizationsDirectoryPage() {
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [enlistingId, setEnlistingId] = useState<number | null>(null);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [view, setView] = useState<'all' | 'enlisted'>('all');
+  const [enlistedSellers, setEnlistedSellers] = useState<EnlistedSeller[]>([]);
+  const [enlistedLoading, setEnlistedLoading] = useState(true);
+  const [removingId, setRemovingId] = useState<number | null>(null);
+
+  const fetchEnlistedSellers = useCallback(async () => {
+    try {
+      const res = await fetch('/api/org/enlisted');
+      if (res.ok) setEnlistedSellers(await res.json());
+    } catch (err) {
+      console.error('Failed to fetch enlisted sellers:', err);
+    } finally {
+      setEnlistedLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchEnlistedSellers();
+  }, [fetchEnlistedSellers]);
+
+  const handleRemoveEnlisted = async (seller: EnlistedSeller) => {
+    if (!confirm(`Remove ${seller.organization_name} from your enlisted sellers? They will lose access to your enlisted-only tenders.`)) return;
+    setRemovingId(seller.organization_id);
+    try {
+      const res = await fetch(`/api/org/enlist/${seller.organization_id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || 'Failed to remove seller');
+      }
+      setEnlistedSellers((prev) => prev.filter((s) => s.organization_id !== seller.organization_id));
+      setOrganizations((prev) =>
+        prev.map((o) => (o.organization_id === seller.organization_id ? { ...o, is_enlisted: false } : o))
+      );
+      setNotification({ message: `Removed ${seller.organization_name} from your enlisted sellers.`, type: 'success' });
+      setTimeout(() => setNotification(null), 3500);
+    } catch (err: any) {
+      setNotification({ message: err.message || 'Failed to remove seller', type: 'error' });
+      setTimeout(() => setNotification(null), 4000);
+    } finally {
+      setRemovingId(null);
+    }
+  };
 
   const fetchOrganizations = useCallback(async (query: string, type: string) => {
     try {
@@ -91,6 +141,7 @@ export default function OrganizationsDirectoryPage() {
         type: 'success',
       });
       setTimeout(() => setNotification(null), 3500);
+      fetchEnlistedSellers();
     } catch (err: any) {
       // Revert optimistic update
       setOrganizations((prev) =>
@@ -113,7 +164,7 @@ export default function OrganizationsDirectoryPage() {
     return true;
   });
 
-  const totalEnlisted = organizations.filter((o) => o.is_enlisted).length;
+  const totalEnlisted = enlistedSellers.length;
   const buyerCount = organizations.filter((o) => o.organization_type === 'Buyer').length;
   const vendorCount = organizations.filter((o) => o.organization_type === 'Vendor').length;
 
@@ -216,6 +267,26 @@ export default function OrganizationsDirectoryPage() {
           </div>
         </div>
 
+        {/* View switcher */}
+        <div className="flex items-center gap-1.5 p-1 bg-surface rounded border border-subtle mb-4 w-fit">
+          {([
+            { value: 'all', label: 'All Organizations' },
+            { value: 'enlisted', label: `My Enlisted Sellers (${enlistedSellers.length})` },
+          ] as const).map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setView(opt.value)}
+              className={`px-3.5 py-1.5 rounded text-xs font-medium transition-all ${
+                view === opt.value ? 'bg-brand-navy text-white' : 'text-content-secondary hover:text-content-primary'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        {view === 'all' ? (
+        <>
         {/* Filter & Search Bar */}
         <div className="bg-surface border border-subtle rounded p-4 mb-8 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
           {/* Search Box */}
@@ -413,6 +484,78 @@ export default function OrganizationsDirectoryPage() {
                 </div>
               );
             })}
+          </div>
+        )}
+        </>
+        ) : (
+          <div className="bg-surface rounded border border-subtle overflow-hidden">
+            <div className="px-5 py-4 border-b border-subtle">
+              <h2 className="text-sm font-semibold text-content-primary">My Enlisted Sellers</h2>
+              <p className="text-xs text-content-secondary mt-0.5">
+                These organizations can see and bid on your enlisted-only tenders.
+              </p>
+            </div>
+            {enlistedLoading ? (
+              <div className="py-12 text-center text-sm text-content-muted">Loading enlisted sellers…</div>
+            ) : enlistedSellers.length === 0 ? (
+              <div className="py-12 px-4 text-center">
+                <p className="text-sm font-semibold text-content-primary">You haven&apos;t enlisted any sellers yet</p>
+                <p className="text-xs text-content-muted mt-1 mb-4">
+                  Enlist trusted sellers from the directory to give them access to your enlisted-only tenders.
+                </p>
+                <button
+                  onClick={() => setView('all')}
+                  className="bg-brand-navy text-white hover:bg-slate-900 text-xs font-medium h-8 px-3 rounded transition"
+                >
+                  Browse organizations
+                </button>
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-app text-content-secondary uppercase text-xs tracking-wider">
+                    <th className="px-5 py-2.5 text-left font-medium">Organization</th>
+                    <th className="px-5 py-2.5 text-left font-medium">Address</th>
+                    <th className="px-5 py-2.5 text-left font-medium">Status</th>
+                    <th className="px-5 py-2.5 text-left font-medium">Enlisted</th>
+                    <th className="px-5 py-2.5 text-left font-medium"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-subtle">
+                  {enlistedSellers.map((seller) => (
+                    <tr key={seller.organization_id} className="hover:bg-app transition">
+                      <td className="px-5 py-3">
+                        <button
+                          onClick={() => router.push(`/organizations/${seller.organization_id}`)}
+                          className="font-medium text-content-primary hover:text-brand-blue text-left"
+                        >
+                          {seller.organization_name}
+                        </button>
+                      </td>
+                      <td className="px-5 py-3 text-content-secondary">{seller.address || '—'}</td>
+                      <td className="px-5 py-3">
+                        <span className={`badge-status ${seller.verification_status === 'Verified' ? 'badge-approved' : 'badge-pending'}`}>
+                          <span className="badge-dot" />
+                          {seller.verification_status}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-content-muted tabular-nums">
+                        {seller.enlisted_at ? new Date(seller.enlisted_at).toLocaleDateString() : '—'}
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <button
+                          disabled={removingId === seller.organization_id}
+                          onClick={() => handleRemoveEnlisted(seller)}
+                          className="px-3 py-1.5 rounded text-xs font-medium text-status-rejected-text bg-status-rejected-bg hover:opacity-80 transition disabled:opacity-50"
+                        >
+                          {removingId === seller.organization_id ? 'Removing…' : 'Remove'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         )}
       </div>
