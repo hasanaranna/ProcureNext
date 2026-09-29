@@ -581,6 +581,148 @@ def send_account_status_email(
 
 
 # ──────────────────────────────────────────────────────────────
+# Account Moderation (Suspended / Banned / Reactivated) – User Notification
+# ──────────────────────────────────────────────────────────────
+
+_MODERATION_COPY = {
+    "Suspended": {
+        "subject": "Your ProcureNext account has been suspended",
+        "heading": "Account Suspended",
+        "emoji": "⏸️",
+        "color": "#f59e0b",
+        "body": (
+            "Your ProcureNext account has been <strong>temporarily suspended</strong> by a platform "
+            "administrator. While suspended, you won't be able to sign in, publish tenders, or submit bids. "
+            "Any bids and tenders you already have remain on record."
+        ),
+        "text_body": (
+            "Your ProcureNext account has been temporarily suspended by a platform administrator. "
+            "While suspended, you won't be able to sign in, publish tenders, or submit bids. "
+            "Any bids and tenders you already have remain on record."
+        ),
+        "closing": "If you believe this was a mistake or want to resolve the issue, simply reply to this email and our team will review your account.",
+    },
+    "Banned": {
+        "subject": "Your ProcureNext account has been banned",
+        "heading": "Account Banned",
+        "emoji": "⛔",
+        "color": "#ef4444",
+        "body": (
+            "Your ProcureNext account has been <strong>banned</strong> by a platform administrator for "
+            "violating the platform's terms of use. You can no longer sign in or take part in any tenders "
+            "or bids on ProcureNext."
+        ),
+        "text_body": (
+            "Your ProcureNext account has been banned by a platform administrator for violating the "
+            "platform's terms of use. You can no longer sign in or take part in any tenders or bids on ProcureNext."
+        ),
+        "closing": "If you believe this decision was made in error, you may reply to this email to request a review.",
+    },
+    "Active": {
+        "subject": "Your ProcureNext account has been reactivated",
+        "heading": "Account Reactivated",
+        "emoji": "✅",
+        "color": "#10b981",
+        "body": (
+            "Good news — your ProcureNext account has been <strong>reactivated</strong> by a platform "
+            "administrator. You now have full access again and can sign in, publish tenders, and submit bids as usual."
+        ),
+        "text_body": (
+            "Good news - your ProcureNext account has been reactivated by a platform administrator. "
+            "You now have full access again and can sign in, publish tenders, and submit bids as usual."
+        ),
+        "closing": "Thank you for your patience. We're glad to have you back.",
+    },
+}
+
+
+def build_account_moderation_html(
+    full_name: str, new_status: str, login_url: str, reason: str | None = None
+) -> str:
+    copy = _MODERATION_COPY[new_status]
+    reason_block = ""
+    if reason:
+        reason_block = f"""
+    <div style="background-color:#f8fafc;border-left:4px solid {copy['color']};padding:16px;border-radius:6px;margin-bottom:24px;">
+      <p style="margin:0;font-size:14px;color:#334155;line-height:1.5;">
+        <strong>Reason provided:</strong> {html.escape(reason)}
+      </p>
+    </div>"""
+
+    cta = ""
+    if new_status == "Active":
+        cta = f"""
+    <table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 auto 28px auto;">
+      <tr><td align="center" style="border-radius:12px;background:linear-gradient(135deg,#10b981 0%,#059669 100%);">
+        <a href="{login_url}" target="_blank" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:12px;">Log In Now &rarr;</a>
+      </td></tr>
+    </table>"""
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{copy['heading']}</title></head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f1f5f9;padding:40px 16px;">
+<tr><td align="center">
+<table role="presentation" width="100%" style="max-width:580px;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 25px -5px rgba(0,0,0,0.08);border:1px solid #e2e8f0;" cellspacing="0" cellpadding="0">
+  <tr><td style="background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);padding:36px 32px;text-align:center;">
+    <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:800;">Procure<span style="color:#38bdf8;">Next</span></h1>
+    <p style="margin:6px 0 0 0;color:#94a3b8;font-size:13px;letter-spacing:0.5px;text-transform:uppercase;">Account Notification</p>
+  </td></tr>
+  <tr><td style="padding:36px 32px;">
+    <div style="text-align:center;margin-bottom:24px;">
+      <span style="display:inline-block;width:56px;height:56px;border-radius:50%;background:{copy['color']};line-height:56px;font-size:28px;text-align:center;">{copy['emoji']}</span>
+    </div>
+    <h2 style="margin:0 0 16px 0;color:#0f172a;font-size:20px;font-weight:700;text-align:center;">{copy['heading']}</h2>
+    <p style="margin:0 0 18px 0;font-size:15px;line-height:1.6;color:#475569;">Hello <strong>{html.escape(full_name)}</strong>,</p>
+    <p style="margin:0 0 24px 0;font-size:15px;line-height:1.6;color:#475569;">{copy['body']}</p>
+    {reason_block}
+    {cta}
+    <p style="margin:0;font-size:14px;line-height:1.6;color:#64748b;">{copy['closing']}</p>
+  </td></tr>
+  <tr><td style="background-color:#f8fafc;padding:24px 32px;text-align:center;border-top:1px solid #e2e8f0;">
+    <p style="margin:0;font-size:11px;color:#94a3b8;">&copy; 2026 ProcureNext. All rights reserved.</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>"""
+
+
+def build_account_moderation_text(
+    full_name: str, new_status: str, login_url: str, reason: str | None = None
+) -> str:
+    copy = _MODERATION_COPY[new_status]
+    reason_line = f"\nReason provided: {reason}\n" if reason else ""
+    login_line = f"\nLog in at: {login_url}\n" if new_status == "Active" else ""
+    return f"""ProcureNext - {copy['heading']}
+
+Hello {full_name},
+
+{copy['text_body']}
+{reason_line}{login_line}
+{copy['closing']}
+
+-- ProcureNext Team
+"""
+
+
+def send_account_moderation_email(
+    to_email: str,
+    full_name: str,
+    new_status: str,
+    login_url: str,
+    reason: str | None = None,
+) -> bool:
+    return send_smtp_email(
+        to_email=to_email,
+        subject=_MODERATION_COPY[new_status]["subject"],
+        html_body=build_account_moderation_html(full_name, new_status, login_url, reason),
+        text_body=build_account_moderation_text(full_name, new_status, login_url, reason),
+    )
+
+
+# ──────────────────────────────────────────────────────────────
 # Bid Received – Buyer Notification
 # ──────────────────────────────────────────────────────────────
 

@@ -551,3 +551,79 @@ class TestModifyUserStatusService:
                 acting_admin_user_id=99,
             )
         assert exc.value.status_code == 403
+
+    @pytest.mark.asyncio
+    @patch("app.modules.admin.service.send_account_moderation_email_task")
+    async def test_suspend_emails_the_user(self, mock_email_task):
+        from app.modules.admin.service import modify_user_status
+        from app.modules.admin.schemas import ModifyUserStatusRequest
+
+        conn = AsyncMock()
+        conn.fetchval.return_value = None  # not an admin
+        conn.fetchrow.return_value = {"email": "seller@test.com", "full_name": "Seller One", "status": "Active"}
+
+        await modify_user_status(
+            conn,
+            ModifyUserStatusRequest(user_id=5, new_status="Suspended", reason="Fraud report"),
+            acting_admin_user_id=99,
+        )
+
+        mock_email_task.delay.assert_called_once_with(
+            to_email="seller@test.com",
+            full_name="Seller One",
+            new_status="Suspended",
+            reason="Fraud report",
+        )
+
+    @pytest.mark.asyncio
+    @patch("app.modules.admin.service.send_account_moderation_email_task")
+    async def test_unchanged_status_sends_no_email(self, mock_email_task):
+        from app.modules.admin.service import modify_user_status
+        from app.modules.admin.schemas import ModifyUserStatusRequest
+
+        conn = AsyncMock()
+        conn.fetchval.return_value = None
+        conn.fetchrow.return_value = {"email": "seller@test.com", "full_name": "Seller One", "status": "Active"}
+
+        await modify_user_status(
+            conn, ModifyUserStatusRequest(user_id=5, new_status="Active"), acting_admin_user_id=99
+        )
+
+        mock_email_task.delay.assert_not_called()
+
+
+class TestModerationEmailContent:
+    @pytest.mark.parametrize("status,phrase", [
+        ("Suspended", "temporarily suspended"),
+        ("Banned", "banned"),
+        ("Active", "reactivated"),
+    ])
+    def test_each_status_renders(self, status, phrase):
+        from app.services.email import build_account_moderation_html, build_account_moderation_text
+
+        html_body = build_account_moderation_html("Seller One", status, "http://x/login", reason="<b>x</b>")
+        text_body = build_account_moderation_text("Seller One", status, "http://x/login", reason="x")
+
+        assert phrase in html_body
+        assert phrase in text_body
+        assert "&lt;b&gt;x&lt;/b&gt;" in html_body  # admin-supplied reason is escaped
+        assert ("Log In Now" in html_body) == (status == "Active")
+
+
+class TestPlatformStatsQuery:
+    @pytest.mark.asyncio
+    async def test_query_uses_real_bid_timestamp_column(self):
+        """bids has no created_at column (it's submitted_at) — this broke the live dashboard."""
+        from app.modules.admin.service import get_platform_stats
+
+        conn = AsyncMock()
+        conn.fetchrow.return_value = {
+            "total_tokens_sold": 1, "tokens_sold_this_month": 1, "approved_owners": 1,
+            "approved_owners_this_month": 1, "pending_approvals": 0, "active_tenders": 1,
+            "total_bids": 1, "bids_this_month": 1, "total_revenue_bdt": 1,
+        }
+        await get_platform_stats(conn)
+
+        sql = conn.fetchrow.call_args[0][0]
+        assert "FROM bids WHERE submitted_at" in sql
+        assert "FROM bids WHERE created_at" not in sql

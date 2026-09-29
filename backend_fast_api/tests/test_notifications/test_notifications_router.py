@@ -226,3 +226,20 @@ class TestNotificationsRouter:
         response = await client.delete("/notifications/99", headers=auth_headers)
 
         assert response.status_code == 404
+
+
+class TestNotificationTimestampTimezone:
+    def test_naive_created_at_is_serialized_as_utc(self):
+        """
+        Regression: created_at is TIMESTAMP WITHOUT TIME ZONE (UTC). Without an
+        explicit offset, a browser in UTC+6 parsed a brand-new notification as
+        being 6 hours old.
+        """
+        from datetime import datetime
+        from app.modules.notifications.schemas import NotificationResponse
+
+        n = NotificationResponse(
+            notification_id=1, user_id=1, title="t", message="m", type="System",
+            action_url=None, is_read=False, created_at=datetime(2026, 9, 30, 10, 0, 0),
+        )
+        assert n.model_dump_json().count("2026-09-30T10:00:00Z") == 1

@@ -165,6 +165,7 @@ export default function HomePage() {
     buyer_org_name: string;
     submission_deadline: string | null;
     created_at: string;
+    visibility_type?: string | null;
     // Present on seller-side results, which are ranked by the search endpoint.
     relevance_score?: number;
   }
@@ -752,6 +753,7 @@ export default function HomePage() {
                         vendor={tender.buyer_org_name}
                         status={tender.status}
                         deadline={tender.submission_deadline}
+                        visibility={tender.visibility_type ?? null}
                         onClick={() => router.push(`/view-my-tender/${tender.tender_id}`)}
                       />
                     ))
