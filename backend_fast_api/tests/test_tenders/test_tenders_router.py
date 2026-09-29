@@ -347,11 +347,13 @@ class TestDocumentView:
         mock_conn = AsyncMock()
         mock_db.side_effect = _mock_db_ctx(mock_conn)
 
-        # Mock DB fetchrow to return a document row
+        # Mock DB fetchrow to return a document row for a tender owned by the caller's org
         mock_row = MagicMock()
         mock_row.__getitem__ = lambda self, key: {
             "file_name": "requirements.pdf",
             "file_path": "tenders/1/abc123_requirements.pdf",
+            "buyer_id": 10,
+            "status": "Draft",
         }[key]
         mock_conn.fetchrow.return_value = mock_row
         mock_signed_url.return_value = "https://supabase.co/storage/v1/object/sign/documents/tenders/1/abc123_requirements.pdf?token=xyz"
@@ -394,6 +396,8 @@ class TestDocumentView:
         mock_row.__getitem__ = lambda self, key: {
             "file_name": "orphan.pdf",
             "file_path": None,
+            "buyer_id": 10,
+            "status": "Draft",
         }[key]
         mock_conn.fetchrow.return_value = mock_row
 
@@ -408,3 +412,54 @@ class TestDocumentView:
         resp = await client.get("/tenders/documents/1/view")
 
         assert resp.status_code == 401
+
+    @pytest.mark.asyncio
+    @patch("app.modules.tenders.router.get_db_connection")
+    async def test_draft_tender_document_rejected_for_other_org(
+        self, mock_db, client, mock_user_org, auth_headers
+    ):
+        """
+        Regression test: a user outside the buyer org must not be able to
+        fetch another org's unpublished (Draft) tender documents by ID.
+        """
+        app.dependency_overrides[get_current_user_org] = lambda: mock_user_org  # organization_id=10
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+
+        mock_row = MagicMock()
+        mock_row.__getitem__ = lambda self, key: {
+            "file_name": "confidential-boq.pdf",
+            "file_path": "tenders/99/xyz_confidential-boq.pdf",
+            "buyer_id": 999,  # different org than the caller
+            "status": "Draft",
+        }[key]
+        mock_conn.fetchrow.return_value = mock_row
+
+        resp = await client.get("/tenders/documents/1/view", headers=auth_headers)
+
+        assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    @patch("app.modules.tenders.router.get_db_connection")
+    @patch("app.services.supabase_storage.generate_signed_url")
+    async def test_published_tender_document_accessible_to_other_org(
+        self, mock_signed_url, mock_db, client, mock_user_org, auth_headers
+    ):
+        """Once a tender is Published, its documents are viewable by any authenticated org (e.g. a bidder)."""
+        app.dependency_overrides[get_current_user_org] = lambda: mock_user_org  # organization_id=10
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+
+        mock_row = MagicMock()
+        mock_row.__getitem__ = lambda self, key: {
+            "file_name": "notice.pdf",
+            "file_path": "tenders/99/xyz_notice.pdf",
+            "buyer_id": 999,  # different org than the caller
+            "status": "Published",
+        }[key]
+        mock_conn.fetchrow.return_value = mock_row
+        mock_signed_url.return_value = "https://supabase.co/storage/v1/object/sign/documents/tenders/99/xyz_notice.pdf?token=xyz"
+
+        resp = await client.get("/tenders/documents/1/view", headers=auth_headers)
+
+        assert resp.status_code == 200
