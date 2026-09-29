@@ -174,6 +174,53 @@ class TestOrganizationEnlistment:
         assert data[0]["organization_name"] == "Global Supplies Ltd"
         mock_get_enlisted.assert_called_once_with(mock_conn, 10)
 
+    @pytest.mark.asyncio
+    @patch("app.modules.organizations.router.get_db_connection")
+    @patch("app.modules.organizations.router.get_enlisting_buyers")
+    async def test_list_buyers_who_enlisted_me(self, mock_get_enlisting, mock_db, client, auth_headers):
+        app.dependency_overrides[get_current_user_org] = lambda: {
+            "organization_id": 25,
+            "user_id": 3,
+            "org_user_id": 4,
+            "role_in_org": "Owner"
+        }
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+
+        mock_get_enlisting.return_value = [
+            {
+                "organization_id": 10,
+                "organization_name": "Acme Buyer Corp",
+                "organization_type": "Buyer",
+                "address": "Dhaka",
+                "website": None,
+                "description": None,
+                "verification_status": "Verified",
+                "enlisted_at": datetime(2026, 3, 1, tzinfo=timezone.utc)
+            }
+        ]
+
+        resp = await client.get("/api/org/enlisted-by", headers=auth_headers)
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data[0]["organization_name"] == "Acme Buyer Corp"
+        mock_get_enlisting.assert_called_once_with(mock_conn, 25)
+
+    @pytest.mark.asyncio
+    async def test_get_enlisting_buyers_queries_reverse_direction(self):
+        """The seller-side lookup must match on enlisted_org_id (the seller), not org_id."""
+        from app.modules.organizations.service import get_enlisting_buyers
+
+        conn = AsyncMock()
+        conn.fetch.return_value = []
+        await get_enlisting_buyers(conn, 25)
+
+        sql, org_id = conn.fetch.call_args[0]
+        assert "JOIN organizations o ON ev.org_id = o.organization_id" in sql
+        assert "WHERE ev.enlisted_org_id = $1" in sql
+        assert org_id == 25
+
 
 class TestOrganizationProfile:
     """Tests for GET /api/org/profile/{org_id}."""

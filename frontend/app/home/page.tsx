@@ -209,7 +209,11 @@ export default function HomePage() {
   // endpoint. Re-applying the client-side substring filter here would discard
   // semantic matches that don't literally contain the typed text.
   const filteredSellerTenders = sellerTenders;
-  const [enlistedOrgs, setEnlistedOrgs] = useState<Array<{ organization_id: number; organization_name: string; organization_type: string }>>([]);
+  // Enlistment is one-directional: a buyer enlists sellers.
+  // enlistedSellers = sellers this org has enlisted (as a buyer);
+  // enlistedByBuyers = buyers that have enlisted this org (as a seller).
+  const [enlistedSellers, setEnlistedSellers] = useState<Array<{ organization_id: number; organization_name: string }>>([]);
+  const [enlistedByBuyers, setEnlistedByBuyers] = useState<Array<{ organization_id: number; organization_name: string }>>([]);
   const [sellerBidCount, setSellerBidCount] = useState(0);
   const [sellerOngoingCount, setSellerOngoingCount] = useState(0);
 
@@ -271,15 +275,16 @@ export default function HomePage() {
     return () => clearTimeout(timer);
   }, [mode, activeTab, searchQuery]);
 
-  // Fetch enlisted organizations
+  // Fetch enlistment in both directions
   useEffect(() => {
     const fetchEnlisted = async () => {
       try {
-        const res = await fetch('/api/org/enlisted');
-        if (res.ok) {
-          const data = await res.json();
-          setEnlistedOrgs(data);
-        }
+        const [sellersRes, buyersRes] = await Promise.all([
+          fetch('/api/org/enlisted'),
+          fetch('/api/org/enlisted-by'),
+        ]);
+        if (sellersRes.ok) setEnlistedSellers(await sellersRes.json());
+        if (buyersRes.ok) setEnlistedByBuyers(await buyersRes.json());
       } catch (err) {
         console.error('Failed to fetch enlisted orgs:', err);
       }
@@ -403,8 +408,6 @@ export default function HomePage() {
   const publishedCount = buyerTenders.filter(t => t.status === 'Published').length;
   const draftCount = buyerTenders.filter(t => t.status === 'Draft').length;
   const awardedCount = buyerTenders.filter(t => t.status === 'Awarded' || t.status === 'Accepted').length;
-  const enlistedVendors = enlistedOrgs.filter(o => o.organization_type === 'Vendor');
-  const enlistedBuyers = enlistedOrgs.filter(o => o.organization_type === 'Buyer');
 
   const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => (
     <div className="flex flex-col h-full bg-surface">
@@ -659,9 +662,9 @@ export default function HomePage() {
                       </button>
                       <button type="button" onClick={() => router.push('/organizations')}
                         className="bg-surface border border-subtle rounded p-3 shadow-subtle-card text-left hover:border-content-muted transition cursor-pointer">
-                        <p className="text-[10px] font-medium uppercase tracking-wider text-content-muted">Vendors</p>
-                        <p className="text-xl font-bold text-content-primary tabular-nums mt-1">{enlistedVendors.length}</p>
-                        <p className="text-[11px] text-brand-blue mt-1 font-medium">Find vendors →</p>
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-content-muted">Enlisted sellers</p>
+                        <p className="text-xl font-bold text-content-primary tabular-nums mt-1">{enlistedSellers.length}</p>
+                        <p className="text-[11px] text-brand-blue mt-1 font-medium">Find sellers →</p>
                       </button>
                     </>
                   ) : (
@@ -682,11 +685,11 @@ export default function HomePage() {
                         <p className="text-xl font-bold text-content-primary tabular-nums mt-1">{filteredSellerTenders.length}</p>
                         <p className="text-[11px] text-content-secondary mt-1">Matching filters</p>
                       </div>
-                      <button type="button" onClick={() => router.push('/organizations')}
+                      <button type="button" onClick={() => handleTabSwitch('enlisted')}
                         className="bg-surface border border-subtle rounded p-3 shadow-subtle-card text-left hover:border-content-muted transition cursor-pointer">
-                        <p className="text-[10px] font-medium uppercase tracking-wider text-content-muted">Buyers</p>
-                        <p className="text-xl font-bold text-content-primary tabular-nums mt-1">{enlistedBuyers.length}</p>
-                        <p className="text-[11px] text-brand-blue mt-1 font-medium">Find buyers →</p>
+                        <p className="text-[10px] font-medium uppercase tracking-wider text-content-muted">Enlisted you</p>
+                        <p className="text-xl font-bold text-content-primary tabular-nums mt-1">{enlistedByBuyers.length}</p>
+                        <p className="text-[11px] text-brand-blue mt-1 font-medium">View their tenders →</p>
                       </button>
                     </>
                   )}
@@ -699,7 +702,7 @@ export default function HomePage() {
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <h2 className="text-sm font-semibold text-content-primary">
-                    {mode === 'buyer' ? 'Your Tenders' : (activeTab === 'enlisted' ? 'From Enlisted Buyers' : 'Available Tenders')}
+                    {mode === 'buyer' ? 'Your Tenders' : (activeTab === 'enlisted' ? 'From Buyers Who Enlisted You' : 'Available Tenders')}
                   </h2>
                   {mode === 'seller' && (
                     <SlidingToggle
@@ -767,16 +770,11 @@ export default function HomePage() {
                     <div className="col-span-full text-center py-14 px-4 bg-surface border border-subtle rounded">
                       {activeTab === 'enlisted' ? (
                         <>
-                          <p className="text-content-primary text-sm font-semibold">No tenders from your enlisted buyers</p>
-                          <p className="text-content-muted text-xs mt-1 max-w-md mx-auto mb-3">
-                            Enlist trusted buyer organizations to see their active and exclusive tenders here.
+                          <p className="text-content-primary text-sm font-semibold">No tenders from buyers who enlisted you</p>
+                          <p className="text-content-muted text-xs mt-1 max-w-md mx-auto">
+                            When a buyer adds your organization to their enlisted sellers, their open tenders —
+                            including enlisted-only ones — will appear here.
                           </p>
-                          <button
-                            onClick={() => router.push('/organizations')}
-                            className="bg-brand-navy text-white hover:bg-slate-900 text-xs font-medium h-8 px-3 rounded transition"
-                          >
-                            + Discover & Enlist Buyers
-                          </button>
                         </>
                       ) : searchQuery.trim() ? (
                         <>

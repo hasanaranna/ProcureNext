@@ -10,10 +10,12 @@ from app.modules.notifications.service import create_notification
 from app.tasks.notification_tasks import (
     send_bid_received_email_task,
     send_bid_accepted_email_task,
+    send_notice_of_assessment_email_task,
     send_bid_rejected_email_task,
     send_intercompany_created_email_task,
 )
 from app.modules.messaging.service import create_intercompany_thread
+from app.modules.bids.notice import fetch_notice
 
 
 async def submit_bid_with_documents(
@@ -440,20 +442,28 @@ async def accept_bid_for_tender(
                 await create_notification(
                     connection,
                     user_id=vendor_info["user_id"],
-                    title="Bid Accepted!",
-                    message=f"Your bid on \"{vendor_info['tender_title']}\" has been accepted by {vendor_info['buyer_org_name']}.",
+                    title="Notice of Assessment Issued",
+                    message=f"Your bid on \"{vendor_info['tender_title']}\" has been accepted by {vendor_info['buyer_org_name']}. Open My Bids to read your Notice of Assessment.",
                     notification_type="Award",
-                    action_url=f"/ongoing-tenders",
+                    action_url="/view-my-bids",
                 )
 
-                # Send email via Celery
-                send_bid_accepted_email_task.delay(
-                    to_email=vendor_info["email"],
-                    vendor_name=vendor_info["full_name"] or "Vendor",
-                    tender_title=vendor_info["tender_title"] or "Tender",
-                    buyer_org_name=vendor_info["buyer_org_name"] or "Buyer",
-                    tender_id=tender_id,
-                )
+                # Send the formal Notice of Assessment via Celery
+                notice = await fetch_notice(connection, bid_id)
+                if notice:
+                    send_notice_of_assessment_email_task.delay(
+                        to_email=vendor_info["email"],
+                        vendor_name=vendor_info["full_name"] or "Vendor",
+                        notice=notice,
+                    )
+                else:
+                    send_bid_accepted_email_task.delay(
+                        to_email=vendor_info["email"],
+                        vendor_name=vendor_info["full_name"] or "Vendor",
+                        tender_title=vendor_info["tender_title"] or "Tender",
+                        buyer_org_name=vendor_info["buyer_org_name"] or "Buyer",
+                        tender_id=tender_id,
+                    )
         except Exception as notify_exc:
             print(f"[NOTIFY WARNING] Failed to send bid accepted notification: {notify_exc}", flush=True)
 
