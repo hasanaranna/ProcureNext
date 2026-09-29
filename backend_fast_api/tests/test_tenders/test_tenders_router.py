@@ -413,6 +413,76 @@ class TestTenderDetail:
 
         assert resp.status_code == 200
 
+    @pytest.mark.asyncio
+    @patch("app.modules.tenders.router.get_db_connection")
+    @patch("app.modules.tenders.router.get_tender_detail")
+    async def test_published_exclusive_tender_hidden_from_non_enlisted_org(
+        self, mock_get_detail, mock_db, client, mock_user_org, sample_tender_row, auth_headers
+    ):
+        """
+        Regression test: a Published-but-Exclusive tender must still enforce
+        the enlisted-vendors restriction on the detail endpoint itself, not
+        just in browse/search listings — a vendor can reach this endpoint
+        directly with the tender_id (e.g. via the bid-for-tender page).
+        """
+        app.dependency_overrides[get_current_user_org] = lambda: mock_user_org  # organization_id=10
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+        mock_conn.fetchval.return_value = None  # not enlisted
+
+        detail = {
+            **sample_tender_row, "status": "Published", "visibility_type": "Exclusive",
+            "buyer_id": 999, "documents": [],
+        }
+        mock_get_detail.return_value = detail
+
+        resp = await client.get("/tenders/1/detail", headers=auth_headers)
+
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    @patch("app.modules.tenders.router.get_db_connection")
+    @patch("app.modules.tenders.router.get_tender_detail")
+    async def test_published_exclusive_tender_visible_to_enlisted_org(
+        self, mock_get_detail, mock_db, client, mock_user_org, sample_tender_row, auth_headers
+    ):
+        app.dependency_overrides[get_current_user_org] = lambda: mock_user_org  # organization_id=10
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+        mock_conn.fetchval.return_value = 1  # enlisted
+        mock_conn.fetchrow.return_value = None  # organizations.primary_contact lookup
+
+        detail = {
+            **sample_tender_row, "status": "Published", "visibility_type": "Exclusive",
+            "buyer_id": 999, "documents": [],
+        }
+        mock_get_detail.return_value = detail
+
+        resp = await client.get("/tenders/1/detail", headers=auth_headers)
+
+        assert resp.status_code == 200
+
+    @pytest.mark.asyncio
+    @patch("app.modules.tenders.router.get_db_connection")
+    @patch("app.modules.tenders.router.get_tender_detail")
+    async def test_published_restricted_tender_hidden_from_uninvited_org(
+        self, mock_get_detail, mock_db, client, mock_user_org, sample_tender_row, auth_headers
+    ):
+        app.dependency_overrides[get_current_user_org] = lambda: mock_user_org  # organization_id=10
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+        mock_conn.fetchval.return_value = None  # not invited
+
+        detail = {
+            **sample_tender_row, "status": "Published", "visibility_type": "Restricted",
+            "buyer_id": 999, "documents": [],
+        }
+        mock_get_detail.return_value = detail
+
+        resp = await client.get("/tenders/1/detail", headers=auth_headers)
+
+        assert resp.status_code == 404
+
 
 # ============================================================
 # GET /tenders/documents/{doc_id}/view

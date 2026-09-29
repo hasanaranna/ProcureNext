@@ -739,6 +739,7 @@ async def get_tender_detail(
             t.description,
             t.eligibility_of_tenderer,
             t.status,
+            t.visibility_type,
             o.organization_name AS buyer_org_name,
             tc.category_name,
             pn.name::text AS procurement_nature,

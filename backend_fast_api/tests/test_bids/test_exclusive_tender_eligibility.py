@@ -97,6 +97,28 @@ class TestExclusiveTenderEligibility:
         conn.fetchval.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_uninvited_vendor_rejected_on_restricted_tender(self):
+        conn = AsyncMock()
+        conn.fetchrow.return_value = {
+            "title": "Invite-Only Supply Contract",
+            "buyer_id": 100,
+            "visibility_type": "Restricted",
+        }
+        conn.fetchval.return_value = None  # not present in tender_invitations
+
+        with pytest.raises(HTTPException) as exc:
+            await submit_bid_with_documents(
+                connection=conn,
+                vendor_org_id=200,
+                submitted_by=1,
+                user_id=1,
+                tender_id=5,
+                financial_amount=1000.0,
+                files_data=[],
+            )
+        assert exc.value.status_code == 403
+
+    @pytest.mark.asyncio
     async def test_nonexistent_tender_returns_404(self):
         conn = AsyncMock()
         conn.fetchrow.return_value = None

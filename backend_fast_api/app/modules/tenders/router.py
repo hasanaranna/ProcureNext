@@ -465,12 +465,33 @@ async def get_tender_details(
 
             buyer_id = tender.get("buyer_id")
             user_org_id = current_user.get("organization_id")
+            visibility_type = tender.get("visibility_type")
+            visibility_type = getattr(visibility_type, "value", visibility_type)
 
-            # Draft (unpublished) tenders are only visible to the buyer org
-            # that owns them. Once Published, any authenticated org may view
-            # them (vendors need this to browse and decide whether to bid).
-            if tender.get("status") != "Published" and user_org_id != buyer_id:
-                raise HTTPException(status_code=404, detail="Tender not found")
+            if user_org_id != buyer_id:
+                # Draft (unpublished) tenders are only visible to the buyer org.
+                if tender.get("status") != "Published":
+                    raise HTTPException(status_code=404, detail="Tender not found")
+
+                # A Published tender still isn't necessarily open to everyone —
+                # Restricted/Exclusive visibility must be enforced here too, not
+                # just in the browse/search listings, since a vendor can reach
+                # this endpoint directly with the tender_id (e.g. via the
+                # bid-for-tender page) without ever going through a listing.
+                if visibility_type == "Restricted":
+                    invited = await connection.fetchval(
+                        "SELECT 1 FROM tender_invitations WHERE tender_id = $1 AND vendor_org_id = $2",
+                        tender_id, user_org_id,
+                    )
+                    if not invited:
+                        raise HTTPException(status_code=404, detail="Tender not found")
+                elif visibility_type == "Exclusive":
+                    enlisted = await connection.fetchval(
+                        "SELECT 1 FROM enlisted_vendors WHERE org_id = $1 AND enlisted_org_id = $2",
+                        buyer_id, user_org_id,
+                    )
+                    if not enlisted:
+                        raise HTTPException(status_code=404, detail="Tender not found")
 
             org_row = None
             if buyer_id:

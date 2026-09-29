@@ -39,11 +39,12 @@ async def submit_bid_with_documents(
         raise HTTPException(status_code=404, detail="Tender not found.")
     tender_title = tender_row["title"]
 
-    # Exclusive tenders are restricted to the buyer's enlisted vendors — the
-    # visibility filter already keeps these out of a non-enlisted vendor's
-    # browse/search results, but this is the actual enforcement: without it,
-    # a non-enlisted vendor who obtains the tender_id another way (a shared
-    # link, an old bookmark, guessing sequential ids) could still bid on it.
+    # Restricted/Exclusive tenders are only open to a specific set of
+    # vendors — the visibility filter already keeps these out of a
+    # non-eligible vendor's browse/search results, but this is the actual
+    # enforcement: without it, an ineligible vendor who obtains the
+    # tender_id another way (a shared link, an old bookmark, guessing
+    # sequential ids) could still bid on it.
     if tender_row["visibility_type"] == "Exclusive":
         is_enlisted = await connection.fetchval(
             "SELECT 1 FROM enlisted_vendors WHERE org_id = $1 AND enlisted_org_id = $2",
@@ -54,6 +55,17 @@ async def submit_bid_with_documents(
             raise HTTPException(
                 status_code=403,
                 detail="This tender is restricted to the buyer's enlisted vendors.",
+            )
+    elif tender_row["visibility_type"] == "Restricted":
+        is_invited = await connection.fetchval(
+            "SELECT 1 FROM tender_invitations WHERE tender_id = $1 AND vendor_org_id = $2",
+            tender_id,
+            vendor_org_id,
+        )
+        if not is_invited:
+            raise HTTPException(
+                status_code=403,
+                detail="This tender is restricted to invited vendors.",
             )
 
     query = """
