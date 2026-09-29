@@ -78,7 +78,51 @@ class TestPublishTender:
         assert kwargs["buyer_id"] == 10
         assert kwargs["user_id"] == 2
 
+    @pytest.mark.asyncio
+    @patch("app.modules.tenders.router.get_db_connection")
+    @patch("app.modules.tenders.router.publish_tender_with_documents")
+    async def test_publish_tender_accepts_exclusive_visibility(self, mock_publish, mock_db, client, auth_headers):
+        """
+        Regression test: the frontend's "Enlisted Only" tender option sends
+        visibility_type: "Exclusive". TenderVisibility previously only defined
+        Public/Restricted, so this request failed with 400 "Invalid JSON data"
+        before ever reaching the service layer — a buyer could not create an
+        enlisted-vendor-restricted tender at all.
+        """
+        app.dependency_overrides[get_current_user_org] = lambda: {"organization_id": 10, "org_user_id": 2}
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
 
+        from datetime import datetime, timezone
+        mock_publish.return_value = {
+            "tender_id": 2,
+            "buyer_id": 10,
+            "created_by": 2,
+            "title": "Exclusive Tender",
+            "description": "Description",
+            "status": "Published",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+
+        tender_data = {
+            "title": "Exclusive Tender",
+            "description": "Description",
+            "visibility_type": "Exclusive",
+            "submission_deadline": "2026-12-31T23:59:59Z"
+        }
+        form_data = {
+            "tender_data": json.dumps(tender_data),
+            "file_names": json.dumps(["doc1.pdf"]),
+        }
+
+        resp = await client.post(
+            "/tenders/buyer/publish-with-documents",
+            headers=auth_headers,
+            data=form_data,
+            files=[("files", ("doc1.pdf", b"dummy content", "application/pdf"))],
+        )
+
+        assert resp.status_code == 201
 
 
 # ---------------------------------------------------------------------------

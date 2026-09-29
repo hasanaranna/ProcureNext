@@ -41,7 +41,9 @@ def build_visibility_filter(viewer_org_id: int | None, param_idx: int) -> tuple[
     Build the SQL fragment that enforces tender visibility rules.
 
     Public tenders are visible to everyone. Restricted tenders are only visible to
-    vendor organizations that have been invited to that specific tender.
+    vendor organizations that have been invited to that specific tender. Exclusive
+    tenders are only visible to vendor organizations the buyer has enlisted (the
+    enlisted_vendors table).
 
     Args:
         viewer_org_id: The viewing organization's id, or None for an anonymous/public caller.
@@ -55,8 +57,12 @@ def build_visibility_filter(viewer_org_id: int | None, param_idx: int) -> tuple[
         return " AND (t.visibility_type = 'Public' OR t.visibility_type IS NULL)", []
     return (
         f" AND (t.visibility_type = 'Public' OR t.visibility_type IS NULL"
-        f" OR EXISTS (SELECT 1 FROM tender_invitations ti"
-        f" WHERE ti.tender_id = t.tender_id AND ti.vendor_org_id = ${param_idx}))",
+        f" OR (t.visibility_type = 'Restricted' AND EXISTS ("
+        f"     SELECT 1 FROM tender_invitations ti"
+        f"     WHERE ti.tender_id = t.tender_id AND ti.vendor_org_id = ${param_idx}))"
+        f" OR (t.visibility_type = 'Exclusive' AND EXISTS ("
+        f"     SELECT 1 FROM enlisted_vendors ev"
+        f"     WHERE ev.org_id = t.buyer_id AND ev.enlisted_org_id = ${param_idx})))",
         [viewer_org_id],
     )
 

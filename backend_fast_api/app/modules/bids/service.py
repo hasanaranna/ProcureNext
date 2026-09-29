@@ -3,6 +3,7 @@
 # ============================================================
 
 import asyncpg
+from fastapi import HTTPException
 from app.tasks.document_tasks import upload_bid_documents_to_supabase
 from app.modules.payments.service import deduct_tokens_for_bid_submission
 from app.modules.notifications.service import create_notification
@@ -30,9 +31,30 @@ async def submit_bid_with_documents(
     Mirrors the tender publishing flow exactly.
     """
 
-    # Fetch tender title for transaction description
-    tender_row = await connection.fetchrow("SELECT title FROM tenders WHERE tender_id = $1", tender_id)
-    tender_title = tender_row["title"] if tender_row else None
+    tender_row = await connection.fetchrow(
+        "SELECT title, buyer_id, visibility_type FROM tenders WHERE tender_id = $1",
+        tender_id,
+    )
+    if tender_row is None:
+        raise HTTPException(status_code=404, detail="Tender not found.")
+    tender_title = tender_row["title"]
+
+    # Exclusive tenders are restricted to the buyer's enlisted vendors — the
+    # visibility filter already keeps these out of a non-enlisted vendor's
+    # browse/search results, but this is the actual enforcement: without it,
+    # a non-enlisted vendor who obtains the tender_id another way (a shared
+    # link, an old bookmark, guessing sequential ids) could still bid on it.
+    if tender_row["visibility_type"] == "Exclusive":
+        is_enlisted = await connection.fetchval(
+            "SELECT 1 FROM enlisted_vendors WHERE org_id = $1 AND enlisted_org_id = $2",
+            tender_row["buyer_id"],
+            vendor_org_id,
+        )
+        if not is_enlisted:
+            raise HTTPException(
+                status_code=403,
+                detail="This tender is restricted to the buyer's enlisted vendors.",
+            )
 
     query = """
         INSERT INTO bids (

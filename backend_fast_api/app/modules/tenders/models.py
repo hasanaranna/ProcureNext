@@ -3,6 +3,7 @@ import enum
 class TenderVisibility(enum.Enum):
     Public = "Public"
     Restricted = "Restricted"
+    Exclusive = "Exclusive"
 
 class TenderStatus(enum.Enum):
     Draft = "Draft"
