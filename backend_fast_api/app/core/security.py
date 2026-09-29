@@ -2,6 +2,7 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
+from fastapi import HTTPException
 from jose import jwt
 
 SECRET_KEY = os.getenv("SECRET_KEY")
@@ -45,3 +46,16 @@ def create_refresh_token(data: dict) -> str:
     to_encode.update({"exp": expire, "type": "refresh"})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+
+BLOCKED_ACCOUNT_MESSAGES = {
+    "Suspended": "Your account has been suspended. Please contact platform support.",
+    "Banned": "Your account has been banned. Please contact platform support.",
+}
+
+
+def ensure_account_not_blocked(account_status: str | None) -> None:
+    """Reject a Suspended/Banned account with a 403 whose detail says why."""
+    message = BLOCKED_ACCOUNT_MESSAGES.get(account_status or "")
+    if message:
+        raise HTTPException(status_code=403, detail=message)

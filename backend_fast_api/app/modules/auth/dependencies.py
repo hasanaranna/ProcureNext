@@ -11,7 +11,7 @@ from jose import JWTError, jwt
 # pyrefly: ignore [missing-import]
 import asyncpg
 
-from app.core.security import SECRET_KEY, ALGORITHM
+from app.core.security import SECRET_KEY, ALGORITHM, ensure_account_not_blocked
 from app.core.db import get_db_connection
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
@@ -53,8 +53,7 @@ async def get_current_user_org(token: str = Depends(oauth2_scheme)) -> dict:
         # Re-checked on every request (not just at login) so a ban/suspend
         # takes effect immediately instead of staying valid until the
         # holder's existing access token naturally expires.
-        if user_org["status"] in ("Suspended", "Banned"):
-            raise HTTPException(status_code=403, detail="This account has been suspended. Contact platform support.")
+        ensure_account_not_blocked(user_org["status"])
 
         return dict(user_org.items())
 
@@ -94,8 +93,7 @@ async def get_current_admin(token: str = Depends(oauth2_scheme)) -> dict:
         if admin_row is None:
             raise HTTPException(status_code=403, detail="Platform administrator privileges required.")
 
-        if admin_row["status"] in ("Suspended", "Banned"):
-            raise HTTPException(status_code=403, detail="This account has been suspended. Contact platform support.")
+        ensure_account_not_blocked(admin_row["status"])
 
         return dict(admin_row.items())
 

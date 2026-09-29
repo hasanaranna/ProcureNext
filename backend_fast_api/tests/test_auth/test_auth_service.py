@@ -50,6 +50,7 @@ class TestAuthenticateUserStatusCheck:
         with pytest.raises(HTTPException) as exc:
             await authenticate_user(conn, LoginRequest(email="user@test.com", password="pw"))
         assert exc.value.status_code == 403
+        assert exc.value.detail == "Your account has been suspended. Please contact platform support."
 
     @pytest.mark.asyncio
     @patch("app.modules.auth.service.verify_password", return_value=True)
@@ -60,6 +61,7 @@ class TestAuthenticateUserStatusCheck:
         with pytest.raises(HTTPException) as exc:
             await authenticate_user(conn, LoginRequest(email="user@test.com", password="pw"))
         assert exc.value.status_code == 403
+        assert exc.value.detail == "Your account has been banned. Please contact platform support."
 
     @pytest.mark.asyncio
     @patch("app.modules.auth.service.verify_password", return_value=True)
