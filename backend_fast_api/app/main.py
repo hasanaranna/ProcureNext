@@ -40,6 +40,7 @@ from app.core.db import (
     create_notifications_table,
     create_password_reset_tokens_table,
     create_tender_search_index,
+    ensure_exclusive_tender_visibility,
 )
 from app.core.logging_config import setup_logging
 from app.middleware.audit_middleware import AuditMiddleware
@@ -81,6 +82,9 @@ async def lifespan(app: FastAPI):
 
     # Ensure the tenders full-text search column/index exists (idempotent)
     await create_tender_search_index()
+
+    # Ensure the tender_visibility enum includes 'Exclusive' (idempotent)
+    await ensure_exclusive_tender_visibility()
 
     yield
     logger.info("ProcureNext backend shutting down.")
