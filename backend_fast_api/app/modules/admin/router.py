@@ -56,12 +56,12 @@
 #   - Admin resolves a report (take action or dismiss)
 # ============================================================
 
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, Query, status
 from app.core.db import get_db_connection
 from app.modules.auth.schemas import LoginRequest, AdminTokenResponse
 from app.modules.auth.service import authenticate_admin
 from app.modules.auth.dependencies import get_current_admin
-from typing import List
+from typing import List, Optional
 from app.modules.admin.schemas import (
     PendingMasterAccountsResponse,
     VerifyOrgRequest,
@@ -165,13 +165,19 @@ async def verify_organization_endpoint(
 
 
 @router.get("/admin/users", response_model=AdminUserListResponse)
-async def list_admin_users(admin: dict = Depends(get_current_admin)):
+async def list_admin_users(
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
+    search: Optional[str] = Query(None, max_length=100),
+    admin: dict = Depends(get_current_admin),
+):
     """
-    List every platform user for the admin user-management view.
+    List platform users for the admin user-management view, paginated and
+    searchable by name, email or organization.
     """
     try:
         async with get_db_connection() as connection:
-            return await list_all_users(connection)
+            return await list_all_users(connection, page=page, limit=limit, search=search)
     except HTTPException:
         raise
     except asyncpg.PostgresError as exc:

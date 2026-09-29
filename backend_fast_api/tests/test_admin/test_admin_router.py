@@ -469,6 +469,60 @@ class TestUserManagement:
         assert resp.json()["total"] == 1
 
     @pytest.mark.asyncio
+    @patch("app.modules.admin.router.get_db_connection")
+    @patch("app.modules.admin.router.list_all_users")
+    async def test_list_users_passes_pagination_and_search(self, mock_list_users, mock_db, client):
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+        mock_list_users.return_value = {"users": [], "total": 0, "page": 3, "limit": 10}
+
+        resp = await client.get("/api/auth/admin/users", params={"page": 3, "search": "acme"})
+
+        assert resp.status_code == 200
+        mock_list_users.assert_awaited_once_with(mock_conn, page=3, limit=10, search="acme")
+
+    @pytest.mark.asyncio
+    async def test_list_users_rejects_invalid_page(self, client):
+        resp = await client.get("/api/auth/admin/users", params={"page": 0})
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_list_all_users_applies_search_offset_and_total(self):
+        from datetime import datetime
+        from app.modules.admin.service import list_all_users
+
+        conn = AsyncMock()
+        conn.fetchval.return_value = 23
+        conn.fetch.return_value = [{
+            "user_id": 7, "full_name": "Acme Owner", "email": "owner@acme.com",
+            "status": "Active", "organization_name": "Acme", "role_in_org": "Owner",
+            "is_admin": False, "created_at": datetime(2026, 1, 1),
+        }]
+
+        result = await list_all_users(conn, page=3, limit=10, search="  acme ")
+
+        count_sql, count_pattern = conn.fetchval.await_args.args
+        assert "ILIKE $1" in count_sql and count_pattern == "%acme%"
+        list_args = conn.fetch.await_args.args
+        assert "LIMIT $2 OFFSET $3" in list_args[0]
+        assert list_args[1:] == ("%acme%", 10, 20)
+        assert result.total == 23 and result.page == 3 and len(result.users) == 1
+
+    @pytest.mark.asyncio
+    async def test_list_all_users_without_search_has_no_filter(self):
+        from app.modules.admin.service import list_all_users
+
+        conn = AsyncMock()
+        conn.fetchval.return_value = 0
+        conn.fetch.return_value = []
+
+        result = await list_all_users(conn)
+
+        assert "WHERE" not in conn.fetchval.await_args.args[0]
+        assert conn.fetch.await_args.args[1:] == (10, 0)
+        assert result.total == 0 and result.users == []
+
+    @pytest.mark.asyncio
     async def test_list_users_returns_401_for_unauthenticated_caller(self, client):
         app.dependency_overrides.pop(get_current_admin, None)
         resp = await client.get("/api/auth/admin/users")

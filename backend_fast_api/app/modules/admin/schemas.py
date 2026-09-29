@@ -68,6 +68,8 @@ class AdminUserListItem(BaseModel):
 class AdminUserListResponse(BaseModel):
     users: list[AdminUserListItem]
     total: int
+    page: int = 1
+    limit: int = 10
 
 
 class PlatformStatsResponse(BaseModel):

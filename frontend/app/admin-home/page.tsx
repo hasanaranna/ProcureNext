@@ -34,6 +34,8 @@ interface PlatformStats {
 
 // Formats a number using the en-IN grouping (lakh/crore) convention used
 // elsewhere on this page for BDT amounts, e.g. 2416000 -> "24,16,000".
+const USERS_PER_PAGE = 10;
+
 function formatIndianGrouping(value: number): string {
   return new Intl.NumberFormat("en-IN").format(Math.round(value));
 }
@@ -96,6 +98,10 @@ export default function AdminHomePage() {
   const [users, setUsers] = useState<AdminUserListItem[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [userActionBusyId, setUserActionBusyId] = useState<number | null>(null);
+  const [userPage, setUserPage] = useState(1);
+  const [userTotal, setUserTotal] = useState(0);
+  const [userSearchInput, setUserSearchInput] = useState("");
+  const [userSearch, setUserSearch] = useState("");
 
   useEffect(() => {
     const adminUser = getAdminUser();
@@ -217,31 +223,50 @@ export default function AdminHomePage() {
       }
     };
     fetchStats();
-
-    fetchUsers();
   }, []);
 
   const stats = buildStatCards(platformStats);
 
-  const fetchUsers = async () => {
-    setLoadingUsers(true);
-    try {
-      const token = localStorage.getItem("admin_access_token") || localStorage.getItem("access_token");
-      const res = await fetch('/api/auth/admin/users', {
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setUsers(data.users || []);
+  // Debounce the search box; a new search always starts from the first page.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setUserPage(1);
+      setUserSearch(userSearchInput.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [userSearchInput]);
+
+  useEffect(() => {
+    let ignore = false;
+    const fetchUsers = async () => {
+      setLoadingUsers(true);
+      try {
+        const token = localStorage.getItem("admin_access_token") || localStorage.getItem("access_token");
+        const params = new URLSearchParams({ page: String(userPage), limit: String(USERS_PER_PAGE) });
+        if (userSearch) params.set("search", userSearch);
+        const res = await fetch(`/api/auth/admin/users?${params}`, {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        if (res.ok && !ignore) {
+          const data = await res.json();
+          setUsers(data.users || []);
+          setUserTotal(data.total || 0);
+        }
+      } catch (err) {
+        console.error("Failed to load users:", err);
+      } finally {
+        if (!ignore) setLoadingUsers(false);
       }
-    } catch (err) {
-      console.error("Failed to load users:", err);
-    } finally {
-      setLoadingUsers(false);
-    }
-  };
+    };
+    fetchUsers();
+    return () => {
+      ignore = true;
+    };
+  }, [userPage, userSearch]);
+
+  const userPageCount = Math.max(1, Math.ceil(userTotal / USERS_PER_PAGE));
 
   const handleUserStatusChange = async (user: AdminUserListItem, newStatus: "Active" | "Suspended" | "Banned") => {
     const verb = newStatus === "Active" ? "reactivate" : newStatus.toLowerCase();
@@ -716,9 +741,19 @@ export default function AdminHomePage() {
 
         {/* Manage Users */}
         <section className="bg-surface rounded border border-subtle overflow-hidden">
-          <div className="px-5 py-4 border-b border-subtle">
-            <h2 className="text-sm font-semibold text-content-primary">Manage Users</h2>
-            <p className="text-xs text-content-secondary mt-0.5">Suspend or ban an account that violates platform policy, or reactivate one.</p>
+          <div className="px-5 py-4 border-b border-subtle flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-content-primary">Manage Users</h2>
+              <p className="text-xs text-content-secondary mt-0.5">Suspend or ban an account that violates platform policy, or reactivate one.</p>
+            </div>
+            <input
+              type="search"
+              value={userSearchInput}
+              onChange={(e) => setUserSearchInput(e.target.value)}
+              placeholder="Search name, email or organization"
+              aria-label="Search users"
+              className="h-9 px-3 border border-subtle rounded bg-surface text-sm text-content-primary sm:w-72 focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+            />
           </div>
 
           <div className="overflow-x-auto">
@@ -732,7 +767,7 @@ export default function AdminHomePage() {
               </div>
             ) : users.length === 0 ? (
               <div className="py-10 text-center">
-                <p className="text-sm text-content-muted">No users found.</p>
+                <p className="text-sm text-content-muted">{userSearch ? `No users match "${userSearch}".` : "No users found."}</p>
               </div>
             ) : (
               <table className="w-full text-sm">
@@ -807,6 +842,31 @@ export default function AdminHomePage() {
                 </tbody>
               </table>
             )}
+          </div>
+
+          <div className="px-5 py-3 border-t border-subtle flex items-center justify-between text-xs text-content-secondary">
+            <span className="tabular-nums">
+              {userTotal === 0
+                ? "0 users"
+                : `Showing ${(userPage - 1) * USERS_PER_PAGE + 1}–${Math.min(userPage * USERS_PER_PAGE, userTotal)} of ${userTotal.toLocaleString()} users`}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setUserPage((p) => Math.max(1, p - 1))}
+                disabled={userPage <= 1 || loadingUsers}
+                className="px-3 py-1.5 rounded border border-subtle bg-app hover:bg-subtle disabled:opacity-40 cursor-pointer"
+              >
+                Previous
+              </button>
+              <span className="tabular-nums">Page {userPage} of {userPageCount}</span>
+              <button
+                onClick={() => setUserPage((p) => Math.min(userPageCount, p + 1))}
+                disabled={userPage >= userPageCount || loadingUsers}
+                className="px-3 py-1.5 rounded border border-subtle bg-app hover:bg-subtle disabled:opacity-40 cursor-pointer"
+              >
+                Next
+              </button>
+            </div>
           </div>
         </section>
 

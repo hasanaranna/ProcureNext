@@ -182,13 +182,33 @@ async def modify_user_status(
     return {"message": f"User status updated to {payload.new_status}"}
 
 
-async def list_all_users(connection: asyncpg.Connection) -> AdminUserListResponse:
+async def list_all_users(
+    connection: asyncpg.Connection,
+    page: int = 1,
+    limit: int = 10,
+    search: str | None = None,
+) -> AdminUserListResponse:
     """
-    List every platform user for the admin user-management view, along with
-    their org affiliation (if any) and whether they hold an admin role.
+    List platform users for the admin user-management view, newest first, along
+    with their org affiliation (if any) and whether they hold an admin role.
+    Paginated; `search` matches name, email or organization (case-insensitive).
     """
+    from_sql = """
+        FROM users u
+        LEFT JOIN organization_employees oe ON oe.user_id = u.user_id
+        LEFT JOIN organizations o ON o.organization_id = oe.organization_id
+        LEFT JOIN admins a ON a.user_id = u.user_id
+    """
+    where_sql = ""
+    params: list = []
+    if search and search.strip():
+        params.append(f"%{search.strip()}%")
+        where_sql = "WHERE (u.full_name ILIKE $1 OR u.email ILIKE $1 OR o.organization_name ILIKE $1)"
+
+    total = await connection.fetchval(f"SELECT COUNT(*) {from_sql} {where_sql}", *params)
+
     rows = await connection.fetch(
-        """
+        f"""
         SELECT
             u.user_id,
             u.full_name,
@@ -198,12 +218,14 @@ async def list_all_users(connection: asyncpg.Connection) -> AdminUserListRespons
             oe.role_in_org,
             (a.admin_id IS NOT NULL) AS is_admin,
             u.created_at
-        FROM users u
-        LEFT JOIN organization_employees oe ON oe.user_id = u.user_id
-        LEFT JOIN organizations o ON o.organization_id = oe.organization_id
-        LEFT JOIN admins a ON a.user_id = u.user_id
-        ORDER BY u.created_at DESC
-        """
+        {from_sql}
+        {where_sql}
+        ORDER BY u.created_at DESC, u.user_id DESC
+        LIMIT ${len(params) + 1} OFFSET ${len(params) + 2}
+        """,
+        *params,
+        limit,
+        (page - 1) * limit,
     )
     users = [
         AdminUserListItem(
@@ -218,7 +240,7 @@ async def list_all_users(connection: asyncpg.Connection) -> AdminUserListRespons
         )
         for row in rows
     ]
-    return AdminUserListResponse(users=users, total=len(users))
+    return AdminUserListResponse(users=users, total=total or 0, page=page, limit=limit)
 
 
 async def verify_organization(
