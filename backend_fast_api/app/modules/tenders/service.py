@@ -681,7 +681,7 @@ async def get_all_published_tenders(
     """
     Fetch all published tenders (for seller browsing).
     If enlisted_only=True and vendor_org_id is provided, only return tenders published
-    by buyers that the vendor organization has enlisted (via enlisted_vendors table).
+    by buyers that have enlisted the vendor organization (via enlisted_vendors table).
     """
     if enlisted_only and vendor_org_id is not None:
         query = """
@@ -695,7 +695,7 @@ async def get_all_published_tenders(
                 t.created_at
             FROM tenders t
             JOIN organizations o ON t.buyer_id = o.organization_id
-            JOIN enlisted_vendors ev ON ev.enlisted_org_id = t.buyer_id AND ev.org_id = $1
+            JOIN enlisted_vendors ev ON ev.org_id = t.buyer_id AND ev.enlisted_org_id = $1
             WHERE t.status = 'Published'
         """
         args = [vendor_org_id]

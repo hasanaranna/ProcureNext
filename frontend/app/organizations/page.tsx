@@ -86,8 +86,8 @@ export default function OrganizationsDirectoryPage() {
 
       setNotification({
         message: isCurrentlyEnlisted
-          ? `Removed ${org.organization_name} from your enlisted list.`
-          : `Enlisted ${org.organization_name} successfully!`,
+          ? `Removed ${org.organization_name} from your enlisted sellers.`
+          : `Enlisted ${org.organization_name} as a seller.`,
         type: 'success',
       });
       setTimeout(() => setNotification(null), 3500);
@@ -153,7 +153,7 @@ export default function OrganizationsDirectoryPage() {
               </span>
             </h1>
             <p className="text-content-secondary mt-2 text-sm md:text-base">
-              Find verified buyers and suppliers, view official credentials, and add them to your enlisted network.
+              Find verified organizations, view official credentials, and enlist trusted sellers for your enlisted-only tenders.
             </p>
           </div>
 
@@ -186,7 +186,7 @@ export default function OrganizationsDirectoryPage() {
           </div>
 
           <div className="bg-surface rounded border border-subtle p-5">
-            <p className="text-content-secondary text-xs font-medium uppercase tracking-wider">In Your Enlisted Network</p>
+            <p className="text-content-secondary text-xs font-medium uppercase tracking-wider">Your Enlisted Sellers</p>
             <div className="flex items-center justify-between mt-2">
               <p className="text-3xl font-semibold text-content-primary tabular-nums">{totalEnlisted}</p>
               <div className="w-10 h-10 bg-brand-blue rounded flex items-center justify-center text-white">
@@ -369,7 +369,7 @@ export default function OrganizationsDirectoryPage() {
                             ? 'bg-status-approved-bg hover:bg-status-rejected-bg text-status-approved-text hover:text-status-rejected-text border border-subtle'
                             : 'bg-brand-navy hover:bg-slate-900 text-white'
                         }`}
-                        title={org.is_enlisted ? 'Click to un-enlist' : 'Click to enlist'}
+                        title={org.is_enlisted ? 'Remove from your enlisted sellers' : 'Enlist as a seller for your enlisted-only tenders'}
                       >
                         {enlistingId === org.organization_id ? (
                           <svg className="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none">
@@ -384,7 +384,7 @@ export default function OrganizationsDirectoryPage() {
                         ) : (
                           <>
                             <span>+</span>
-                            <span>Enlist</span>
+                            <span>Enlist seller</span>
                           </>
                         )}
                       </button>
