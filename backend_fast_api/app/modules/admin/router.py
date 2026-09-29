@@ -62,8 +62,8 @@ from app.modules.auth.schemas import LoginRequest, AdminTokenResponse
 from app.modules.auth.service import authenticate_admin
 from app.modules.auth.dependencies import get_current_admin
 from typing import List
-from app.modules.admin.schemas import PendingMasterAccountsResponse, VerifyOrgRequest
-from app.modules.admin.service import get_pending_master_accounts, verify_organization
+from app.modules.admin.schemas import PendingMasterAccountsResponse, VerifyOrgRequest, PlatformStatsResponse
+from app.modules.admin.service import get_pending_master_accounts, verify_organization, get_platform_stats
 from app.modules.payments.schemas import (
     PricingConfigResponse,
     UpdatePricingRequest,
@@ -142,6 +142,24 @@ async def verify_organization_endpoint(
     try:
         async with get_db_connection() as connection:
             return await verify_organization(connection, organization_id, payload)
+    except HTTPException:
+        raise
+    except asyncpg.PostgresError as exc:
+        print(f"[DB ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Database Error: {str(exc)}") from exc
+    except Exception as exc:
+        print(f"[SYSTEM ERROR] {exc}", flush=True)
+        raise HTTPException(status_code=500, detail=f"System Error: {str(exc)}") from exc
+
+
+@router.get("/admin/stats", response_model=PlatformStatsResponse)
+async def get_admin_stats(admin: dict = Depends(get_current_admin)):
+    """
+    Quick platform-wide statistics summary for the admin dashboard overview cards.
+    """
+    try:
+        async with get_db_connection() as connection:
+            return await get_platform_stats(connection)
     except HTTPException:
         raise
     except asyncpg.PostgresError as exc:

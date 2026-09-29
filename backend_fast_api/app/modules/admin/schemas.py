@@ -52,3 +52,15 @@ class PendingMasterAccount(BaseModel):
 class PendingMasterAccountsResponse(BaseModel):
     accounts: list[PendingMasterAccount]
     total: int
+
+
+class PlatformStatsResponse(BaseModel):
+    total_tokens_sold: int
+    tokens_sold_this_month: int
+    approved_owners: int
+    approved_owners_this_month: int
+    pending_approvals: int
+    active_tenders: int
+    total_bids: int
+    bids_this_month: int
+    total_revenue_bdt: float

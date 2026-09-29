@@ -30,12 +30,16 @@
 
 
 # ============================================================
+from datetime import datetime, timezone
+
 import pytest
 from unittest.mock import AsyncMock, patch
 from contextlib import asynccontextmanager
 from fastapi import HTTPException
+from jose import jwt
 
 from app.main import app
+from app.core.security import SECRET_KEY, ALGORITHM
 from app.modules.auth.dependencies import get_current_admin
 
 
@@ -355,3 +359,78 @@ class TestNonAdminRejected:
     async def test_pending_accounts_returns_401_for_unauthenticated_caller(self, client):
         resp = await client.get("/api/auth/admin/pending-accounts")
         assert resp.status_code == 401
+
+
+# ===========================================================================
+# GET /api/auth/admin/stats — get_platform_stats
+# ===========================================================================
+
+class TestPlatformStats:
+    @pytest.mark.asyncio
+    @patch("app.modules.admin.router.get_db_connection")
+    @patch("app.modules.admin.router.get_platform_stats")
+    async def test_get_stats_returns_200_with_metrics(self, mock_stats, mock_db, client):
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+        mock_stats.return_value = {
+            "total_tokens_sold": 48320,
+            "tokens_sold_this_month": 1240,
+            "approved_owners": 312,
+            "approved_owners_this_month": 14,
+            "pending_approvals": 5,
+            "active_tenders": 87,
+            "total_bids": 2641,
+            "bids_this_month": 318,
+            "total_revenue_bdt": 2416000.0,
+        }
+
+        resp = await client.get("/api/auth/admin/stats")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["active_tenders"] == 87
+        assert body["total_revenue_bdt"] == 2416000.0
+        mock_stats.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_get_stats_returns_401_for_unauthenticated_caller(self, client):
+        app.dependency_overrides.pop(get_current_admin, None)
+        resp = await client.get("/api/auth/admin/stats")
+        assert resp.status_code == 401
+
+
+# ===========================================================================
+# get_current_admin — regression test for stale/forged admin_role JWT claim
+# ===========================================================================
+# A JWT can keep a truthy `admin_role` claim from before a user's admin
+# privileges were revoked in the `admins` table. Admin status must be
+# re-verified against the DB on every request rather than trusted from the
+# token alone, otherwise a revoked admin (or a token with a forged claim)
+# would still pass as an admin until the token expires.
+
+class TestAdminRoleClaimNotTrustedOverDb:
+    @pytest.mark.asyncio
+    @patch("app.modules.auth.dependencies.get_db_connection")
+    async def test_admin_role_claim_without_db_row_is_rejected(self, mock_db, client):
+        app.dependency_overrides.pop(get_current_admin, None)
+
+        mock_conn = AsyncMock()
+        mock_db.side_effect = _mock_db_ctx(mock_conn)
+        mock_conn.fetchrow.return_value = None  # no matching row in `admins`
+
+        token = jwt.encode(
+            {
+                "sub": "99",
+                "admin_role": "SuperAdmin",  # stale/forged claim
+                "exp": datetime(2099, 1, 1, tzinfo=timezone.utc),
+            },
+            SECRET_KEY,
+            algorithm=ALGORITHM,
+        )
+
+        resp = await client.get(
+            "/api/auth/admin/pending-accounts",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert resp.status_code == 403

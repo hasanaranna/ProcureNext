@@ -27,6 +27,7 @@
 # ============================================================
 
 import logging
+import os
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 load_dotenv()
@@ -42,6 +43,7 @@ from app.core.db import (
 )
 from app.core.logging_config import setup_logging
 from app.middleware.audit_middleware import AuditMiddleware
+from app.middleware.rate_limiter import RateLimiterMiddleware
 from app.middleware.request_logging import RequestLoggingMiddleware
 from app.modules.organizations.router import router as organizations_router
 from app.modules.auth.router import router as auth_router
@@ -89,15 +91,32 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# CORS_ORIGINS is a comma-separated list of allowed frontend origins, e.g.
+# "http://13.212.216.26,http://localhost:3000". allow_origins=["*"] combined
+# with allow_credentials=True is disallowed by the CORS spec for browsers,
+# but Starlette silently works around it by reflecting the request's Origin
+# header back, which effectively allows any site to make credentialed
+# requests to this API. Restrict to an explicit allow-list instead.
+_default_origins = "http://localhost:3000,http://127.0.0.1:3000"
+_frontend_url = os.getenv("FRONTEND_URL")
+if _frontend_url:
+    _default_origins += f",{_frontend_url}"
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", _default_origins).split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
 	CORSMiddleware,
-	allow_origins=["*"],
+	allow_origins=CORS_ORIGINS,
 	allow_credentials=True,
 	allow_methods=["*"],
 	allow_headers=["*"],
 )
 app.add_middleware(AuditMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(RateLimiterMiddleware)
 
 app.include_router(organizations_router)
 app.include_router(auth_router)

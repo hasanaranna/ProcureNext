@@ -61,7 +61,6 @@ async def get_current_admin(token: str = Depends(oauth2_scheme)) -> dict:
         if user_id_str is None:
             raise credentials_exception
         user_id = int(user_id_str)
-        admin_role = payload.get("admin_role")
     except JWTError:
         raise credentials_exception
 
@@ -76,10 +75,14 @@ async def get_current_admin(token: str = Depends(oauth2_scheme)) -> dict:
             """,
             user_id,
         )
-        if admin_row is None and not admin_role:
+        # The `admin_role` claim embedded in the JWT is not trusted on its own:
+        # admin status must always be re-verified against the current `admins`
+        # table so that revoking a user's admin privileges takes effect
+        # immediately, instead of staying valid until their existing token expires.
+        if admin_row is None:
             raise HTTPException(status_code=403, detail="Platform administrator privileges required.")
 
-        return dict(admin_row.items()) if admin_row else {"user_id": user_id, "admin_role": admin_role}
+        return dict(admin_row.items())
 
 
 # Alias for compatibility with audit module and other services

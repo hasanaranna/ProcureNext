@@ -4,7 +4,12 @@ from datetime import datetime, timedelta, timezone
 import bcrypt
 from jose import jwt
 
-SECRET_KEY = os.getenv("SECRET_KEY", "your-super-secret-development-key")
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "SECRET_KEY environment variable is not set. Refusing to start with a "
+        "hardcoded default, since that would let anyone forge auth tokens."
+    )
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 REFRESH_TOKEN_EXPIRE_DAYS = 7

@@ -22,6 +22,7 @@ from app.modules.admin.schemas import (
     PendingDocuments,
     ModifyUserStatusRequest,
     VerifyOrgRequest,
+    PlatformStatsResponse,
 )
 from app.services.supabase_storage import generate_signed_url_optional, delete_files
 
@@ -309,3 +310,41 @@ async def verify_organization(
                     )
 
             return {"message": f"Organization {organization_id} has been {payload.verification_status}."}
+
+
+async def get_platform_stats(connection: asyncpg.Connection) -> PlatformStatsResponse:
+    """
+    Quick platform-wide statistics summary for the admin dashboard.
+    All figures are computed live from current data — no cached/mock values.
+    """
+    row = await connection.fetchrow(
+        """
+        SELECT
+            (SELECT COALESCE(SUM(amount), 0) FROM credit_transactions WHERE transaction_type = 'Purchase') AS total_tokens_sold,
+            (SELECT COALESCE(SUM(amount), 0) FROM credit_transactions
+                WHERE transaction_type = 'Purchase' AND created_at >= date_trunc('month', now())) AS tokens_sold_this_month,
+            (SELECT COUNT(*) FROM users u JOIN organization_employees oe ON u.user_id = oe.user_id
+                WHERE oe.role_in_org = 'Owner' AND u.status = 'Active') AS approved_owners,
+            (SELECT COUNT(*) FROM users u JOIN organization_employees oe ON u.user_id = oe.user_id
+                WHERE oe.role_in_org = 'Owner' AND u.status = 'Active'
+                AND u.created_at >= date_trunc('month', now())) AS approved_owners_this_month,
+            (SELECT COUNT(*) FROM users u JOIN organization_employees oe ON u.user_id = oe.user_id
+                WHERE oe.role_in_org = 'Owner' AND u.status = 'Pending') AS pending_approvals,
+            (SELECT COUNT(*) FROM tenders WHERE status = 'Published') AS active_tenders,
+            (SELECT COUNT(*) FROM bids) AS total_bids,
+            (SELECT COUNT(*) FROM bids WHERE created_at >= date_trunc('month', now())) AS bids_this_month,
+            (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'Completed') AS total_revenue_bdt
+        """
+    )
+
+    return PlatformStatsResponse(
+        total_tokens_sold=row["total_tokens_sold"],
+        tokens_sold_this_month=row["tokens_sold_this_month"],
+        approved_owners=row["approved_owners"],
+        approved_owners_this_month=row["approved_owners_this_month"],
+        pending_approvals=row["pending_approvals"],
+        active_tenders=row["active_tenders"],
+        total_bids=row["total_bids"],
+        bids_this_month=row["bids_this_month"],
+        total_revenue_bdt=float(row["total_revenue_bdt"]),
+    )

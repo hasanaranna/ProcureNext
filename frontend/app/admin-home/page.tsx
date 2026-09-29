@@ -8,20 +8,65 @@ import PendingRequestDetailModal, {
 import { getAdminUser, clearAdminSession } from "@/lib/auth";
 
 
-const stats = [
-  { label: "Total Tokens Sold", value: "48,320", sub: "+1,240 this month",
-    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) },
-  { label: "Approved Owners", value: "312", sub: "+14 this month",
-    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) },
-  { label: "Pending Approvals", value: "5", sub: "Awaiting review",
-    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>) },
-  { label: "Active Tenders", value: "87", sub: "Across all companies",
-    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>) },
-  { label: "Total Bids Placed", value: "2,641", sub: "+318 this month",
-    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" /></svg>) },
-  { label: "Revenue (BDT)", value: "৳ 24,16,000", sub: "From token purchases",
-    icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>) },
-];
+interface PlatformStats {
+  total_tokens_sold: number;
+  tokens_sold_this_month: number;
+  approved_owners: number;
+  approved_owners_this_month: number;
+  pending_approvals: number;
+  active_tenders: number;
+  total_bids: number;
+  bids_this_month: number;
+  total_revenue_bdt: number;
+}
+
+// Formats a number using the en-IN grouping (lakh/crore) convention used
+// elsewhere on this page for BDT amounts, e.g. 2416000 -> "24,16,000".
+function formatIndianGrouping(value: number): string {
+  return new Intl.NumberFormat("en-IN").format(Math.round(value));
+}
+
+function buildStatCards(stats: PlatformStats | null) {
+  const na = "—";
+  return [
+    {
+      label: "Total Tokens Sold",
+      value: stats ? formatIndianGrouping(stats.total_tokens_sold) : na,
+      sub: stats ? `+${formatIndianGrouping(stats.tokens_sold_this_month)} this month` : "Loading…",
+      icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>),
+    },
+    {
+      label: "Approved Owners",
+      value: stats ? formatIndianGrouping(stats.approved_owners) : na,
+      sub: stats ? `+${formatIndianGrouping(stats.approved_owners_this_month)} this month` : "Loading…",
+      icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>),
+    },
+    {
+      label: "Pending Approvals",
+      value: stats ? formatIndianGrouping(stats.pending_approvals) : na,
+      sub: "Awaiting review",
+      icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>),
+    },
+    {
+      label: "Active Tenders",
+      value: stats ? formatIndianGrouping(stats.active_tenders) : na,
+      sub: "Across all companies",
+      icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>),
+    },
+    {
+      label: "Total Bids Placed",
+      value: stats ? formatIndianGrouping(stats.total_bids) : na,
+      sub: stats ? `+${formatIndianGrouping(stats.bids_this_month)} this month` : "Loading…",
+      icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" /></svg>),
+    },
+    {
+      label: "Revenue (BDT)",
+      value: stats ? `৳ ${formatIndianGrouping(stats.total_revenue_bdt)}` : na,
+      sub: "From token purchases",
+      icon: (<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>),
+    },
+  ];
+}
 
 export default function AdminHomePage() {
   const router = useRouter();
@@ -34,6 +79,7 @@ export default function AdminHomePage() {
   const [selectedRegistration, setSelectedRegistration] =
     useState<RegistrationDetail | null>(null);
   const [adminName, setAdminName] = useState<string>("System Administrator");
+  const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
 
   useEffect(() => {
     const adminUser = getAdminUser();
@@ -134,7 +180,27 @@ export default function AdminHomePage() {
       }
     };
     fetchPackages();
+
+    const fetchStats = async () => {
+      try {
+        const token = localStorage.getItem("admin_access_token") || localStorage.getItem("access_token");
+        const res = await fetch('/api/auth/admin/stats', {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setPlatformStats(data);
+        }
+      } catch (err) {
+        console.error("Failed to load platform stats:", err);
+      }
+    };
+    fetchStats();
   }, []);
+
+  const stats = buildStatCards(platformStats);
 
   const handleLogout = async () => {
     try {
